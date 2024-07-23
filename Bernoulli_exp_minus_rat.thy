@@ -1,18 +1,12 @@
-theory Bernoulli_2nat
+theory Bernoulli_exp_minus_rat
   imports "Probabilistic_While.While_SPMF"
           "HOL-Probability.Probability"
 begin
 
-value "bernoulli_pmf (of_rat 1/3)"
-value "bernoulli_pmf (1/3)"
-
-value "Fract 1 (2*(1::nat))"
-
 definition bernoulli_spmf :: "real \<Rightarrow> bool spmf" where
- "bernoulli_spmf p = do{
-                      a \<leftarrow> bernoulli_pmf p;
-                      return_spmf a
-                      }"
+ "bernoulli_spmf p = spmf_of_pmf (bernoulli_pmf p)"
+
+
 
 
 context notes [[function_internals]] begin
@@ -34,10 +28,6 @@ definition  bernoulli_exp_minus_rat_from_0_to_1 :: "nat \<Rightarrow> nat \<Righ
         if odd k then return_spmf True else return_spmf False
     }
   "
-value "(4::nat)/(3::nat)"
-value "4/3::real"
-value "floor (4/3::real)"
-value "(3::nat) mod (2::nat)"
 
 context notes [[function_internals]] begin
 partial_function (spmf) loop2 :: "nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bool spmf" where
@@ -60,12 +50,6 @@ definition bernoulli_exp_minus_rat :: "nat \<Rightarrow> nat  \<Rightarrow> bool
   )
 "
 
-term "spmf (bernoulli_exp_rat (Fract 1 3)) True"
-value "spmf (bernoulli_exp_rat (Fract 1 3)) True"
-
-
-(*we need define fixpoint as part of  while loop*)
-
 thm "loop1.fixp_induct"
 
 lemma loop1_fixp_induct [case_names adm bottom step]:
@@ -87,48 +71,17 @@ lemma loop2_fixp_induct [case_names adm bottom step]:
   shows "P loop2"
   using assms by (rule loop2.fixp_induct)
 
-term "fact"
-term "power 2 3"
-value "(power 2 3):: nat"
-value "(Fract 3 2) / 2"
-value " (1::nat)"
-value "real_of_rat (Fract 3 2)"
-term "spmf (loop1 1 2 1) 3"
-value "1- (2/3::rat)"
-value "(1::nat)/(2::nat)"
-value "(1::nat)/((2::nat)*(3::nat))"
-term "(1::nat)/(2::nat)"
-
 context
   fixes n :: "nat"
   and d :: "nat"
   and body :: "bool \<times> nat \<Rightarrow> (bool \<times> nat) spmf"
-defines [simp]: "body \<equiv> (\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (b,k'+1) else (\<not>b,k'))) (bernoulli_spmf  (n/(d*k'))))"
-(*
-defines [simp]: "body \<equiv> (\<lambda>(b,k'::nat). do {
-                                             a \<leftarrow> bernoulli_pmf (n/(d*k')); 
-                                             if a then  return_spmf (b,k'+1) else return_spmf (\<not>b,k'::nat) 
-                                            })"
-*)
+  assumes cond1:"d \<ge> 1" and cond2:"n \<le> d"
+defines [simp]: "body \<equiv> (\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (True,k'+1) else (False,k'))) (bernoulli_spmf  (n/(d*k'))))"
+
 begin
 interpretation loop_spmf fst body 
-  rewrites "body \<equiv>  (\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (b,k'+1) else (\<not>b,k'))) (bernoulli_spmf  (n/(d*k'))))" 
+  rewrites "body \<equiv>  (\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (True,k'+1) else (False,k'))) (bernoulli_spmf  (n/(d*k'))))" 
   by(fact body_def)
-(*
-  rewrites "body \<equiv>  (\<lambda>(b,k'::nat). do {
-                                             a \<leftarrow> bernoulli_pmf (n/(d*k')); 
-                                             if a then  return_spmf (b,k'+1) else return_spmf (\<not>b,k'::nat) 
-                                            })" 
-*)
-
-thm spmf.map_comp
-thm o_def
-thm bind_spmf_cong_simp
-thm ord_spmf_bind_reflI
-term "while"
-thm "while.simps"
-find_theorems name: "loop_spmf.while"
-thm ""
 
 lemma loop1_conv_while:
  "loop1 n d 1 = map_spmf snd (while (True, 1))"
@@ -167,32 +120,83 @@ proof -
   from this[of 1] show ?thesis by(simp cong:map_spmf_cong)
 qed
 
+thm "spmf.map_comp"
+thm "spmf_map"
+thm "pmf_bernoulli_False"
+thm "spmf_conv_measure_spmf"
+thm "bind_return_spmf"
+thm "order.trans"
+value "fact 0::nat"
+
 lemma lossless_loop1 [simp]: "lossless_spmf (loop1 n d 1)"
+  sorry
+(*
 proof -
-  let ?body = " (\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (b,k'+1) else (\<not>b,k'))) (bernoulli_spmf  (n/(d*k'))))"
-  have "lossless_spmf (while (True, 1))"
-  proof(rule termination_0_1_immediate_invar)
-  
-  
+  let ?body = " (\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (True,k'+1) else (False,k'))) (bernoulli_spmf  (n/(d*k'))))"
+  have loop1:"lossless_spmf (while (True, k))"
+    if k1: "n < d * k" and k2: "1 \<le> k"
+    for k
+  proof(rule termination_0_1_immediate; clarify?)
+    have condi1:"0 \<le> real n / (real d * real k)" using k1 k2 by auto
+    have condi2:"real n / (real d * real k) < 1" using k1 k2 
+      by (smt (verit) divide_less_eq_1 less_imp_of_nat_less of_nat_less_0_iff of_nat_mult)
+    show goal2: "0 < 1-(n/d)" using condi2 by 
+    have "1-(n/d)\<le>  spmf (map_spmf fst (map_spmf (\<lambda>b'. (if b' then (True,k+1) else (False,k))) (bernoulli_spmf  (n/(d*k))))) False" 
+    proof -
+      have eq1: "spmf (map_spmf fst (map_spmf (\<lambda>b'. (if b' then (True,k+1) else (False,k))) (bernoulli_spmf  (n/(d*k))))) False = spmf (map_spmf fst (?body (True,k))) False"  by simp
+      have leq4:"1-(n/d) \<le> spmf (map_spmf fst (map_spmf (\<lambda>b'. (if b' then (True,k+1) else (False,k))) (bernoulli_spmf  (n/(d*k))))) False" using cond1 cond2
+        apply(simp add: spmf.map_comp)
+        apply(simp add: o_def)
+        apply(simp add: bernoulli_spmf_def)
+        done
+      show ?thesis using eq1 leq4 by auto
+*)
+
+lemma spmf_loop1:
+  assumes asm1:"1\<le>d" and asm2:"n\<le> d" and asm3:"1\<le>m"
+  shows "spmf (loop1 n d 1) m = (n/d)^(m-1)/(frac (m-1)) - (n/d)^m/(frac (m))" (is "?lhs m = ?rhs m")
+  sorry
+
+lemma spmf_bernoulli_exp_minus_rat_from_0_to_1_True:
+  assumes "1\<le>d" "n \<le> d"
+  shows "spmf (bernoulli_exp_minus_rat_from_0_to_1 n d) True = exp(-n/d) "
+  sorry
+
+lemma spmf_bernoulli_exp_minus_rat_from_0_to_1_False:
+  assumes "1\<le>d" "n\<le>d"
+  shows "spmf (bernoulli_exp_minus_rat_from_0_to_1 n d) True =  1 - exp(-n/d)"
+  sorry
+
+lemma spmf_loop2_True: 
+  assumes "1\<le>d" "d \<le> n"
+  shows "spmf (loop2 n d 1) True = exp(-floor(n/d))"
+  sorry
+lemma spmf_loop2_False:
+  assumes "1\<le>d" "d\<le>n"
+  shows "spmf (loop2 n d 1) False = 1 - exp(-floor(n/d))"
+  sorry
+
+lemma spmf_bernoulli_exp_minus_rat_True:
+  assumes "1\<le>d"
+  shows "spmf (bernoulli_exp_minus_rat n d) True = exp(-n/d)"
+  apply(simp add: bernoulli_exp_minus_rat_def)
+proof 
+  show "(n \<le> d \<longrightarrow> spmf (bernoulli_exp_minus_rat_from_0_to_1 n d) True = exp (- (real n / real d)))" using assms
+    by(simp add: spmf_bernoulli_exp_minus_rat_from_0_to_1_True)
+  show "\<not> n \<le> d \<longrightarrow> spmf (loop2 n d (Suc 0) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_rat_from_0_to_1 (n mod d) d else return_spmf b)) True = exp (- (real n / real d))" using assms
+    sorry
 qed
+
+lemma spmf_bernoulli_exp_minus_rat_False:
+  assumes "1\<le>d"
+  shows "spmf (bernoulli_exp_minus_rat n d) False = 1-exp(n/d)"
+  sorry
+
+
 
 end
 
-(*
-lemma lossless_geometric [simp]: "lossless_spmf (geometric_spmf p) \<longleftrightarrow> p > 0"
-proof(cases "0 < p \<and> p < 1")
-  case True
-  let ?body = "\<lambda>(b, x :: nat). map_spmf (\<lambda>b'. (\<not> b', x + (if b' then 0 else 1))) (bernoulli p)"
-  have "lossless_spmf (while (True, 0))"
-  proof(rule termination_0_1_immediate)
-    have "{x. x} = {True}" by auto
-    then show "p \<le> spmf (map_spmf fst (?body s)) False" for s :: "bool \<times> nat" using True
-      by(cases s)(simp add: spmf.map_comp o_def spmf_map vimage_def spmf_conv_measure_spmf[symmetric])
-    show "0 < p" using True by simp
-  qed(clarsimp)
-  with True show ?thesis by(simp add: geometric_spmf_conv_while)
-qed(auto simp add: spmf_geometric_nonpos spmf_geometric_ge_1)
-*)
+
 
 
 end
