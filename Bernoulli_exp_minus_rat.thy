@@ -119,14 +119,7 @@ proof -
   from this[of 1] show ?thesis by(simp cong:map_spmf_cong)
 qed
 
-thm "spmf.map_comp"
-thm "spmf_map"
-thm "pmf_bernoulli_False"
-thm "spmf_conv_measure_spmf"
-thm "bind_return_spmf"
-thm "order.trans"
-value "fact 0::nat"
-term "lossless_spmf"
+end
 
 lemma lossless_loop1 [simp]: "lossless_spmf (loop1 n d 1)"
   sorry
@@ -194,14 +187,33 @@ lemma lossless_bernoulli_exp_minus_rat_from_0_to_1 [simp]:
   
 
 lemma spmf_bernoulli_exp_minus_rat_from_0_to_1_True[simp]:
-  assumes "1\<le>d" "n \<le> d"
+  assumes  "n \<le> d"
   shows "spmf (bernoulli_exp_minus_rat_from_0_to_1 n d) True = exp(-n/d) "
   sorry
 
 lemma spmf_bernoulli_exp_minus_rat_from_0_to_1_False[simp]:
-  assumes "1\<le>d" "n\<le>d"
+  assumes  "n\<le>d"
   shows "spmf (bernoulli_exp_minus_rat_from_0_to_1 n d) False =  1 - exp(-n/d)" 
   using assms by(simp add:spmf_False_conv_True)
+
+context
+  fixes n :: "nat"
+  and d :: "nat"
+  and body :: "bool \<Rightarrow> bool spmf"
+  assumes cond1:"d \<ge> 1" and cond2:"n \<le> d"
+defines [simp]: "body \<equiv> (\<lambda>b. map_spmf (\<lambda>b'. (if b' then True else False)) (bernoulli_exp_minus_rat_from_0_to_1 1 1))"
+
+begin
+interpretation loop_spmf id body 
+  rewrites "body \<equiv>  (\<lambda>b. map_spmf (\<lambda>b'. (if b' then True else False)) (bernoulli_exp_minus_rat_from_0_to_1 1 1))"
+  by(fact body_def)
+
+
+lemma loop2_conv_iter:
+  shows "loop2 n d 1 = iter (nat (floor (n/d))) True"
+  sorry
+
+end
 
 lemma lossless_loop2 [simp]:
   shows "lossless_spmf (loop2 n d 1)"
@@ -210,37 +222,30 @@ lemma lossless_loop2 [simp]:
 thm "spmf_False_conv_True"
 
 lemma spmf_loop2_True [simp]: 
-  assumes "1\<le>d" "d \<le> n"
+  assumes "1\<le>d" "d < n"
   shows "spmf (loop2 n d 1) True = exp(-floor(n/d))"
   sorry
 lemma spmf_loop2_False [simp]:
-  assumes "1\<le>d" "d\<le>n"
+  assumes "1\<le>d" "d<n"
   shows "spmf (loop2 n d 1) False = 1 - exp(-floor(n/d))"
   by (metis One_nat_def lossless_loop2 of_int_minus spmf_False_conv_True spmf_loop2_True)
 
 lemma lossless_bernoulli_exp_minus_rat[simp]:
   shows "lossless_spmf (bernoulli_exp_minus_rat n d)"
+  using lossless_loop2 by(simp add:bernoulli_exp_minus_rat_def)
 
 
-lemma spmf_bernoulli_exp_minus_rat_True:
-  assumes "1\<le>d"
+lemma spmf_bernoulli_exp_minus_rat_True[simp]:
   shows "spmf (bernoulli_exp_minus_rat n d) True = exp(-n/d)"
   apply(simp add: bernoulli_exp_minus_rat_def)
-proof 
-  show "(n \<le> d \<longrightarrow> spmf (bernoulli_exp_minus_rat_from_0_to_1 n d) True = exp (- (real n / real d)))" using assms
-    by(simp add: spmf_bernoulli_exp_minus_rat_from_0_to_1_True)
-  show "\<not> n \<le> d \<longrightarrow> spmf (loop2 n d (Suc 0) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_rat_from_0_to_1 (n mod d) d else return_spmf b)) True = exp (- (real n / real d))" using assms
-    sorry
-qed
-
-lemma spmf_bernoulli_exp_minus_rat_False:
-  assumes "1\<le>d"
-  shows "spmf (bernoulli_exp_minus_rat n d) False = 1-exp(n/d)"
   sorry
 
+lemma spmf_bernoulli_exp_minus_rat_False[simp]:
+  shows "spmf (bernoulli_exp_minus_rat n d) False = 1-exp(-n/d)"
+  by(simp add:spmf_False_conv_True)
 
 
-end
+
 
 
 
