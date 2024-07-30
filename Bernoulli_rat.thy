@@ -4,14 +4,65 @@ theory Bernoulli_rat
           "Probabilistic_While.Fast_Dice_Roll"
 begin
 
-definition bernoulli_rat :: "nat \<Rightarrow> nat \<Rightarrow> bool spmf" where
-"bernoulli_rat n d = do {
-                      x \<leftarrow> fast_uniform d;
-                      if x < n then return_spmf True else return_spmf False
-}"
 
+
+definition bernoulli_rat :: "nat \<Rightarrow> nat \<Rightarrow> bool spmf" where
+"bernoulli_rat n d = 
+  (if d=0 then return_spmf False
+   else do {
+            x \<leftarrow> fast_uniform d;
+            return_spmf (x<n)
+})"
+
+find_theorems "bind_spmf _ return_spmf  "
+thm "bind_return_spmf"
+thm "spmf_of_set_def"
+
+lemma nat_set_finite[simp]:
+  fixes d::nat
+  assumes "d>0"
+  shows "pmf (spmf_of_set {0..<d}) None = 0"
+proof -
+  have "finite {0..<d}" by simp
+  show ?thesis by (simp add: assms)
+qed
+
+lemma spmf_of_set_d:
+  fixes d::nat
+  assumes"0 < d"
+shows  "spmf_of_set {..<d} = spmf_of_pmf (pmf_of_set {..<d})"
+proof -
+  have "{..<d}\<noteq>{}" using assms by auto
+  then show ?thesis by simp
+qed
+
+lemma finite_nat_set[simp]:
+  fixes d::nat
+  assumes "0<d"
+  shows "finite {..<d}" by simp
+
+lemma
+  fixes d::nat
+  assumes "0<d"
+  shows "finite {..<d}" by simp
+
+thm "spmf_of_set"
 lemma pmf_bernoulli_rat_None: "pmf (bernoulli_rat n d) None = 0"
-  sorry
+proof (cases "d=0")
+  case True 
+  then show ?thesis by(simp add: bernoulli_rat_def)
+next
+  case False 
+  have 1:"finite{..<d}" by simp
+  have 2:"{..<d}\<noteq>{}" using False by auto
+  show ?thesis using False
+    apply(simp add: bernoulli_rat_def)
+    apply(simp add: fast_uniform_conv_uniform)
+    apply(simp add: spmf_of_set_d)
+    apply(simp add: pmf_bind_pmf_of_set)
+    sorry
+qed
+
 
 lemma lossless_bernoulli_rat [simp]: "lossless_spmf (bernoulli_rat n d)"
   by(simp add: lossless_iff_pmf_None pmf_bernoulli_rat_None)
@@ -28,29 +79,36 @@ lemma spmf_return_spmf_0:
   by (simp)
 
 find_theorems "\<Sum>_\<in>_. if _ then _ else _"
+find_theorems "\<Sum>_\<in>_.   indicat_real _ _"
 thm "sum.mono_neutral_left"
 thm "sum.delta"
 thm "sum.union_disjoint"
 thm "sum.If_cases"
 value "(real 1/real 0)"
 value "(real 0/ real 0)"
+find_theorems "indicat_real"
 
-lemma [simp]: assumes "n/d\<le>1" "d > 0"
-  shows bernoulli_rat_True: "spmf (bernoulli_rat n d) True = n/d" (is ?True)
-and bernoulli_rat_False: "spmf (bernoulli_rat n d) False = 1 -n/d" (is ?False)
-proof -
-  show true: "spmf (bernoulli_rat n d) True = n/d" using assms
+lemma [simp]: assumes "n/d\<le>1"
+  shows bernoulli_rat_True: "spmf (bernoulli_rat n d) True = n/d" 
+proof (cases "d=0")
+  case True
+  then show ?thesis by(simp add: bernoulli_rat_def)
+next
+  case False
+  then show ?thesis using assms
     apply(simp add: bernoulli_rat_def)
     apply(simp add: fast_uniform_conv_uniform)
     apply(simp add: spmf_bind)
     apply(simp add: integral_spmf_of_set)
-    apply(simp add: spmf_if_split)
-    apply(rewrite spmf_return_spmf_1)
-    apply(rewrite spmf_return_spmf_0)
-    apply(simp add: sum.If_cases)
-    by (metis card_Collect_less_nat inf.absorb_iff1 inf_commute lessThan_def lessThan_subset_iff)
-  show "spmf (bernoulli_rat n d) False = 1-n/d" using true
-    by (simp add: spmf_False_conv_True)
+    apply(simp add: indicator_def)
+    by (metis card_lessThan inf.absorb_iff2 lessThan_def lessThan_subset_iff)   
+qed
+
+lemma [simp]: assumes "n/d\<le>1"
+  shows bernoulli_rat_False: "spmf (bernoulli_rat n d) False = 1-n/d"
+proof -
+  show ?thesis using bernoulli_rat_True
+    by (simp add: assms spmf_False_conv_True)
 qed
 
 lemma bernoulli_rat_pos [simp]:
@@ -67,24 +125,30 @@ proof -
     using assms of_nat_0_less_iff by fastforce
 qed
 
-thm "spmf_eqI"
+lemma [simp]: assumes "1\<le> n/d"
+  shows "spmf (bernoulli_rat n d) False = 0"
+ by (simp add: assms spmf_False_conv_True)
 
 context begin interpretation pmf_as_function .
 lemma bernoulli_rat_eq_bernoulli_pmf:
 "bernoulli_rat n d = spmf_of_pmf (bernoulli_pmf (n/d))"
 proof -
-  have "\<And>i. spmf (bernoulli_rat n d) i = pmf (bernoulli_pmf (real n / real d)) i"
-  proof -
-    fix i
-    have " spmf (bernoulli_rat n d) i = pmf (bernoulli_pmf (real n / real d)) i"
-    proof (cases "n/d \<le> 1")
-      case True
-      then show ?thesis
-      proof (cases "i")
-        case True
-        then show ?thesis
-          apply(simp)
-
-  done
+  have true_eq:"spmf (bernoulli_rat n d) True = pmf (bernoulli_pmf (real n / real d)) True"
+  proof (cases "1\<le>n/d")
+    case True
+    then show ?thesis 
+      by (metis bernoulli_eq_bernoulli_pmf bernoulli_pos bernoulli_rat_pos spmf_return_spmf_1 spmf_spmf_of_pmf)
+  next
+    case False 
+    then show ?thesis by simp
+  qed
+  have false_eq:"spmf (bernoulli_rat n d) False = pmf (bernoulli_pmf (real n / real d)) False" using true_eq 
+    apply(simp add: spmf_False_conv_True pmf_False_conv_True)
+    done
+  have "\<And>i. spmf (bernoulli_rat n d) i = pmf (bernoulli_pmf (real n / real d)) i" using true_eq false_eq
+    by metis
+  then show ?thesis 
+    by (simp add: spmf_eqI)
+qed
 end
 end
