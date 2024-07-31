@@ -145,16 +145,23 @@ proof -
       show ?thesis using eq1 leq4 by auto
 *)
 
-thm "spmf_bind"
-thm "spmf_ub_tight"
-term "fact 1" 
-value "fact 0::nat"
-find_theorems "frac "
+lemma meeting:
+  shows "spmf.admissible (\<lambda>loop1. spmf (loop1 ((n, d), l)) m = 0)"
+  sorry
 
 lemma loop1_a [simp]:
-  assumes "l > m"
-  shows "spmf (loop1 n d l) m = 0"
-  sorry
+  shows "\<forall>l.  l>m \<longrightarrow> spmf (loop1 n d l) m = 0"
+proof (induction rule: loop1_fixp_induct)
+  case adm
+  then show ?case sorry
+next
+  case bottom
+  then show ?case by simp
+next
+  case (step k)
+  then show ?case  sorry
+qed
+
 
 
 lemma spmf_loop1:
@@ -189,7 +196,7 @@ lemma lossless_bernoulli_exp_minus_rat_from_0_to_1 [simp]:
 lemma spmf_bernoulli_exp_minus_rat_from_0_to_1_True[simp]:
   assumes  "n \<le> d"
   shows "spmf (bernoulli_exp_minus_rat_from_0_to_1 n d) True = exp(-n/d) "
-  sorry
+  apply(simp add: bernoulli_exp_minus_rat_from_0_to_1_def)
 
 lemma spmf_bernoulli_exp_minus_rat_from_0_to_1_False[simp]:
   assumes  "n\<le>d"
