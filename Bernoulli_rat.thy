@@ -14,19 +14,6 @@ definition bernoulli_rat :: "nat \<Rightarrow> nat \<Rightarrow> bool spmf" wher
             return_spmf (x<n)
 })"
 
-find_theorems "bind_spmf _ return_spmf  "
-thm "bind_return_spmf"
-thm "spmf_of_set_def"
-
-lemma nat_set_finite[simp]:
-  fixes d::nat
-  assumes "d>0"
-  shows "pmf (spmf_of_set {0..<d}) None = 0"
-proof -
-  have "finite {0..<d}" by simp
-  show ?thesis by (simp add: assms)
-qed
-
 lemma spmf_of_set_d:
   fixes d::nat
   assumes"0 < d"
@@ -36,31 +23,25 @@ proof -
   then show ?thesis by simp
 qed
 
-lemma finite_nat_set[simp]:
-  fixes d::nat
-  assumes "0<d"
-  shows "finite {..<d}" by simp
 
-lemma
-  fixes d::nat
-  assumes "0<d"
-  shows "finite {..<d}" by simp
 
-thm "spmf_of_set"
 lemma pmf_bernoulli_rat_None: "pmf (bernoulli_rat n d) None = 0"
 proof (cases "d=0")
   case True 
   then show ?thesis by(simp add: bernoulli_rat_def)
 next
   case False 
-  have 1:"finite{..<d}" by simp
-  have 2:"{..<d}\<noteq>{}" using False by auto
   show ?thesis using False
     apply(simp add: bernoulli_rat_def)
     apply(simp add: fast_uniform_conv_uniform)
     apply(simp add: spmf_of_set_d)
-    apply(simp add: pmf_bind_pmf_of_set)
-    sorry
+  proof -
+    have 1:"finite{..<d}" by simp
+    have 2:"{..<d}\<noteq>{}" using False by auto
+    show "pmf (pmf_of_set {..<d} \<bind> (\<lambda>x. return_spmf (x < n))) None = 0" using 1 2
+      apply(simp add: pmf_bind_pmf_of_set)
+      done
+  qed
 qed
 
 
