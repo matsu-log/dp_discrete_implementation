@@ -155,32 +155,7 @@ term spmf.lub_fun
 term measure_pmf.prob
 term lub_spmf
 
-lemma meeting:
-  "spmf.admissible (\<lambda>loop1. spmf (loop1 ((n, d), l)) m = 0)"
-proof (simp add: ccpo.admissible_def fun_lub_def spmf_lub_spmf, clarify)
-  fix A
-  assume CA: "Complete_Partial_Order.chain spmf.le_fun A" and A: "A \<noteq> {}" and
-  H: "\<forall>x\<in>A. spmf (x ((n, d), l)) m = 0"
-  have "spmf (lub_spmf {y. \<exists>f\<in>A. y = f ((n, d), l)}) m =  (\<Squnion>p\<in>{y. \<exists>f\<in>A. y = f ((n, d), l)}. spmf p m)"
-  proof (rule spmf_lub_spmf)
-    show "Complete_Partial_Order.chain (ord_spmf (=)) {y. \<exists>f\<in>A. y = f ((n, d), l)}"
-      using CA chain_fun by fastforce
-  next
-    show "{y. \<exists>f\<in>A. y = f ((n, d), l)} \<noteq> {}"
-      using A by blast
-  qed
-  also have "... = \<Squnion>{0}"
-  proof (rule cong[where f=Sup and g=Sup],simp)
-    show " (\<lambda>p. spmf p m) ` {y. \<exists>f\<in>A. y = f ((n, d), l)} = {0}"
-      using A H by (auto simp add: image_def)
-  qed
-  also have "... = 0"
-    by simp
-  finally show  "spmf (lub_spmf {y. \<exists>f\<in>A. y = f ((n, d), l)}) m = 0"
-    by simp
-qed
-
-lemma loop1_spmf_zero_fixp_induct_case_adm:
+lemma spmf_loop1_zero_fixp_induct_case_adm:
   shows "spmf.admissible (\<lambda>loop1. \<forall>l>m. spmf (curry (curry loop1) n d l) m = 0)"
 proof(simp add: ccpo.admissible_def fun_lub_def spmf_lub_spmf, clarify)
   fix A l
@@ -210,7 +185,7 @@ lemma spmf_loop1_zero:
 proof (induction rule: loop1_fixp_induct)
   case adm
   then show ?case 
-    using loop1_spmf_zero_fixp_induct_case_adm by fastforce
+    using spmf_loop1_zero_fixp_induct_case_adm by fastforce
 next
   case bottom
   then show ?case by simp
@@ -228,17 +203,6 @@ next
   qed
 qed
 
-lemma spmf_loop1_zero':
-  shows "ennreal (spmf (loop1 n d 2) 1) = 0"
-  using spmf_loop1_zero
-  by simp
-
-thm "times_divide_eq_right"
-value "(3::nat) div (2::nat)"
-thm "minus_mod_eq_mult_div"
-thm "fact_div_fact"
-
-
 lemma Prod_sequence:
   fixes k:: nat and l:: nat
   shows "k*\<Prod>{k+1..k + l} = \<Prod>{k..k + l}"
@@ -253,11 +217,9 @@ qed
 lemma Prod_sequence2:
   shows "(k * \<Prod>{k+1..k+l+1}) = \<Prod>{k..k+l+1}"
   sorry
-value "(3::nat)/(2::nat)"
-find_theorems "ennreal (spmf _ _) = _"
-value "\<Prod>{(4::nat)..2}"
-value "\<Prod>{(0::nat)..-1}"
-value "(1::nat) \<le> 1"
+
+find_theorems "ennreal _ = ennreal _"
+
 lemma spmf_loop1:
   assumes asm1:"n/d\<le> 1" and asm2:"1\<le>m"
   shows "spmf (loop1 n d 1) m = (n/d)^(m-1)/fact (m-1) - (n/d)^m/fact m" (is "?lhs m = ?rhs m")
@@ -360,7 +322,7 @@ proof -
       qed
     qed
   qed
-  then have "ennreal (spmf (loop1 n d 1) m) = ennreal ((n/d)^(m-1)/(fact (m-1)) - (n/d)^m/(fact (m)))" 
+  then have ennreal_eq:"ennreal (spmf (loop1 n d 1) m) = ennreal ((n/d)^(m-1)/(fact (m-1)) - (n/d)^m/(fact (m)))" 
   proof - 
     have "ennreal (spmf (loop1 n d 1) m) = ennreal (spmf (loop1 n d 1) (1+(m-1)))" using asm2 by simp
     also have "... = (n/d)^(m-1) /\<Prod>{1..1+(m-1)-1} - (n/d)^(m-1+1)/\<Prod>{1..1+(m-1)}" using P
@@ -369,29 +331,51 @@ proof -
       then show "ennreal (spmf (loop1 n d 1) (1 + (m - 1))) =
                  ennreal ( (n/d)^(m-1) /\<Prod>{1..1+(m-1)-1} - (n/d)^(m-1+1)/\<Prod>{1..1+(m-1)})"
         apply(rewrite P)
-         apply(simp)
-      proof
-      qed
+         apply(simp_all)
+        done
     qed
     also have "... =  (n/d)^(m-1) /\<Prod>{1..m-1} - (n/d)^(m)/\<Prod>{1..m}" using assms by simp
     also have "... = (n/d)^(m-1) /fact (m-1) - (n/d)^(m)/fact m" by (simp add:fact_prod)
     finally show "ennreal (spmf (loop1 n d 1) m) = ennreal ((n/d)^(m-1)/(fact (m-1)) - (n/d)^m/(fact (m)))" by simp
   qed
-  then show "spmf (loop1 n d 1) m = (n/d)^(m-1)/fact (m-1) - (n/d)^m/fact m" 
-    sorry
+  then show "spmf (loop1 n d 1) m = (n/d)^(m-1)/fact (m-1) - (n/d)^m/fact m"
+  proof - 
+    have 1:"0 \<le> spmf (loop1 n d 1) m" by simp
+    then have 2:"0 \<le> (n/d)^(m-1)/fact (m-1) - (n/d)^m/fact m" 
+    proof -
+      have 1:"(n/d)^m \<le> (n/d)^(m-1)" 
+        apply(rewrite power_decreasing)
+        apply(simp_all add:assms) 
+        done
+      have 2:"fact(m-1) \<le> fact m"
+      proof -
+        have "m-1\<le>m" by simp
+        then show "fact (m-1) \<le> fact m"
+          sorry
+      qed
+      find_theorems "0 < fact _"
+      have 3: "0 < fact (m-1)" 
+        sorry
+      have "(n/d)^m/fact m \<le> (n/d)^(m-1)/fact (m-1) " using 1 2 3 
+        sorry
+      then show "0 \<le> (n/d)^(m-1)/fact (m-1) - (n/d)^m/fact m" by simp
+    qed
+    show "spmf (loop1 n d 1) m = (n/d)^(m-1)/fact (m-1) - (n/d)^m/fact m" using 1 2 ennreal_eq by simp
+  qed
 qed
+
 lemma lossless_bernoulli_exp_minus_rat_from_0_to_1 [simp]:
   shows "lossless_spmf (bernoulli_exp_minus_rat_from_0_to_1 n d)"
   using lossless_loop1 by(simp add: bernoulli_exp_minus_rat_from_0_to_1_def)
 
-
+find_theorems "inverse"
 
 lemma spmf_bernoulli_exp_minus_rat_from_0_to_1_True[simp]:
   assumes  "n \<le> d"
   shows "spmf (bernoulli_exp_minus_rat_from_0_to_1 n d) True = exp(-n/d) "
 proof -
   have "ennreal (spmf (bernoulli_exp_minus_rat_from_0_to_1 n d) True) = exp(-n/d)"
-    apply(simp add:bernoulli_exp_minus_rat_from_0_to_1_def ennreal_spmf_bind nn_integral_measure_spmf exp_def)
+    apply(simp add:bernoulli_exp_minus_rat_from_0_to_1_def ennreal_spmf_bind nn_integral_measure_spmf exp_def inverse_eq_divide)
   proof -
     have "\<forall>x. spmf (if odd x then return_spmf True else return_spmf False) True 
           = (if odd x then 1 else 0)"
@@ -405,11 +389,20 @@ proof -
       by (smt (verit, best) ennreal_0 ennreal_1 nn_integral_cong)
     have "... = (\<Sum>\<^sup>+ x. (if odd x then spmf (loop1 n d 1) x  else 0))" 
       by (smt (verit, ccfv_threshold) ennreal_0 mult_zero_right nn_integral_cong verit_prod_simplify(2))
-    have "... = (\<Sum>\<^sup>+x \<in>{y. odd y}. ennreal (spmf (loop1 n d 1) x))+ (\<Sum>\<^sup>+x \<in>{y. \<not>odd y}. 0) "
-
-
-  then show ?thesis by simp
+    have "... = (\<Sum>\<^sup>+x \<in>{y\<in>Nats. odd y}. (spmf (loop1 n d 1) x)) "
+      sledgehammer
+      sorry
+    have "... = (\<Sum>\<^sup>+x. (spmf (loop1 n d 1) (2*x+1)))"
+      sorry
+    show "(\<Sum>\<^sup>+ x.
+       ennreal (spmf (loop1 n d (Suc 0)) x) *
+       ennreal (spmf (if odd x then return_spmf True else return_spmf False) True)) =
+    ennreal (\<Sum>na. (- (real n / real d)) ^ na/fact na)"
+      sorry
+  qed
+  then show ?thesis sorry
 qed
+
 
 lemma spmf_bernoulli_exp_minus_rat_from_0_to_1_False[simp]:
   assumes  "n\<le>d"
