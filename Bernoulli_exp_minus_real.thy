@@ -1,7 +1,7 @@
 theory Bernoulli_exp_minus_rat
   imports "Probabilistic_While.While_SPMF"
           "HOL-Probability.Probability"
-          "Bernoulli_rat"
+          "Probabilistic_While.Bernoulli"
 begin
 
 
@@ -9,42 +9,43 @@ begin
 
 
 context notes [[function_internals]] begin
-partial_function (spmf) loop1 :: "nat \<Rightarrow> nat  \<Rightarrow> nat  \<Rightarrow> nat spmf" where
- "loop1 n d k =
+partial_function (spmf) loop1 :: "real  \<Rightarrow> nat  \<Rightarrow> nat spmf" where
+ "loop1 p k =
     (
     do {
-      a \<leftarrow> bernoulli_rat n (d*k);
-      if a then loop1 n d (k+1) else return_spmf k
+      a \<leftarrow> bernoulli (p/k);
+      if a then loop1 p (k+1) else return_spmf k
     }
 )
 "
 end
 
-definition  bernoulli_exp_minus_rat_from_0_to_1 :: "nat \<Rightarrow> nat \<Rightarrow> bool spmf" where
-  "bernoulli_exp_minus_rat_from_0_to_1 n d = 
+definition  bernoulli_exp_minus_real_from_0_to_1 :: "real \<Rightarrow> bool spmf" where
+  "bernoulli_exp_minus_real_from_0_to_1 p = 
     do {
-        k \<leftarrow> loop1 n d 1;
+        k \<leftarrow> loop1 p 1;
         if odd k then return_spmf True else return_spmf False
     }
   "
 
 context notes [[function_internals]] begin
-partial_function (spmf) loop2 :: "nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bool spmf" where
-  "loop2 n d k = (if 1\<le>k & k\<le> (floor (n/d)) then do {
-                                              b \<leftarrow> bernoulli_exp_minus_rat_from_0_to_1 1 1;
-                                              if b then loop2 n d (k+1) else return_spmf False
+partial_function (spmf) loop2 :: "real \<Rightarrow> nat \<Rightarrow> bool spmf" where
+  "loop2 p k = (if 1\<le>k & k\<le> nat(floor p) then do {
+                                              b \<leftarrow> bernoulli_exp_minus_real_from_0_to_1 1;
+                                              if b then loop2 p (k+1) else return_spmf False
                                               } 
                 else return_spmf True)"
 end
 
-definition bernoulli_exp_minus_rat :: "nat \<Rightarrow> nat  \<Rightarrow> bool spmf" where
-  "bernoulli_exp_minus_rat n d = 
+definition bernoulli_exp_minus_real :: "real  \<Rightarrow> bool spmf" where
+  "bernoulli_exp_minus_real p = 
   (
-    if 0 \<le> n & n\<le> d then bernoulli_exp_minus_rat_from_0_to_1 n d
+    if p < 0 then return_spmf True  
+    else if 0 \<le> p & p\<le>1  then bernoulli_exp_minus_real_from_0_to_1 p
     else
      do {
-        b \<leftarrow> loop2 n d 1;
-        if b then bernoulli_exp_minus_rat_from_0_to_1 (n mod d) d else return_spmf b
+        b \<leftarrow> loop2 p 1;
+        if b then bernoulli_exp_minus_real_from_0_to_1 (p-floor p) else return_spmf b
       }
   )
 "
@@ -52,40 +53,39 @@ definition bernoulli_exp_minus_rat :: "nat \<Rightarrow> nat  \<Rightarrow> bool
 thm "loop1.fixp_induct"
 
 lemma loop1_fixp_induct [case_names adm bottom step]:
-  assumes "spmf.admissible (\<lambda>loop1. P (curry (curry loop1)))"
-    and "P (\<lambda>loop1 n d. return_pmf None)"
-    and "(\<And>k. P k \<Longrightarrow> P (\<lambda>a b c. bernoulli_rat a (b*c) \<bind> (\<lambda>aa. if aa then k a b (c + 1) else return_spmf c)))"
+  assumes "spmf.admissible (\<lambda>loop1. P (curry loop1))"
+    and "P (\<lambda>loop1 p. return_pmf None)"
+    and "(\<And>loop1'. P loop1' \<Longrightarrow> P (\<lambda>a b. bernoulli (a / b) \<bind> (\<lambda>aa. if aa then loop1' a (b + 1) else return_spmf b)))"
   shows "P loop1"
   using assms by (rule loop1.fixp_induct)
 
 thm "loop2.fixp_induct"
 
 lemma loop2_fixp_induct [case_names adm bottom step]:
-  assumes "spmf.admissible (\<lambda>loop2. P (curry (curry loop2)))"
-    and "P (\<lambda>loop2 n d. return_pmf None)"
-    and "(\<And>k. P k \<Longrightarrow>
-      P (\<lambda>a b c.
-             if 1 \<le> c \<and> int c \<le> \<lfloor>real a / real b\<rfloor> then bernoulli_exp_minus_rat_from_0_to_1 1 1 \<bind> (\<lambda>ba. if ba then k a b (c + 1) else return_spmf False)
-             else return_spmf True))"
+  assumes "spmf.admissible (\<lambda>loop2. P (curry loop2))"
+    and "P (\<lambda>loop2 p. return_pmf None)"
+    and "(\<And>loop2'. P loop2' \<Longrightarrow>
+      P (\<lambda>a b. if 1 \<le> b \<and> b \<le> nat \<lfloor>a\<rfloor>
+                then bernoulli_exp_minus_real_from_0_to_1 1 \<bind> (\<lambda>ba. if ba then loop2' a (b + 1) else return_spmf False)
+                else return_spmf True))"
   shows "P loop2"
   using assms by (rule loop2.fixp_induct)
 
 context
-  fixes n :: "nat"
-  and d :: "nat"
+  fixes p :: "real"
   and body :: "bool \<times> nat \<Rightarrow> (bool \<times> nat) spmf"
-  assumes cond1:"d \<ge> 1" and cond2:"n \<le> d"
-defines [simp]: "body \<equiv> (\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (True,k'+1) else (False,k'))) (bernoulli_rat  n (d*k')))"
+  assumes cond1:"0\<le>p" and cond2:"p\<le>1"
+defines [simp]: "body \<equiv> (\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (True,k'+1) else (False,k'))) (bernoulli  (p/k')))"
 
 begin
 interpretation loop_spmf fst body 
-  rewrites "body \<equiv>  (\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (True,k'+1) else (False,k'))) (bernoulli_rat  n (d*k')))" 
+  rewrites "body \<equiv>  (\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (True,k'+1) else (False,k'))) (bernoulli (p/k')))" 
   by(fact body_def)
 
 lemma loop1_conv_while:
- "loop1 n d 1 = map_spmf snd (while (True, 1))"
+ "loop1 p 1 = map_spmf snd (while (True, 1))"
 proof -
-  have "(loop1 n d x) = map_spmf snd (while (True, x))" (is "?lhs = ?rhs") for x
+  have "(loop1 p x) = map_spmf snd (while (True, x))" (is "?lhs = ?rhs") for x
   proof (rule spmf.leq_antisym)
     show "ord_spmf (=) ?lhs ?rhs"
     proof (induction arbitrary: x rule: loop1_fixp_induct)
@@ -119,8 +119,6 @@ proof -
   from this[of 1] show ?thesis by(simp cong:map_spmf_cong)
 qed
 
-end
-
 lemma lossless_loop1 [simp]: "lossless_spmf (loop1 n d 1)"
   sorry
 (*
@@ -145,6 +143,7 @@ proof -
       show ?thesis using eq1 leq4 by auto
 *)
 
+end
 (* declare[[show_types,show_sorts]]*)
 
 term List.bind
@@ -156,32 +155,32 @@ term measure_pmf.prob
 term lub_spmf
 
 lemma spmf_loop1_zero_fixp_induct_case_adm:
-  shows "spmf.admissible (\<lambda>loop1. \<forall>l>m. spmf (curry (curry loop1) n d l) m = 0)"
+  shows "spmf.admissible (\<lambda>loop1. \<forall>l>m. spmf ((curry loop1) p l) m = 0)"
 proof(simp add: ccpo.admissible_def fun_lub_def spmf_lub_spmf, clarify)
   fix A l
   assume CA: "Complete_Partial_Order.chain spmf.le_fun A" and A: "A \<noteq> {}" and
-  H: "\<forall>x\<in>A.\<forall>l>m. spmf (x ((n, d), l)) m = 0" and
+  H: "\<forall>x\<in>A.\<forall>l>m. spmf (x (p, l)) m = 0" and
   L: "l>m" 
-  have P:"spmf (lub_spmf {y. \<exists>f\<in>A. y = f ((n, d), l)}) m =  (\<Squnion>p\<in>{y. \<exists>f\<in>A. y = f ((n, d), l)}. spmf p m)"
+  have P:"spmf (lub_spmf {y. \<exists>f\<in>A. y = f (p, l)}) m =  (\<Squnion>p\<in>{y. \<exists>f\<in>A. y = f (p, l)}. spmf p m)"
   proof(rule spmf_lub_spmf)
-    show "Complete_Partial_Order.chain (ord_spmf (=)) {y. \<exists>f\<in>A. y = f ((n, d), l)}" 
+    show "Complete_Partial_Order.chain (ord_spmf (=)) {y. \<exists>f\<in>A. y = f (p, l)}" 
       by (simp add: CA chain_fun)
   next 
-    show "{y. \<exists>f\<in>A. y = f ((n, d), l)} \<noteq> {}" using A by blast
+    show "{y. \<exists>f\<in>A. y = f (p, l)} \<noteq> {}" using A by blast
   qed
   have "... =  \<Squnion>{0}"
   proof (rule cong[where f=Sup and g=Sup],simp)
-    show " (\<lambda>p. spmf p m) ` {y. \<exists>f\<in>A. y = f ((n, d), l)} = {0}"
+    show " (\<lambda>p. spmf p m) ` {y. \<exists>f\<in>A. y = f (p, l)} = {0}"
       using A H L by (auto simp add: image_def)
   qed
   also have "... = 0"
     by simp
-  finally show  "spmf (lub_spmf {y. \<exists>f\<in>A. y = f ((n, d), l)}) m = 0"
+  finally show  "spmf (lub_spmf {y. \<exists>f\<in>A. y = f (p, l)}) m = 0"
     using P by presburger
 qed
 
 lemma spmf_loop1_zero:
-  shows "\<forall>l.  l>m \<longrightarrow> spmf (loop1 n d l) m = 0"
+  shows "\<forall>l.  l>m \<longrightarrow> spmf (loop1 p l) m = 0"
 proof (induction rule: loop1_fixp_induct)
   case adm
   then show ?case 
@@ -194,8 +193,8 @@ next
   then show ?case  
   proof (clarify)
     fix l
-    assume Step:"\<forall>l>m. spmf (k n d l) m = 0" and L:"l>m"
-    have "ennreal (spmf (bernoulli_rat n (d * l) \<bind> (\<lambda>aa. if aa then k n d (l + 1) else return_spmf l)) m) =ennreal 0"
+    assume Step:"\<forall>l>m. spmf (k p l) m = 0" and L:"l>m"
+    have "ennreal (spmf (bernoulli (p/k) \<bind> (\<lambda>aa. if aa then k n d (l + 1) else return_spmf l)) m) =ennreal 0"
       apply(simp add: ennreal_spmf_bind nn_integral_measure_spmf UNIV_bool nn_integral_count_space_finite)
       using L Step not_less_eq option.inject order_less_imp_not_less singletonD apply(auto)
       done
@@ -207,11 +206,9 @@ lemma Prod_sequence:
   fixes k:: nat and l:: nat
   shows "k*\<Prod>{k+1..k + l} = \<Prod>{k..k + l}"
 proof -
-  have "k \<le> k+l" by simp
-  then have "k*\<Prod>{k+1..k + l} =k* (fact (k+l) div fact k)"
-    using fact_div_fact by simp
-  show ?thesis
-    sorry
+  have "{k..k+l} = {k} \<union> {k+1..k+l}"
+    by auto
+  then show ?thesis by simp
 qed
 
 lemma Prod_sequence2:
@@ -221,6 +218,7 @@ lemma Prod_sequence2:
 find_theorems "ennreal _ = ennreal _"
 find_theorems "fact _ \<le> fact _"
 
+declare[[show_types]]
 lemma spmf_loop1:
   assumes asm1:"n/d\<le> 1" and asm2:"1\<le>m"
   shows "spmf (loop1 n d 1) m = (n/d)^(m-1)/fact (m-1) - (n/d)^m/fact m" (is "?lhs m = ?rhs m")
@@ -348,18 +346,17 @@ proof -
         apply(rewrite power_decreasing)
         apply(simp_all add:assms) 
         done
-      have 2:"fact(m-1) \<le> fact m"
-      proof -
-        have "m-1\<le>m" by simp
-        show "fact (m-1) \<le> fact m" 
-        proof (rule fact_mono)
-          sorry
-      qed
-      find_theorems "0 < fact _"
-      have 3: "0 < fact (m-1)" 
-        sorry
-      have "(n/d)^m/fact m \<le> (n/d)^(m-1)/fact (m-1) " using 1 2 3 
-        sorry
+      have 2:"(fact (m-1::nat)::nat) \<le> fact m" 
+        by(rule fact_mono[of "m-1" "m"]) auto
+      have 3: "0 < (fact (m-1)::nat)" 
+        by simp
+      have "(n/d)^m/((fact m)::nat) \<le> (n/d)^(m-1)/((fact (m-1))::nat) "
+        apply(rule frac_le)
+           apply simp
+        using 1 apply simp
+         apply simp
+        using 2 
+        by linarith  
       then show "0 \<le> (n/d)^(m-1)/fact (m-1) - (n/d)^m/fact m" by simp
     qed
     show "spmf (loop1 n d 1) m = (n/d)^(m-1)/fact (m-1) - (n/d)^m/fact m" using 1 2 ennreal_eq by simp
