@@ -179,10 +179,22 @@ proof-
       qed
       show "?I (True,2)" using cond2 by simp
     qed
-    let ?p = 1
     show "lossless_spmf (while (True,1))"
-      thm "while.simps"
-      apply(simp add: while.simps)
+      find_theorems "weight_spmf"
+      apply(rewrite lossless_spmf_def)
+    proof-
+      have "ennreal (weight_spmf (while (True,1))) = 1"
+        apply(simp add:weight_spmf_eq_nn_integral_spmf)
+        apply(rewrite while.simps)
+        apply(simp add: bind_map_spmf o_def)
+      proof -
+        have "(\<lambda>x. local.while (if x then (True, Suc 0 + 1) else (False, Suc 0))) = (\<lambda>x.(if x then while(True, Suc 0 + 1) else while(False, Suc 0)))"
+          by auto
+        have "lossless_spmf (while (False,1))"
+          sorry
+        then have "(\<Sum>\<^sup>+ x. ennreal (spmf (bernoulli p \<bind> (\<lambda>x. (if x then while(True, Suc 0 + 1) else while(False, Suc 0)))) x)) = 1" using lossless_over_2 
+          
+
   qed
   then show "lossless_spmf (loop1 p 1)" 
     using loop1_conv_while by simp
