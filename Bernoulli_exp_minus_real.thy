@@ -98,7 +98,7 @@ proof -
         apply(clarsimp simp add: map_spmf_bind_spmf)
         apply(clarsimp simp add:bind_map_spmf)
         apply(clarsimp intro!: ord_spmf_bind_reflI)
-        apply(rewrite loop_spmf.while.simps)
+        apply(rewrite while.simps)
         apply(clarsimp)
         done
     qed
@@ -179,22 +179,25 @@ proof-
       qed
       show "?I (True,2)" using cond2 by simp
     qed
+    have lossless_False_1: "lossless_spmf (while (False,1))"
+      apply(rewrite while.simps)
+      apply(simp)
+      done
     show "lossless_spmf (while (True,1))"
       find_theorems "weight_spmf"
-      apply(rewrite lossless_spmf_def)
-    proof-
-      have "ennreal (weight_spmf (while (True,1))) = 1"
-        apply(simp add:weight_spmf_eq_nn_integral_spmf)
-        apply(rewrite while.simps)
-        apply(simp add: bind_map_spmf o_def)
-      proof -
-        have "(\<lambda>x. local.while (if x then (True, Suc 0 + 1) else (False, Suc 0))) = (\<lambda>x.(if x then while(True, Suc 0 + 1) else while(False, Suc 0)))"
-          by auto
-        have "lossless_spmf (while (False,1))"
-          sorry
-        then have "(\<Sum>\<^sup>+ x. ennreal (spmf (bernoulli p \<bind> (\<lambda>x. (if x then while(True, Suc 0 + 1) else while(False, Suc 0)))) x)) = 1" using lossless_over_2 
-          
-
+      apply(rewrite while.simps)
+      apply(simp add:bind_map_spmf)
+    proof 
+      fix x
+      assume "x \<in> set_spmf (bernoulli p)"
+      show "(x \<longrightarrow> lossless_spmf (local.while (True, Suc (Suc 0)))) \<and> (\<not> x \<longrightarrow> lossless_spmf (local.while (False, Suc 0)))"
+      proof 
+        show "x \<longrightarrow> lossless_spmf (local.while (True, Suc (Suc 0)))"
+          using lossless_over_2 by (simp add: numeral_2_eq_2)
+        show " \<not> x \<longrightarrow> lossless_spmf (local.while (False, Suc 0))"
+          using lossless_False_1 by simp
+      qed
+    qed
   qed
   then show "lossless_spmf (loop1 p 1)" 
     using loop1_conv_while by simp
@@ -458,97 +461,143 @@ proof -
   qed
 qed
 
-lemma lossless_bernoulli_exp_minus_rat_from_0_to_1 [simp]:
+lemma lossless_bernoulli_exp_minus_real_from_0_to_1 [simp]:
+  assumes "0\<le>p" and "p\<le>1"
   shows "lossless_spmf (bernoulli_exp_minus_real_from_0_to_1 p)"
-  using lossless_loop1 try
+  apply(rewrite bernoulli_exp_minus_real_from_0_to_1_def)
+  using assms lossless_loop1 by fastforce
 
-find_theorems "inverse"
-
-lemma spmf_bernoulli_exp_minus_rat_from_0_to_1_True[simp]:
-  assumes  "n \<le> d"
-  shows "spmf (bernoulli_exp_minus_rat_from_0_to_1 n d) True = exp(-n/d) "
+lemma spmf_bernoulli_exp_minus_real_from_0_to_1_True[simp]:
+  assumes  "0\<le>p" and "p\<le>1"
+  shows "spmf (bernoulli_exp_minus_real_from_0_to_1 p) True = exp(-p) "
 proof -
-  have "ennreal (spmf (bernoulli_exp_minus_rat_from_0_to_1 n d) True) = exp(-n/d)"
-    apply(simp add:bernoulli_exp_minus_rat_from_0_to_1_def ennreal_spmf_bind nn_integral_measure_spmf exp_def inverse_eq_divide)
+  have "ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1 p) True) = exp(-p)"
+    apply(simp add:bernoulli_exp_minus_real_from_0_to_1_def ennreal_spmf_bind nn_integral_measure_spmf exp_def inverse_eq_divide)
   proof -
-    have "\<forall>x. spmf (if odd x then return_spmf True else return_spmf False) True 
-          = (if odd x then 1 else 0)"
-    proof 
-      show "\<And>x. spmf (if odd x then return_spmf True else return_spmf False) True 
-          = (if odd x then 1 else 0 )"
-        using spmf_return_spmf_0 spmf_return_spmf_1 by presburger
-    qed
-    then have " (\<Sum>\<^sup>+ x. ennreal (spmf (loop1 n d 1) x) * ennreal (spmf (if odd x then return_spmf True else return_spmf False) True))
-                = (\<Sum>\<^sup>+ x. ennreal (spmf (loop1 n d 1) x) *  (if odd x then 1 else 0))"
-      by (smt (verit, best) ennreal_0 ennreal_1 nn_integral_cong)
-    have "... = (\<Sum>\<^sup>+ x. (if odd x then spmf (loop1 n d 1) x  else 0))" 
-      by (smt (verit, ccfv_threshold) ennreal_0 mult_zero_right nn_integral_cong verit_prod_simplify(2))
-    have "... = (\<Sum>\<^sup>+x \<in>{y\<in>Nats. odd y}. (spmf (loop1 n d 1) x)) "
-      sledgehammer
-      sorry
-    have "... = (\<Sum>\<^sup>+x. (spmf (loop1 n d 1) (2*x+1)))"
-      sorry
-    show "(\<Sum>\<^sup>+ x.
-       ennreal (spmf (loop1 n d (Suc 0)) x) *
-       ennreal (spmf (if odd x then return_spmf True else return_spmf False) True)) =
-    ennreal (\<Sum>na. (- (real n / real d)) ^ na/fact na)"
-      sorry
-  qed
-  then show ?thesis sorry
-qed
+     have " (\<Sum>\<^sup>+ x::nat. ennreal (spmf (loop1 p (Suc (0::nat))) x) * ennreal (spmf (if odd x then return_spmf True else return_spmf False) True))
+                =   (\<Sum>\<^sup>+ x::nat. ennreal (spmf (loop1 p 1) x) * (if odd x then 1 else 0))"
+     proof - 
+       have 1:"\<And> x. ennreal (spmf (if odd x then return_spmf True else return_spmf False) True) = (if odd x then 1 else 0)" by simp
+       show ?thesis
+         by(simp add: 1)  
+     qed
+     also have "... = (\<Sum>\<^sup>+ x::nat. (if odd x then ennreal (spmf (loop1 p 1) x)* 1 else ennreal (spmf (loop1 p 1) x) * 0))"
+     proof -
+       have "(\<forall>n. (ennreal (spmf (loop1 p 1) n) * (if odd n then 1 else 0) = ennreal (spmf (loop1 p 1) n) * 0 \<or> odd n) \<and> (ennreal (spmf (loop1 p 1) n) * (if odd n then 1 else 0) = ennreal (spmf (loop1 p 1) n) * 1 \<or> even n)) \<or> (\<Sum>\<^sup>+ n. ennreal (spmf (loop1 p 1) n) * (if odd n then 1 else 0)) = (\<Sum>\<^sup>+ n. if odd n then ennreal (spmf (loop1 p 1) n) * 1 else ennreal (spmf (loop1 p 1) n) * 0)"
+         by presburger
+       then show ?thesis
+         by meson
+     qed
+     also have "... = (\<Sum>\<^sup>+ x::nat. (if odd x then ennreal (spmf (loop1 p 1) x) else  0))" try
+       by (meson mult.right_neutral mult_zero_right)
+     show "(\<Sum>\<^sup>+ x::nat. ennreal (spmf (loop1 p (Suc (0::nat))) x) * ennreal (spmf (if odd x then return_spmf True else return_spmf False) True)) = ennreal (\<Sum>n::nat. (- p) ^ n / fact n)"
+       sorry
+   qed
+   show ?thesis
+     sorry
+ qed
 
 
-lemma spmf_bernoulli_exp_minus_rat_from_0_to_1_False[simp]:
-  assumes  "n\<le>d"
-  shows "spmf (bernoulli_exp_minus_rat_from_0_to_1 n d) False =  1 - exp(-n/d)" 
+lemma spmf_bernoulli_exp_minus_real_from_0_to_1_False[simp]:
+  assumes  "0\<le>p" and "p\<le>1"
+  shows "spmf (bernoulli_exp_minus_real_from_0_to_1 p) False =  1 - exp(-p)" 
   using assms by(simp add:spmf_False_conv_True)
 
 context
-  fixes n :: "nat"
-  and d :: "nat"
+  fixes p:: real
   and body :: "bool \<Rightarrow> bool spmf"
-  assumes cond1:"d \<ge> 1" and cond2:"n \<le> d"
-defines [simp]: "body \<equiv> (\<lambda>b. map_spmf (\<lambda>b'. (if b' then True else False)) (bernoulli_exp_minus_rat_from_0_to_1 1 1))"
+  assumes "1\<le>p"
+defines [simp]: "body \<equiv> (\<lambda>b. map_spmf (\<lambda>b'. (if b' then True else False)) (bernoulli_exp_minus_real_from_0_to_1 1))"
 
 begin
 interpretation loop_spmf id body 
-  rewrites "body \<equiv>  (\<lambda>b. map_spmf (\<lambda>b'. (if b' then True else False)) (bernoulli_exp_minus_rat_from_0_to_1 1 1))"
+  rewrites "body \<equiv>  (\<lambda>b. map_spmf (\<lambda>b'. (if b' then True else False)) (bernoulli_exp_minus_real_from_0_to_1 1))"
   by(fact body_def)
 
 
 lemma loop2_conv_iter:
-  shows "loop2 n d 1 = iter (nat (floor (n/d))) True"
-  sorry
-
-end
+  shows "loop2 p 1 = iter (nat (floor p)) True" (is "?lhs = ?rhs")
+proof(rule spmf.leq_antisym)
+  show "ord_spmf (=) ?lhs ?rhs"
+  proof (induction rule: loop2_fixp_induct)
+    case adm
+    then show ?case by simp
+  next
+    case bottom
+    then show ?case by simp
+  next
+    case (step loop2')
+    then show ?case 
+    proof -
+      thm iter.simps
+      have cond1:"1\<le> nat (floor p) \<Longrightarrow> iter (nat \<lfloor>p\<rfloor>) True =   (if id True then map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (nat \<lfloor>p\<rfloor> - 1) else return_spmf True)"
+        sorry
+      have cond2:"nat (floor p) < 1 \<Longrightarrow> iter (nat \<lfloor>p\<rfloor>) True = return_spmf True"
+        by simp
+      have "iter (nat \<lfloor>p\<rfloor>) True = (if 1 \<le> nat (floor p) then  (if id True then map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (nat \<lfloor>p\<rfloor> - 1) else return_spmf True)
+                                    else return_spmf True)"
+        using cond1 cond2
+        by (meson Suc_le_eq not_less_eq_eq)
+      also have "... = (if 1 \<le> nat (floor p) then map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (nat \<lfloor>p\<rfloor> - 1)
+                        else return_spmf True)"
+        by simp
+      finally have 1:"iter (nat \<lfloor>p\<rfloor>) True =  (if 1 \<le> nat (floor p) then map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (nat \<lfloor>p\<rfloor> - 1)
+                                            else return_spmf True)"
+        by simp
+      have 2:"ord_spmf (=)
+     (if (1::nat) \<le> (1::nat) \<and> (1::nat) \<le> nat \<lfloor>p\<rfloor> then bernoulli_exp_minus_real_from_0_to_1 (1::real) \<bind> (\<lambda>ba::bool. if ba then loop2' p ((1::nat) + (1::nat)) else return_spmf False)
+      else return_spmf True)
+      (if 1 \<le> nat (floor p) then  map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (nat \<lfloor>p\<rfloor> - 1)
+       else return_spmf True)"
+        apply(clarsimp simp add: map_spmf_bind_spmf)
+        apply(clarsimp intro!: ord_spmf_bind_reflI)
+        sorry
+      show ?thesis using 1 2 by argo 
+  qed
+  show "ord_spmf (=) ?rhs ?lhs"
+    sorry
+qed
 
 lemma lossless_loop2 [simp]:
-  shows "lossless_spmf (loop2 n d 1)"
-  sorry
+  shows "lossless_spmf (loop2 p 1)"
+proof -
+  have "lossless_spmf (iter (nat (floor p)) True)"
+    using lossless_iter by simp
+  then show ?thesis
+    using loop2_conv_iter by simp
+qed
+end
 
 thm "spmf_False_conv_True"
 
 lemma spmf_loop2_True [simp]: 
-  assumes "1\<le>d" "d < n"
-  shows "spmf (loop2 n d 1) True = exp(-floor(n/d))"
+  assumes "1\<le>p" 
+  shows "spmf (loop2 p 1) True = exp(-floor(p))"
   sorry
 lemma spmf_loop2_False [simp]:
-  assumes "1\<le>d" "d<n"
-  shows "spmf (loop2 n d 1) False = 1 - exp(-floor(n/d))"
-  by (metis One_nat_def lossless_loop2 of_int_minus spmf_False_conv_True spmf_loop2_True)
+  assumes "1\<le>p"
+  shows "spmf (loop2 p 1) False = 1 - exp(-floor(p))"
+  using assms lossless_loop2 spmf_False_conv_True spmf_loop2_True by auto
 
-lemma lossless_bernoulli_exp_minus_rat[simp]:
-  shows "lossless_spmf (bernoulli_exp_minus_rat n d)"
-  using lossless_loop2 by(simp add:bernoulli_exp_minus_rat_def)
-
+lemma lossless_bernoulli_exp_minus_real[simp]:
+  shows "lossless_spmf (bernoulli_exp_minus_real p)"
+proof -
+  have 1:"0\<le>p - real_of_int \<lfloor>p\<rfloor>" by simp
+  have 2:"p - real_of_int \<lfloor>p\<rfloor>\<le>1" 
+    by linarith
+  show ?thesis
+    apply(rewrite bernoulli_exp_minus_real_def)
+    using 1 2 lossless_bernoulli_exp_minus_real_from_0_to_1 lossless_loop2
+    by simp
+qed
 
 lemma spmf_bernoulli_exp_minus_rat_True[simp]:
-  shows "spmf (bernoulli_exp_minus_rat n d) True = exp(-n/d)"
-  apply(simp add: bernoulli_exp_minus_rat_def)
+  shows "spmf (bernoulli_exp_minus_real p) True = exp(-p)"
+  apply(simp add: bernoulli_exp_minus_real_def)
   sorry
 
 lemma spmf_bernoulli_exp_minus_rat_False[simp]:
-  shows "spmf (bernoulli_exp_minus_rat n d) False = 1-exp(-n/d)"
+  shows "spmf (bernoulli_exp_minus_real p) False = 1-exp(-p)"
   by(simp add:spmf_False_conv_True)
 
 
