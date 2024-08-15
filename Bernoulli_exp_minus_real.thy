@@ -37,6 +37,8 @@ partial_function (spmf) loop2 :: "real \<Rightarrow> nat \<Rightarrow> bool spmf
                 else return_spmf True)"
 end
 
+
+
 definition bernoulli_exp_minus_real :: "real  \<Rightarrow> bool spmf" where
   "bernoulli_exp_minus_real p = 
   (
@@ -179,12 +181,11 @@ proof-
       qed
       show "?I (True,2)" using cond2 by simp
     qed
-    have lossless_False_1: "lossless_spmf (while (False,1))"
+    have lossless_False_1: "lossless_spmf (while (False,1))" 
       apply(rewrite while.simps)
       apply(simp)
       done
     show "lossless_spmf (while (True,1))"
-      find_theorems "weight_spmf"
       apply(rewrite while.simps)
       apply(simp add:bind_map_spmf)
     proof 
@@ -303,13 +304,13 @@ qed
 find_theorems "ennreal _ = ennreal _"
 find_theorems "fact _ \<le> fact _"
 
-declare[[show_types]]
-lemma spmf_loop1:
+
+lemma spmf_loop1[simp]:
   assumes asm1:"0\<le>p" "p\<le> 1" and asm2:"1\<le>m"
   shows "spmf (loop1 p 1) m = p^(m-1)/fact (m-1) - p^m/fact m" (is "?lhs m = ?rhs m")
 proof -
   have P:"\<forall>k l::nat . 1\<le>k \<longrightarrow> ennreal (spmf (loop1 p k) (k+l)) = p^l /\<Prod>{k..(k+l-1)} - p^(l+1)/\<Prod>{k..(k+l)}"
-  proof (clarify)
+  proof rule+
     fix l
     show "\<And>k.1 \<le> k \<Longrightarrow>
            ennreal (spmf (loop1 p k) (k + l)) =
@@ -488,11 +489,37 @@ proof -
        then show ?thesis
          by meson
      qed
-     also have "... = (\<Sum>\<^sup>+ x::nat. (if odd x then ennreal (spmf (loop1 p 1) x) else  0))" try
+     also have "... = (\<Sum>\<^sup>+ x::nat. (if odd x then ennreal (spmf (loop1 p 1) x) else  0))" 
        by (meson mult.right_neutral mult_zero_right)
-     show "(\<Sum>\<^sup>+ x::nat. ennreal (spmf (loop1 p (Suc (0::nat))) x) * ennreal (spmf (if odd x then return_spmf True else return_spmf False) True)) = ennreal (\<Sum>n::nat. (- p) ^ n / fact n)"
+     also have "... = (\<Sum> x::nat. (if odd x then ennreal (spmf (loop1 p 1) x) else  0))" 
+       by (simp add: nn_integral_count_space_nat)
+     also have "... = (\<Sum>n::nat. if odd (2 * n + 1) then ennreal (spmf (loop1 p 1) (2 * n + 1)) else 0)" 
+     proof(subst suminf_mono_reindex[of "\<lambda>n::nat. 2*n+1" "(\<lambda>x::nat. (if odd x then ennreal (spmf (loop1 p 1) x) else  0))",symmetric])
+       show "strict_mono (\<lambda>n::nat. 2 * n + 1)" 
+         by (simp add: strict_mono_Suc_iff)
+       show "\<And>n. n \<notin> range (\<lambda>n::nat. 2 * n + 1) \<Longrightarrow> (if odd n then ennreal (spmf (loop1 p 1) n) else 0) = 0" using oddE by fastforce
+       show "(\<Sum>n. if odd (2 * n + 1) then ennreal (spmf (loop1 p 1) (2 * n + 1)) else 0) =
+             (\<Sum>n. if odd (2 * n + 1) then ennreal (spmf (loop1 p 1) (2 * n + 1)) else 0)" by simp
+     qed
+     also have "... = (\<Sum>n::nat. ennreal (spmf (loop1 p 1) (2 * n + 1)))" 
+       by auto 
+     also have "... = (\<Sum>n::nat. ennreal (p^(2*n)/fact (2*n) - p^(2*n+1)/fact (2*n+1)))" 
+       by(subst spmf_loop1,auto simp:assms)
+     also have "... = (\<Sum>n::nat. p^(2*n)/fact (2*n) - p^(2*n+1)/fact (2*n+1))"
        sorry
+     also have "... = (\<Sum>n::nat. (-p)^(2*n)/fact (2*n) + (-p)^(2*n+1)/fact (2*n+1))" 
+       by auto
+     also have "... = (\<Sum>n::nat. (-p)^(n)/fact n)"    
+       sorry
+     also have "... = ennreal (\<Sum>n. (-p)^(n)/fact n)" 
+       by blast
+     finally show "(\<Sum>\<^sup>+ x::nat. ennreal (spmf (loop1 p (Suc (0::nat))) x) * ennreal (spmf (if odd x then return_spmf True else return_spmf False) True))
+                  = ennreal (\<Sum>n. (- p) ^ n / fact n)"  try
+       
    qed
+   find_theorems "(\<Sum> _ . _) = (\<Sum> _ . _)"
+   thm suminf_mono_reindex[of "\<lambda>n. 2*n+1"]
+   thm suminf_mono_reindex[of "\<lambda>n. 2*n+1" "(\<lambda>x::nat. (if odd x then ennreal (spmf (loop1 p 1) x) else  0))"]
    show ?thesis
      sorry
  qed
@@ -514,12 +541,28 @@ interpretation loop_spmf id body
   rewrites "body \<equiv>  (\<lambda>b. map_spmf (\<lambda>b'. (if b' then True else False)) (bernoulli_exp_minus_real_from_0_to_1 1))"
   by(fact body_def)
 
+lemma loop2_iter_simps:
+  shows "iter n True = (if 1 \<le> n then  map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (n - 1)
+                       else return_spmf True)"
+proof -
+  have "1\<le>n \<Longrightarrow> iter n True = map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (n - 1)"
+  proof (cases "1\<le>n")
+    case True
+    then show ?thesis 
+  next
+    case False
+    then show ?thesis sorry
+  qed
 
+
+value "nat (-1)"
 lemma loop2_conv_iter:
-  shows "loop2 p 1 = iter (nat (floor p)) True" (is "?lhs = ?rhs")
+  shows "loop2 p 1 = iter (nat (floor p)) True" 
+proof - 
+  have "loop2 p x = iter (nat ((floor p) - nat(x-1))) True" (is "?lhs = ?rhs") for x
 proof(rule spmf.leq_antisym)
   show "ord_spmf (=) ?lhs ?rhs"
-  proof (induction rule: loop2_fixp_induct)
+  proof (induction arbitrary: x rule: loop2_fixp_induct)
     case adm
     then show ?case by simp
   next
@@ -527,10 +570,10 @@ proof(rule spmf.leq_antisym)
     then show ?case by simp
   next
     case (step loop2')
-    then show ?case 
+    then show ?case using step.IH[of "Suc x"]
     proof -
       thm iter.simps
-      have cond1:"1\<le> nat (floor p) \<Longrightarrow> iter (nat \<lfloor>p\<rfloor>) True =   (if id True then map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (nat \<lfloor>p\<rfloor> - 1) else return_spmf True)"
+      have cond1:"1\<le> nat (\<lfloor>p\<rfloor> - int (nat (int (x - (1::nat))))) \<Longrightarrow> iter (nat (\<lfloor>p\<rfloor> - int (nat (int (x - (1::nat))))) ) True =   (if id True then map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (nat \<lfloor>p\<rfloor> - 1) else return_spmf True)"
         sorry
       have cond2:"nat (floor p) < 1 \<Longrightarrow> iter (nat \<lfloor>p\<rfloor>) True = return_spmf True"
         by simp
