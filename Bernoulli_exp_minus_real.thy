@@ -485,7 +485,14 @@ proof (rule summable_diff)
 qed
 
 term "summable"
+
 lemma 
+  assumes "\<forall>\<^sub>F x in sequentially. f < g"
+    and "\<forall>\<^sub>F x in sequentially. g < c"
+  shows "\<forall>\<^sub>F x in sequentially. f< c"
+  using assms try
+
+lemma
   fixes p::real
   assumes "0\<le>p" and "p\<le>1"
   shows " (\<lambda>n. \<Sum>i = 0..n. (-p)^(2*i)/fact (2*i) + (-p)^(2*i+1)/fact (2*i+1) - (- p)^i/fact i) \<longlonglongrightarrow> 0"
@@ -567,19 +574,33 @@ proof -
       show ?thesis
         using 1 2 by simp
     qed
-    find_theorems exp summable
-    thm summable_LIMSEQ'
     show ?thesis 
-    proof -
-      have 1:"?s1-?s2 \<longlonglongrightarrow> (\<Sum>n.?f n)- (\<Sum>n.?f n)"
-        using 1 2
+    proof 
+      have a1:"\<And>e. 0 < e \<Longrightarrow> \<forall>\<^sub>F x in sequentially. dist (?s1 x) (\<Sum>n.?f n) < e"
+        using 1 by (rule tendstoD)
+      have a2:"\<And>e. 0 < e \<Longrightarrow> \<forall>\<^sub>F x in sequentially. dist (?s2 x) (\<Sum>n.?f n) < e"
+        using 2 by (rule tendstoD)
+      have a3:" \<forall>\<^sub>F x in sequentially. dist ((?s1-?s2) x) 0 \<le> dist (?s1 x) (\<Sum>n.?f n) + dist (?s2 x) (\<Sum>n.?f n)"
         sorry
-      have 2:"(\<Sum>n.?f n)- (\<Sum>n.?f n) = 0" by simp
-      show ?thesis using 1 2 by simp
+      show "\<And>e. 0 < e \<Longrightarrow> \<forall>\<^sub>F x in sequentially. dist ((?s1 - ?s2) x) 0 < e "
+      proof -
+        fix e::real
+        assume asm:"e>0"
+        have b1:"\<forall>\<^sub>F x in sequentially. dist (?s1 x) (\<Sum>n.?f n) < e" 
+          using a1 asm by simp
+        have b2:"\<forall>\<^sub>F x in sequentially. dist (?s2 x) (\<Sum>n.?f n) < e"
+          using a2 asm by simp
+        have b3:" \<forall>\<^sub>F x in sequentially.  dist (?s1 x) (\<Sum>n.?f n) +  dist (?s1 x) (\<Sum>n.?f n) < 2 * e"
+          using b1 b2 by simp
+        have "\<forall>\<^sub>F x in sequentially.  dist ((?s1-?s2) x) 0 < 2 * e"  
+          
+         
+
+
     qed
   qed
   thm tendsto_add
-  thm 
+  thm convergent_subtract
   find_theorems "  _\<longlonglongrightarrow> _ \<Longrightarrow> _ \<longlonglongrightarrow> _"
   show ?thesis using 1 2 3 by simp
 qed
