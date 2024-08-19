@@ -468,8 +468,7 @@ lemma lossless_bernoulli_exp_minus_real_from_0_to_1 [simp]:
   apply(rewrite bernoulli_exp_minus_real_from_0_to_1_def)
   using assms lossless_loop1 by fastforce
 
-thm summable_diff [of "\<lambda>i. p ^ (2 * i) / fact (2 * i)" "\<lambda>i. p ^ (2 * i + 1) / fact (2 * i + 1)"]
-
+(*this lemma for summable_2i_2i_plus_1*)
 lemma power_divide_fact :
   fixes p::real and n m::nat
   assumes "0\<le>p" and "p\<le>1" and "n\<le>m"
@@ -484,8 +483,7 @@ proof -
     by (simp add: assms(3) fact_mono frac_le)
 qed
 
-thm power_divide_fact[of "p" "n" "2*n"]
-
+(* these two lemma  for lemma spmf_bernoulli_exp_minus_real_from_0_to_1*)
 lemma summable_2i_2i_plus_1:
   fixes p:: real
   assumes "0\<le>p" and "p\<le>1"
@@ -537,17 +535,11 @@ proof (rule summable_diff)
     qed
     show "summable (\<lambda>i. p ^ i / fact i)" 
       using 1 by simp
+    show "True" by simp
   qed
 qed
 
-thm summable_comparison_test[of "\<lambda>i. p^(2*i) / fact (2*i)" "\<lambda>i. p^i / fact i"]
-thm summable_mult[of "(\<lambda>i. p^i / fact i)" "2/2"]
-thm bounded_linear.summable
-term "summable"
-
-thm summable_mono_reindex
-
-lemma
+lemma lim_zero_for_spmf_bernoulli_exp_minus_real_from_0_to_1:
   fixes p::real
   assumes "0\<le>p" and "p\<le>1"
   shows " (\<lambda>n. \<Sum>i = 0..n. (-p)^(2*i)/fact (2*i) + (-p)^(2*i+1)/fact (2*i+1) - (- p)^i/fact i) \<longlonglongrightarrow> 0"
@@ -608,16 +600,7 @@ proof -
     have "(\<Sum>n.?f n) = exp (-p)"
       apply(subst exp_def)
       by (simp add: inverse_eq_divide)
-    have 1:"?s1 \<longlonglongrightarrow> (\<Sum>n.?f n) "
-    proof -
-      have 1:"?s1 = (\<lambda>n. sum ?f {..2*n+1})"
-        by (simp add: atMost_atLeast0)
-      then have 2:"(\<lambda>n. sum ?f {..2*n+1}) \<longlonglongrightarrow> (\<Sum>n.?f n)"
-        thm sums_def_le
-        sorry
-      show ?thesis using 1 2  by simp
-    qed
-    have 2:"?s2 \<longlonglongrightarrow> (\<Sum>n.?f n) "
+    have 1:"?s2 \<longlonglongrightarrow> (\<Sum>n.?f n) "
     proof -
       have 1:"?s2 =(\<lambda>n. sum ?f {..n})"
         by (simp add: atMost_atLeast0)
@@ -629,81 +612,46 @@ proof -
       show ?thesis
         using 1 2 by simp
     qed
+    have 2:"?s1 \<longlonglongrightarrow> (\<Sum>n.?f n) "
+    proof -
+      have "?s1 = ((\<lambda>n. \<Sum>i = 0..n. (- p) ^ i / fact i) \<circ> (\<lambda>n. 2 * n + 1))"
+        by auto
+      also have "... \<longlonglongrightarrow> (\<Sum>n.?f n)"
+      proof (rule LIMSEQ_subseq_LIMSEQ[of "(\<lambda>n. \<Sum>i = 0.. n. ?f i)" "(\<Sum>n. (- p) ^ n / fact n)" "\<lambda>n. 2*n+1"])
+        show "?s2 \<longlonglongrightarrow> (\<Sum>n.?f n) " 
+          using 1 by simp
+        show "strict_mono (\<lambda>n::nat. 2*n + 1)" 
+          by (simp add: strict_monoI)
+      qed
+      finally show ?thesis by simp
+    qed
     show ?thesis 
-    proof 
-      fix e::real
-      assume "0<e"
-      show "\<forall>\<^sub>F x in sequentially. dist ((?s1 - ?s2) x) 0 < e"
-      proof (subst eventually_sequentially)
-
-       
-
-
+    proof -
+      have "?s1 - ?s2 = (\<lambda>n. (\<Sum>i=0..2*n+1. (-p)^i/fact i)+(-(\<lambda>n. \<Sum>i = 0..n. (-p)^i/fact i)) n)"
+        by auto
+      also have "... \<longlonglongrightarrow> (\<Sum>n. ?f n) + - (\<Sum>n. ?f n)"
+      proof (rule tendsto_add[of "?s1" "(\<Sum>n.?f n)" "sequentially" "-?s2" "-(\<Sum>n.?f n)"])
+        show "?s1 \<longlonglongrightarrow> (\<Sum>n. (- p) ^ n / fact n)"
+          using 2 by simp
+        show "-?s2 \<longlonglongrightarrow> -(\<Sum>n. ?f n)" 
+        proof -
+          have "-?s2 = (\<lambda>n. -(\<Sum>i = 0..n. (- p) ^ i / fact i))"
+            by auto
+          also have "... \<longlonglongrightarrow> -(\<Sum>n. ?f n)"
+            using 1 tendsto_minus[of "?s2" "(\<Sum>n.?f n)" "sequentially"] by simp
+          finally show ?thesis by simp
+        qed
+      qed
+      also have "(\<Sum>n. ?f n) + - (\<Sum>n. ?f n) = 0" by simp
+      finally show ?thesis by blast
     qed
   qed
-  thm tendsto_add
-  thm convergent_subtract
-  find_theorems "  _\<longlonglongrightarrow> _ \<Longrightarrow> _ \<longlonglongrightarrow> _"
   show ?thesis using 1 2 3 by simp
 qed
-    (*  thm "CauchyD"
-      have "Cauchy ?s"
-      proof (rule convergent_Cauchy)
-        show "convergent ?s"
-        proof (rule summable_imp_convergent)
-          show "summable ?s"
-          proof -
-            have "summable ?f" using summable_exp_generic[of"-p"]
-              by (simp add: inverse_eq_divide)
-            then show ?thesis 
-            sorry
-        qed
-      qed
-      then have 1:"\<And>e. 0 < e \<Longrightarrow> \<exists>M. \<forall>m\<ge>M. \<forall>n\<ge>M. norm (?s m - ?s n) < e"
-        by (rule CauchyD)
-      then have "\<And>e. 0 < e \<Longrightarrow> \<exists>M. \<forall>n\<ge>M. norm (?s (2*n+1) - ?s n) < e"
-      proof -
-        fix e::real
-        assume "0<e"
-        show "\<exists>M. \<forall>n\<ge>M. norm (?s (2*n+1) - ?s n) < e"
-        proof - 
-          have "\<exists>M. \<forall>n::nat\<ge>M. 2*n+1 \<ge> M" by simp
-          then show ?thesis using 1 
-            
-            sorry
-        qed
-      qed
-      then have "\<And>e. 0 < e \<Longrightarrow> \<forall>\<^sub>F x in sequentially. dist (?s (2*x+1) - ?s x) 0 < e"
-        using eventually_sequentiallyI by fastforce
-      then show ?thesis 
-        by(rule metric_space_class.tendstoI)
-    qed
-    have 2:"\<forall>n. ?s (2*n+1) - ?s n = (\<Sum>i = n+1..2*n+1. ?f i)"
-    proof 
-      fix n 
-      show "?s (2*n+1) - ?s n = (\<Sum>i = n+1..2*n+1. ?f i)"
-      proof -
-        let ?s1 = "(\<lambda>n. \<Sum>i \<in> {0..<n+1}. ?f i)"
-        have "\<forall>n. ?s n = ?s1 n"
-          using Suc_eq_plus1 atLeastLessThanSuc_atLeastAtMost by presburger
-        then have "?s (2*n+1) - ?s n = ?s1 (2*n+1) - ?s1 n" 
-          by simp
-        also have "... = (\<Sum>i = n+1..<2*n+1+1. ?f i)"
-          by(rule sum_diff_nat_ivl[of "0" "n+1" "2*n+1+1" "?f"],auto)
-        also have "... = (\<Sum>i = n+1..2*n+1. ?f i)"
-        proof -
-          have "{n+1..<2*n+1+1} = {n+1..2*n+1}" by auto
-          then show ?thesis by simp
-        qed
-        finally show ?thesis by simp
-      qed
-    qed
-    then show ?thesis using 1 2 by presburger
-  qed
-  show ?thesis 
-  using 1 2 by simp
-qed
-*)
+
+find_theorems "lim"
+find_theorems "suminf _ = suminf _"
+
 lemma spmf_bernoulli_exp_minus_real_from_0_to_1_True[simp]:
   assumes  "0\<le>p" and "p\<le>1"
   shows "spmf (bernoulli_exp_minus_real_from_0_to_1 p) True = exp(-p) "
@@ -783,9 +731,7 @@ proof -
          proof 
            let ?f = "\<lambda>n. (-p)^n/fact n"
            show 1:"(\<lambda>n. \<Sum>i = 0..n. ?f (2*i) + ?f (2*i+1) - ?f i) \<longlonglongrightarrow> 0"
-             thm suminf_exist_split2
-             sorry
-           find_theorems " (\<lambda>_. \<Sum> _ . _ ) \<longlonglongrightarrow> 0"
+             using lim_zero_for_spmf_bernoulli_exp_minus_real_from_0_to_1 assms by simp
            show "\<And>s. (\<lambda>n. \<Sum>i = 0..n. ?f (2*i) + ?f (2*i+1) - ?f i) \<longlonglongrightarrow> s \<Longrightarrow> s = 0"
            proof -
              fix s
@@ -826,6 +772,7 @@ interpretation loop_spmf id body
   rewrites "body \<equiv>  (\<lambda>b. map_spmf (\<lambda>b'. (if b' then True else False)) (bernoulli_exp_minus_real_from_0_to_1 1))"
   by(fact body_def)
 
+(*
 lemma loop2_iter_simps:
   shows "iter n True = (if 1 \<le> n then  map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (n - 1)
                        else return_spmf True)"
@@ -838,9 +785,8 @@ proof -
     case False
     then show ?thesis sorry
   qed
+*)
 
-
-value "nat (-1)"
 lemma loop2_conv_iter:
   shows "loop2 p 1 = iter (nat (floor p)) True" 
 proof - 
