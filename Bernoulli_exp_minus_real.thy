@@ -770,45 +770,29 @@ interpretation loop_spmf id body
 
 
 lemma loop2_conv_iter:
-  shows "loop2 p (nat (floor p)) = iter (nat (floor p)) True" 
-proof - 
-  have "loop2 p x = iter (nat ((floor p) - nat(x-1))) True" (is "?lhs = ?rhs") for x
-  proof(rule spmf.leq_antisym)
-    show "ord_spmf (=) ?lhs ?rhs"
-    proof (induction arbitrary: x rule: loop2_fixp_induct)
-      case adm
-      then show ?case by simp
-    next
-      case bottom
-      then show ?case by simp
-    next
-      case (step loop2')
-      then show ?case using step.IH[of "Suc x"]
-      proof -
-        thm iter.simps
-        have cond1:"1\<le> nat (\<lfloor>p\<rfloor> - int (nat (int (x - (1::nat))))) \<Longrightarrow> iter (nat (\<lfloor>p\<rfloor> - int (nat (int (x - (1::nat))))) ) True =   (if id True then map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (nat \<lfloor>p\<rfloor> - 1) else return_spmf True)"
-          sorry
-        have cond2:"nat (floor p) < 1 \<Longrightarrow> iter (nat \<lfloor>p\<rfloor>) True = return_spmf True"
-          by simp
-        have "iter (nat \<lfloor>p\<rfloor>) True = (if 1 \<le> nat (floor p) then  (if id True then map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (nat \<lfloor>p\<rfloor> - 1) else return_spmf True)
-                                    else return_spmf True)"
-          using cond1 cond2
-          sorry
-        show ?thesis 
-          sorry
-      qed
-    qed
-    show "ord_spmf (=) ?rhs ?lhs"
+  shows "loop2 p k = iter k True" (is "?lhs = ?rhs")
+proof(rule spmf.leq_antisym)
+  show "ord_spmf (=) ?lhs ?rhs"
+  proof (induction arbitrary: k rule: loop2_fixp_induct)
+    case adm
+    then show ?case by simp
+  next
+    case bottom
+    then show ?case by simp
+  next
+    case (step loop2)
+    then show ?case 
       sorry
   qed
-  then show ?thesis 
+next
+  show "ord_spmf (=) ?rhs ?lhs"
     sorry
 qed
 
 lemma lossless_loop2 [simp]:
-  shows "lossless_spmf (loop2 p (nat(floor p)))"
+  shows "lossless_spmf (loop2 p k)"
 proof -
-  have "lossless_spmf (iter (nat (floor p)) True)"
+  have "lossless_spmf (iter k True)"
     using lossless_iter by simp
   then show ?thesis
     using loop2_conv_iter by simp
@@ -819,25 +803,37 @@ thm "spmf_False_conv_True"
 
 lemma spmf_loop2_True [simp]: 
   assumes "1\<le>p" 
-  shows "spmf (loop2 p 1) True = exp(-floor(p))"
-proof -
-  have "\<forall>k::nat. nat (floor p) < k \<longrightarrow> spmf (loop2 p k) True = 1"
-  proof rule+
-    fix k
-    assume 1:"nat \<lfloor>p\<rfloor> < k"
-    show "spmf (loop2 p k) True = 1 "
+  shows "spmf (loop2 p k) True = exp(-k)"
+proof (induct k)
+  case 0
+  then show ?case 
+    apply(rewrite loop2.simps)
+    using 0 by simp
+next
+  case (Suc k)
+  then show ?case 
+  proof -
+    assume step:"spmf (loop2 p k) True = exp (- real k)"
+    have "ennreal (spmf (loop2 p (Suc k)) True) = exp(-(Suc k))"
       apply(rewrite loop2.simps)
-      using 1 by(simp)
+      apply(simp add: ennreal_spmf_bind nn_integral_measure_spmf UNIV_bool nn_integral_count_space_finite)
+      apply(simp add: step)
+    proof -
+      have 1:"0 < exp (-1::real)" by simp
+      have 2:"0 < exp (-k::real)" by simp
+      have "ennreal (exp (-1)) * ennreal (exp (-k)) = exp (-1) * exp (-k)"
+        using 1 2 by(simp add:ennreal_mult)
+      also have "... = exp (-(k+1))"
+        by (simp add: mult_exp_exp)
+      finally show "ennreal (exp (-1)) * ennreal (exp (- real k)) = exp(-1- real k)" by simp
+    qed
+    then show ?thesis by simp
   qed
-  have "\<forall>k::nat . 1\<le>k \<and>  k \<le> nat (floor p) \<longrightarrow> spmf (loop2 p k) True = exp(-floor p + k - 1)"
-  proof rule+
-    fix k
-    assume 1:"1\<le> k \<and> k \<le> nat \<lfloor>p\<rfloor>"
-    show "spmf (loop2 p k) True = exp(-floor p + k - 1)"
-  sorry
+qed
+
 lemma spmf_loop2_False [simp]:
   assumes "1\<le>p"
-  shows "spmf (loop2 p 1) False = 1 - exp(-floor(p))"
+  shows "spmf (loop2 p k) False = 1 - exp(-k)"
   using assms lossless_loop2 spmf_False_conv_True spmf_loop2_True by auto
 
 lemma lossless_bernoulli_exp_minus_real[simp]:
@@ -852,14 +848,39 @@ proof -
     by simp
 qed
 
-lemma spmf_bernoulli_exp_minus_rat_True[simp]:
+lemma spmf_bernoulli_exp_minus_real_True[simp]:
+  assumes "0\<le>p"
   shows "spmf (bernoulli_exp_minus_real p) True = exp(-p)"
-  apply(simp add: bernoulli_exp_minus_real_def)
-  sorry
-
+    apply(simp add: bernoulli_exp_minus_real_def)
+    apply(cases "p\<le>1")
+     apply(simp_all)
+     apply(subst order_class.leD, simp add: assms, simp)
+proof-
+  assume cond: "\<not> p \<le> 1"
+  have "ennreal (spmf (loop2 p (nat \<lfloor>p\<rfloor>) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_real_from_0_to_1 (p - real_of_int \<lfloor>p\<rfloor>) else return_spmf b)) True)
+        = ennreal (spmf (loop2 p (nat \<lfloor>p\<rfloor>)) True) * ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1 (p - real_of_int \<lfloor>p\<rfloor>)) True)"
+    by(simp add:ennreal_spmf_bind nn_integral_measure_spmf UNIV_bool nn_integral_count_space_finite)
+  also have "... = ennreal (exp (- nat \<lfloor>p\<rfloor>)) * ennreal (exp (-p+ \<lfloor>p\<rfloor>))"
+  proof(rewrite spmf_loop2_True)
+    show "1\<le>p" using cond by simp
+    show "ennreal (exp (- real (nat \<lfloor>p\<rfloor>))) * ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1 (p - \<lfloor>p\<rfloor>)) True)
+        = ennreal (exp (- (nat \<lfloor>p\<rfloor>))) * ennreal (exp (- p + \<lfloor>p\<rfloor>))"
+    proof (rewrite spmf_bernoulli_exp_minus_real_from_0_to_1_True, simp_all)
+      show "p - \<lfloor>p\<rfloor> \<le> 1" using cond by linarith
+    qed
+  qed
+  also have "... = exp (-(\<lfloor>p\<rfloor>)) * exp (- p + \<lfloor>p\<rfloor>)"
+    using ennreal_mult' assms  by auto
+  also have "... = exp (-p)"
+    by (simp add: mult_exp_exp)
+  finally show "spmf (loop2 p (nat \<lfloor>p\<rfloor>) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_real_from_0_to_1 (p - real_of_int \<lfloor>p\<rfloor>) else return_spmf b)) True = exp (- p)"
+    by simp
+qed
+    
 lemma spmf_bernoulli_exp_minus_rat_False[simp]:
+  assumes "0\<le>p"
   shows "spmf (bernoulli_exp_minus_real p) False = 1-exp(-p)"
-  by(simp add:spmf_False_conv_True)
+  by (simp add: assms spmf_False_conv_True)
 
 
 
