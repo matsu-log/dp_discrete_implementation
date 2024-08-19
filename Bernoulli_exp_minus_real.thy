@@ -30,14 +30,12 @@ definition  bernoulli_exp_minus_real_from_0_to_1 :: "real \<Rightarrow> bool spm
 
 context notes [[function_internals]] begin
 partial_function (spmf) loop2 :: "real \<Rightarrow> nat \<Rightarrow> bool spmf" where
-  "loop2 p k = (if 1\<le>k & k\<le> nat(floor p) then do {
-                                              b \<leftarrow> bernoulli_exp_minus_real_from_0_to_1 1;
-                                              if b then loop2 p (k+1) else return_spmf False
-                                              } 
+  "loop2 p k = (if 1\<le>k then do {
+                                b \<leftarrow> bernoulli_exp_minus_real_from_0_to_1 1;
+                                if b then loop2 p (k-1) else return_spmf False
+                                } 
                 else return_spmf True)"
 end
-
-
 
 definition bernoulli_exp_minus_real :: "real  \<Rightarrow> bool spmf" where
   "bernoulli_exp_minus_real p = 
@@ -46,7 +44,7 @@ definition bernoulli_exp_minus_real :: "real  \<Rightarrow> bool spmf" where
     else if 0 \<le> p & p\<le>1  then bernoulli_exp_minus_real_from_0_to_1 p
     else
      do {
-        b \<leftarrow> loop2 p 1;
+        b \<leftarrow> loop2 p (nat (floor p));
         if b then bernoulli_exp_minus_real_from_0_to_1 (p-floor p) else return_spmf b
       }
   )
@@ -66,10 +64,8 @@ thm "loop2.fixp_induct"
 lemma loop2_fixp_induct [case_names adm bottom step]:
   assumes "spmf.admissible (\<lambda>loop2. P (curry loop2))"
     and "P (\<lambda>loop2 p. return_pmf None)"
-    and "(\<And>loop2'. P loop2' \<Longrightarrow>
-      P (\<lambda>a b. if 1 \<le> b \<and> b \<le> nat \<lfloor>a\<rfloor>
-                then bernoulli_exp_minus_real_from_0_to_1 1 \<bind> (\<lambda>ba. if ba then loop2' a (b + 1) else return_spmf False)
-                else return_spmf True))"
+    and "(\<And>loop2. P loop2 \<Longrightarrow> P (\<lambda>a b. if 1 \<le> b then bernoulli_exp_minus_real_from_0_to_1 1 \<bind> (\<lambda>ba. if ba then loop2 a (b - 1) else return_spmf False) 
+                                        else return_spmf True))"
   shows "P loop2"
   using assms by (rule loop2.fixp_induct)
 
@@ -772,68 +768,45 @@ interpretation loop_spmf id body
   rewrites "body \<equiv>  (\<lambda>b. map_spmf (\<lambda>b'. (if b' then True else False)) (bernoulli_exp_minus_real_from_0_to_1 1))"
   by(fact body_def)
 
-(*
-lemma loop2_iter_simps:
-  shows "iter n True = (if 1 \<le> n then  map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (n - 1)
-                       else return_spmf True)"
-proof -
-  have "1\<le>n \<Longrightarrow> iter n True = map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (n - 1)"
-  proof (cases "1\<le>n")
-    case True
-    then show ?thesis 
-  next
-    case False
-    then show ?thesis sorry
-  qed
-*)
 
 lemma loop2_conv_iter:
-  shows "loop2 p 1 = iter (nat (floor p)) True" 
+  shows "loop2 p (nat (floor p)) = iter (nat (floor p)) True" 
 proof - 
   have "loop2 p x = iter (nat ((floor p) - nat(x-1))) True" (is "?lhs = ?rhs") for x
-proof(rule spmf.leq_antisym)
-  show "ord_spmf (=) ?lhs ?rhs"
-  proof (induction arbitrary: x rule: loop2_fixp_induct)
-    case adm
-    then show ?case by simp
-  next
-    case bottom
-    then show ?case by simp
-  next
-    case (step loop2')
-    then show ?case using step.IH[of "Suc x"]
-    proof -
-      thm iter.simps
-      have cond1:"1\<le> nat (\<lfloor>p\<rfloor> - int (nat (int (x - (1::nat))))) \<Longrightarrow> iter (nat (\<lfloor>p\<rfloor> - int (nat (int (x - (1::nat))))) ) True =   (if id True then map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (nat \<lfloor>p\<rfloor> - 1) else return_spmf True)"
-        sorry
-      have cond2:"nat (floor p) < 1 \<Longrightarrow> iter (nat \<lfloor>p\<rfloor>) True = return_spmf True"
-        by simp
-      have "iter (nat \<lfloor>p\<rfloor>) True = (if 1 \<le> nat (floor p) then  (if id True then map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (nat \<lfloor>p\<rfloor> - 1) else return_spmf True)
+  proof(rule spmf.leq_antisym)
+    show "ord_spmf (=) ?lhs ?rhs"
+    proof (induction arbitrary: x rule: loop2_fixp_induct)
+      case adm
+      then show ?case by simp
+    next
+      case bottom
+      then show ?case by simp
+    next
+      case (step loop2')
+      then show ?case using step.IH[of "Suc x"]
+      proof -
+        thm iter.simps
+        have cond1:"1\<le> nat (\<lfloor>p\<rfloor> - int (nat (int (x - (1::nat))))) \<Longrightarrow> iter (nat (\<lfloor>p\<rfloor> - int (nat (int (x - (1::nat))))) ) True =   (if id True then map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (nat \<lfloor>p\<rfloor> - 1) else return_spmf True)"
+          sorry
+        have cond2:"nat (floor p) < 1 \<Longrightarrow> iter (nat \<lfloor>p\<rfloor>) True = return_spmf True"
+          by simp
+        have "iter (nat \<lfloor>p\<rfloor>) True = (if 1 \<le> nat (floor p) then  (if id True then map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (nat \<lfloor>p\<rfloor> - 1) else return_spmf True)
                                     else return_spmf True)"
-        using cond1 cond2
-        by (meson Suc_le_eq not_less_eq_eq)
-      also have "... = (if 1 \<le> nat (floor p) then map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (nat \<lfloor>p\<rfloor> - 1)
-                        else return_spmf True)"
-        by simp
-      finally have 1:"iter (nat \<lfloor>p\<rfloor>) True =  (if 1 \<le> nat (floor p) then map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (nat \<lfloor>p\<rfloor> - 1)
-                                            else return_spmf True)"
-        by simp
-      have 2:"ord_spmf (=)
-     (if (1::nat) \<le> (1::nat) \<and> (1::nat) \<le> nat \<lfloor>p\<rfloor> then bernoulli_exp_minus_real_from_0_to_1 (1::real) \<bind> (\<lambda>ba::bool. if ba then loop2' p ((1::nat) + (1::nat)) else return_spmf False)
-      else return_spmf True)
-      (if 1 \<le> nat (floor p) then  map_spmf (\<lambda>b'::bool. if b' then True else False) (bernoulli_exp_minus_real_from_0_to_1 (1::real)) \<bind> iter (nat \<lfloor>p\<rfloor> - 1)
-       else return_spmf True)"
-        apply(clarsimp simp add: map_spmf_bind_spmf)
-        apply(clarsimp intro!: ord_spmf_bind_reflI)
-        sorry
-      show ?thesis using 1 2 by argo 
+          using cond1 cond2
+          sorry
+        show ?thesis 
+          sorry
+      qed
+    qed
+    show "ord_spmf (=) ?rhs ?lhs"
+      sorry
   qed
-  show "ord_spmf (=) ?rhs ?lhs"
+  then show ?thesis 
     sorry
 qed
 
 lemma lossless_loop2 [simp]:
-  shows "lossless_spmf (loop2 p 1)"
+  shows "lossless_spmf (loop2 p (nat(floor p)))"
 proof -
   have "lossless_spmf (iter (nat (floor p)) True)"
     using lossless_iter by simp
@@ -847,6 +820,20 @@ thm "spmf_False_conv_True"
 lemma spmf_loop2_True [simp]: 
   assumes "1\<le>p" 
   shows "spmf (loop2 p 1) True = exp(-floor(p))"
+proof -
+  have "\<forall>k::nat. nat (floor p) < k \<longrightarrow> spmf (loop2 p k) True = 1"
+  proof rule+
+    fix k
+    assume 1:"nat \<lfloor>p\<rfloor> < k"
+    show "spmf (loop2 p k) True = 1 "
+      apply(rewrite loop2.simps)
+      using 1 by(simp)
+  qed
+  have "\<forall>k::nat . 1\<le>k \<and>  k \<le> nat (floor p) \<longrightarrow> spmf (loop2 p k) True = exp(-floor p + k - 1)"
+  proof rule+
+    fix k
+    assume 1:"1\<le> k \<and> k \<le> nat \<lfloor>p\<rfloor>"
+    show "spmf (loop2 p k) True = exp(-floor p + k - 1)"
   sorry
 lemma spmf_loop2_False [simp]:
   assumes "1\<le>p"
