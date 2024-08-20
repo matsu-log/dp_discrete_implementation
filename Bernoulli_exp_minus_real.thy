@@ -4,10 +4,6 @@ theory Bernoulli_exp_minus_real
           "Probabilistic_While.Bernoulli"
 begin
 
-
-
-
-
 context notes [[function_internals]] begin
 partial_function (spmf) loop1 :: "real  \<Rightarrow> nat  \<Rightarrow> nat spmf" where
  "loop1 p k =
@@ -80,7 +76,7 @@ interpretation loop_spmf fst body
   rewrites "body \<equiv>  (\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (True,k'+1) else (False,k'))) (bernoulli (p/k')))" 
   by(fact body_def)
 
-lemma loop1_conv_while:
+ lemma loop1_conv_while:
  "loop1 p 1 = map_spmf snd (while (True, 1))"
 proof -
   have "(loop1 p x) = map_spmf snd (while (True, x))" (is "?lhs = ?rhs") for x
@@ -768,25 +764,48 @@ interpretation loop_spmf id body
   rewrites "body \<equiv>  (\<lambda>b. map_spmf (\<lambda>b'. (if b' then True else False)) (bernoulli_exp_minus_real_from_0_to_1 1))"
   by(fact body_def)
 
+lemma iter_simps_for_loop2:
+  shows "iter k True = (if 1\<le>k then (bernoulli_exp_minus_real_from_0_to_1 1) \<bind> (\<lambda>b. if b then iter (k-1) True else return_spmf False) else return_spmf True)"
+proof (cases "1\<le>k")
+  case True
+  then show ?thesis 
+  proof -
+    have "iter k True = iter (Suc (k-1)) True" using True by simp
+    also have "... = (bernoulli_exp_minus_real_from_0_to_1 1) \<bind> iter (k-1)" by simp
+    also have "... = (if 1 \<le> k then (bernoulli_exp_minus_real_from_0_to_1 1) \<bind>  (\<lambda>b. if b then iter (k-1) True else return_spmf False) else return_spmf True)"
+    proof -
+      have "iter (k-1) = (\<lambda>b. if b then iter (k-1) True else return_spmf False)" by fastforce
+      then show ?thesis using True by simp
+    qed
+    finally show ?thesis by simp
+  qed
+next
+  case False
+  then show ?thesis 
+  proof -
+    have "iter k True = iter 0 True" using False 
+      by (simp add: not_less_eq_eq)
+    also have "... = return_spmf True" by simp
+    also have "... = (if 1 \<le> k then (bernoulli_exp_minus_real_from_0_to_1 1) \<bind> (\<lambda>b. if b then iter (k-1) True else return_spmf False) else return_spmf True)"
+      using False by simp
+    finally show ?thesis by simp
+  qed
+qed  
 
 lemma loop2_conv_iter:
   shows "loop2 p k = iter k True" (is "?lhs = ?rhs")
-proof(rule spmf.leq_antisym)
-  show "ord_spmf (=) ?lhs ?rhs"
-  proof (induction arbitrary: k rule: loop2_fixp_induct)
-    case adm
-    then show ?case by simp
-  next
-    case bottom
-    then show ?case by simp
-  next
-    case (step loop2)
-    then show ?case 
-      sorry
-  qed
+proof (induction k)
+  case 0
+  then show ?case
+    apply(rewrite iter_simps_for_loop2)
+    apply(rewrite loop2.simps)
+    by(simp)
 next
-  show "ord_spmf (=) ?rhs ?lhs"
-    sorry
+  case (Suc k)
+  then show ?case 
+    apply(rewrite iter_simps_for_loop2)
+    apply(rewrite loop2.simps)
+    using diff_Suc_1 by presburger
 qed
 
 lemma lossless_loop2 [simp]:
@@ -798,8 +817,6 @@ proof -
     using loop2_conv_iter by simp
 qed
 end
-
-thm "spmf_False_conv_True"
 
 lemma spmf_loop2_True [simp]: 
   assumes "1\<le>p" 
@@ -881,11 +898,5 @@ lemma spmf_bernoulli_exp_minus_rat_False[simp]:
   assumes "0\<le>p"
   shows "spmf (bernoulli_exp_minus_real p) False = 1-exp(-p)"
   by (simp add: assms spmf_False_conv_True)
-
-
-
-
-
-
 
 end
