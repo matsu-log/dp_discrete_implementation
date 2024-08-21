@@ -127,7 +127,7 @@ proof -
     apply(simp add: spmf_False_conv_True pmf_False_conv_True)
     done
   have "\<And>i. spmf (bernoulli_rat n d) i = pmf (bernoulli_pmf (real n / real d)) i" using true_eq false_eq
-    by metis
+    by (rule bool.induct)
   then show ?thesis 
     by (simp add: spmf_eqI)
 qed
