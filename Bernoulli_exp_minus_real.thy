@@ -79,7 +79,7 @@ interpretation loop_spmf fst body
  lemma loop1_conv_while:
  "loop1 p 1 = map_spmf snd (while (True, 1))"
 proof -
-  have "(loop1 p x) = map_spmf snd (while (True, x))" (is "?lhs = ?rhs") for x
+  have "loop1 p x = map_spmf snd (while (True, x))" (is "?lhs = ?rhs") for x
   proof (rule spmf.leq_antisym)
     show "ord_spmf (=) ?lhs ?rhs"
     proof (induction arbitrary: x rule: loop1_fixp_induct)
@@ -253,9 +253,9 @@ next
     assume Step:"\<forall>l>m. spmf (k p l) m = 0" and L:"l>m"
     have "ennreal (spmf (bernoulli (p/l) \<bind> (\<lambda>aa. if aa then k p (l + 1) else return_spmf l)) m) = ennreal 0"
       apply(simp add: ennreal_spmf_bind nn_integral_measure_spmf UNIV_bool nn_integral_count_space_finite)
-      using L Step not_less_eq option.inject order_less_imp_not_less singletonD apply(auto)
-      done
-    then show " \<forall>l>m. spmf (k p l) m = 0 \<Longrightarrow> m < l \<Longrightarrow> spmf (bernoulli (p/l) \<bind> (\<lambda>aa. if aa then k p (l + 1) else return_spmf l)) m = 0" by simp
+      using L Step not_less_eq option.inject order_less_imp_not_less singletonD 
+      by auto
+    then show "spmf (bernoulli (p/l) \<bind> (\<lambda>aa. if aa then k p (l + 1) else return_spmf l)) m = 0" by simp
   qed
 qed
 

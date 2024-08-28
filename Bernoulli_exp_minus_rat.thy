@@ -1,4 +1,4 @@
-theory Bernoulli_exp_minus_rat_2
+theory Bernoulli_exp_minus_rat
   imports "Probabilistic_While.While_SPMF"
           "HOL-Probability.Probability"
           "Bernoulli_rat"
@@ -199,6 +199,12 @@ lemma bernoulli_exp_minus_rat_eq_bernoulli_exp_minus_real:
   apply(rewrite sublemma_for_bernoulli_exp_minus_rat_eq_bernoulli_exp_minus_real)
   by(simp_all add: assms)
 
+lemma lossless_bernoulli_exp_minus_rat:
+  fixes p::rat
+  assumes "0\<le>p"
+  shows "lossless_spmf (bernoulli_exp_minus_rat p)"
+  using assms  bernoulli_exp_minus_rat_eq_bernoulli_exp_minus_real by simp
+
 lemma spmf_bernoulli_exp_minus_rat_True[simp]:
   fixes p::rat
   assumes "0\<le>p"
@@ -207,7 +213,19 @@ proof -
   have "spmf (bernoulli_exp_minus_rat p) True = spmf (bernoulli_exp_minus_real (of_rat p)) True"
     using bernoulli_exp_minus_rat_eq_bernoulli_exp_minus_real assms by simp
   also have "... = exp(-(of_rat p))"
-    using spmf_bernoulli_exp_minus_real_True assms by simp
+    using assms by simp
+  finally show ?thesis by simp
+qed
+
+lemma spmf_bernoulli_exp_minus_rat_False[simp]:
+  fixes p::rat
+  assumes "0\<le>p"
+  shows "spmf (bernoulli_exp_minus_rat p) False = 1-exp(-(of_rat p))"
+proof -
+  have "spmf (bernoulli_exp_minus_rat p) False = spmf (bernoulli_exp_minus_real (of_rat p)) False"
+    using bernoulli_exp_minus_rat_eq_bernoulli_exp_minus_real assms by simp
+  also have "... = 1 - exp(-(of_rat p))"
+    using assms by simp
   finally show ?thesis by simp
 qed
 end
