@@ -215,12 +215,31 @@ proof -
   then show ?thesis by simp
 qed
 
+thm discrete_laplace_rat.simps
+term map_spmf
+term  "(fast_uniform (t::nat) \<bind>
+                          (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t))))"
+term "(\<lambda>d. if \<not> d then (true, t, s, 0)
+           else (loop 0 \<bind>
+                (\<lambda>v. let x = u + t * v; y = \<lfloor>x/s\<rfloor> in map_spmf (\<lambda>b. if \<not> b \<and> y = 0 then (true, t, s, 0) else if b then (false, t , s, - y) else (false, t, s, y)))) bernoulli_rat 1 2)"
+term " map_spmf (\<lambda>b. if \<not> b \<and> y = 0 then (true, t, s, 0) else if b then (false, t , s, - y) else (false, t, s, y)) (bernoulli_rat 1 2)"
+context
+  fixes body :: "bool \<times> nat \<times> nat \<times> int \<Rightarrow> (bool \<times> nat \<times> nat \<times> int) spmf"
+  defines [simp]: "body \<equiv> (\<lambda>(b, s, t, z). map_spmf 
+                      (\<lambda>d. if \<not> d then (true, t, s, 0)
+                         else (loop 0 \<bind>
+                          (\<lambda>v. let x = u + t * v; y = \<lfloor>x/s\<rfloor> in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then (true, t, s, 0) else if b then (false, t , s, - y) else (false, t, s, y)))))
+                      (fast_uniform (t::nat) \<bind>
+                          (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t))))"
+
+begin
+interpretation loop_spmf fst body 
+  rewrites "body \<equiv> (\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (True,k') else (False,k'))) (bernoulli_exp_minus_rat 1))"
+  by(fact body_def)
+)
+
 lemma spmf_discrete_laplace_rat[simp]:
   shows "spmf (discrete_laplace_rat t s) z = (exp(t/s)-1)/(exp(t/s)+1) * exp (- abs z * t/s)"
-  apply (rewrite discrete_laplace_rat.simps)
-
-proof -
-  have ""
-  sorry
+proof (spmf_ub_tight)
 
 end
