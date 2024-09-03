@@ -2,18 +2,21 @@ theory Discrete_Laplace_rat
   imports "Bernoulli_exp_minus_rat"
           "Probabilistic_While.Fast_Dice_Roll"
           "Bernoulli_rat"
+          "Probabilistic_While.While_SPMF"
 begin
 
 term "fast_uniform 3" 
 
+context notes [[function_internals]] begin
 partial_function (spmf) loop :: "nat \<Rightarrow> nat spmf" where
 "loop v = do {
               a \<leftarrow> bernoulli_exp_minus_rat 1;
               if a = False then return_spmf v
               else  loop (v+1)
 }"
+end
 
-
+context notes [[function_internals]] begin
 partial_function (spmf) discrete_laplace_rat :: "nat \<Rightarrow> nat \<Rightarrow> int spmf" where
 "discrete_laplace_rat t s = bind_spmf 
                               (fast_uniform t) 
@@ -28,6 +31,7 @@ partial_function (spmf) discrete_laplace_rat :: "nat \<Rightarrow> nat \<Rightar
                                                                                       else if b then return_spmf (-y) 
                                                                                            else return_spmf y ) )))
 "
+end
 
 thm loop.fixp_induct
 
@@ -37,6 +41,21 @@ and "P (\<lambda>loop. return_pmf None)"
 and "(\<And>loop'. P loop' \<Longrightarrow> P (\<lambda>va. bernoulli_exp_minus_rat 1 \<bind> (\<lambda>a. if a = False then return_spmf va else loop' (va + 1))))"
 shows "P loop"
   using assms by (rule loop.fixp_induct)
+
+thm discrete_laplace_rat.fixp_induct
+
+lemma discrete_laplace_rat_fixp_induct [case_names adm bottom step]:
+  assumes "spmf.admissible (\<lambda>discrete_laplace_rat. P (curry discrete_laplace_rat))"
+and "P (\<lambda>discrete_laplace_rat t. return_pmf None)"
+and "(\<And>discrete_laplace_rat. P discrete_laplace_rat \<Longrightarrow>
+      P (\<lambda>a b. fast_uniform a \<bind>
+                (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int a)) \<bind>
+                     (\<lambda>d. if \<not> d then discrete_laplace_rat a b
+                          else loop 0 \<bind>
+                               (\<lambda>v. let x = u + a * v; y = \<lfloor>real x / real b\<rfloor>
+                                    in bernoulli_rat 1 2 \<bind> (\<lambda>ba. if \<not> ba \<and> y = 0 then discrete_laplace_rat a b else if ba then return_spmf (- y) else return_spmf y))))))"
+shows "P discrete_laplace_rat"
+  using assms by (rule discrete_laplace_rat.fixp_induct)
 
 context
   fixes body :: "bool \<times> nat \<Rightarrow> (bool \<times> nat) spmf"
@@ -216,23 +235,22 @@ proof -
 qed
 
 thm discrete_laplace_rat.simps
-term map_spmf
-term  "(fast_uniform (t::nat) \<bind>
-                          (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t))))"
-term "(\<lambda>d. if \<not> d then return_spmf (True, t, s, 0)
-            else loop 0 \<bind>
-                 (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
-                       in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s,- y) else return_spmf (False, t, s,y))))"
 
-term "(fast_uniform (t::nat) \<bind>
-                          (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t))))  \<bind>
-(\<lambda>d. if \<not> d then return_spmf (True, t, s, 0)
-            else loop 0 \<bind>
-                 (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
-                       in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s,- y) else return_spmf (False, t, s,y))))"
-
-value "snd (snd(1::nat,2::nat,3::nat,4::nat))"
-term "snd \<circ> snd \<circ> snd"
+context notes [[function_internals]] begin
+partial_function (spmf) test :: "bool \<Rightarrow> bool spmf" where
+"test b = do {
+              a \<leftarrow> bernoulli_exp_minus_rat 1;
+              if a = False then return_spmf b
+              else  test b
+}"
+end
+thm test.fixp_induct
+lemma test_fixp_induct [case_names adm bottom step]:
+  assumes "spmf.admissible P"
+and "P (\<lambda>test. return_pmf None)"
+and "(\<And>b. P b \<Longrightarrow> P (\<lambda>ba. bernoulli_exp_minus_rat 1 \<bind> (\<lambda>a. if a = False then return_spmf ba else b ba)))"
+shows "P test"
+  using assms by (rule test.fixp_induct)
 
 context
   fixes body :: "bool \<times> nat \<times> nat \<times> int \<Rightarrow> (bool \<times> nat \<times> nat \<times> int) spmf"
@@ -255,13 +273,54 @@ interpretation loop_spmf fst body
                                        in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s,- y) else return_spmf (False, t, s,y))))))"
   by(fact body_def)
 
-lemma discrete_laplace_rat_cov_while:
-"discrete_laplace_rat t s = map_spmf (snd \<circ> snd \<circ> snd) (while (True, t, s, 0))"
+lemma map_spmf_bind_spmf_lambda:
+"map_spmf f \<circ> (\<lambda>y. bind_spmf (p y) (g y) ) = (\<lambda>y. (p y) \<bind> map_spmf f \<circ> (g y))"
+  by (simp add: comp_def map_spmf_bind_spmf)
+
+lemma 
+  fixes t s ::nat 
+  shows 
+" 
+    (\<lambda>y. bind_spmf (p y)
+      (\<lambda>ya. bind_spmf  (g y) (map_spmf f \<circ> local.while)))
+=
+    (\<lambda>y. bind_spmf (p y)
+      (\<lambda>ya. bind_spmf (g y) (map_spmf f \<circ> local.while)))
+"
   sorry
+
+  find_theorems "bind_spmf _ (map_spmf _) = _"
+
+lemma discrete_laplace_rat_cov_while:
+"discrete_laplace_rat t s = map_spmf (snd \<circ> snd \<circ> snd) (while (True, t, s, 0))" (is "?lhs = ?rhs")
+proof (rule spmf.leq_antisym)
+  show "ord_spmf (=) ?lhs ?rhs"
+  proof (induction rule: discrete_laplace_rat_fixp_induct)
+    case adm
+    then show ?case by simp
+  next
+    case bottom
+    then show ?case by simp
+  next
+    case (step discrete_laplace_rat)
+    show ?case 
+      apply(rewrite while.simps)
+      apply(clarsimp)
+      apply(clarsimp simp add: map_spmf_bind_spmf)
+      apply(clarsimp simp add: map_spmf_bind_spmf_lambda)
+      apply(clarsimp intro!: ord_spmf_bind_reflI)
+      sorry
+  qed
+  show "ord_spmf (=) ?rhs ?lhs"
+    sorry
+qed
 
 lemma lossless_discrete_laplace_rat:
 "lossless_spmf (discrete_laplace_rat t s)"
   sorry
+
+end
+
 
 lemma spmf_discrete_laplace_rat[simp]:
   shows "spmf (discrete_laplace_rat t s) z = (exp(t/s)-1)/(exp(t/s)+1) * exp (- abs z * t/s)"
@@ -272,10 +331,47 @@ proof (rule spmf_ub_tight)
     show "spmf (discrete_laplace_rat t s) x \<le> (exp (t/s) - 1) / (exp (t/s) + 1) * exp (- \<bar>real_of_int x\<bar> * t/s)"
     proof -
       have "ennreal (spmf (discrete_laplace_rat t s) x) \<le>ennreal ((exp (t/s) - 1) / (exp (t/s) + 1) * exp (- \<bar>real_of_int x\<bar> * t/s))"
-        sorry
+        apply(rewrite discrete_laplace_rat.simps)
+        apply(simp add: ennreal_spmf_bind nn_integral_measure_spmf)
+        apply(simp add: nn_integral_count_space_finite UNIV_bool)
+      proof-
+        have "ennreal (spmf (discrete_laplace_rat t s) x) = 
+              ennreal (spmf (fast_uniform t \<bind>
+                              (\<lambda>u. bernoulli_exp_minus_rat (Fract u t) \<bind>
+                                (\<lambda>d. if \<not> d then discrete_laplace_rat t s
+                                     else loop 0 \<bind>
+                                      (\<lambda>v. let x = u + t * v; y = \<lfloor>x/s\<rfloor>
+                                       in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then discrete_laplace_rat t s else if b then return_spmf (- y) else return_spmf y)))))x)"
+          by (simp add: discrete_laplace_rat.simps)
+        also have "... =
+                  (\<Sum>\<^sup>+ u. ennreal (spmf (fast_uniform t) u) *
+                          (\<Sum>\<^sup>+ d. ennreal (spmf (bernoulli_exp_minus_rat (Fract (int u) (int t))) d) *
+                                  ennreal (spmf (if \<not> d then discrete_laplace_rat t s
+                                                 else loop 0 \<bind>
+                                                    (\<lambda>v. let x = u + t * v; y = \<lfloor>x/s\<rfloor> in
+                                                     bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then discrete_laplace_rat t s 
+                                                                                else if b then return_spmf (- y) else return_spmf y)))x)))"
+          by (simp add: ennreal_spmf_bind nn_integral_measure_spmf)
+        also have "... =  (\<Sum>\<^sup>+ u. ennreal (spmf (fast_uniform t) u) *
+       (ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) False) * ennreal (spmf (discrete_laplace_rat t s) x) +
+        ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) True) * ennreal (spmf (loop 0 \<bind>
+                                                                                    (\<lambda>v. let y = \<lfloor>(real u + real t * real v) / real s\<rfloor>
+                                                                                         in bernoulli_rat (Suc 0) 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then discrete_laplace_rat t s 
+                                                                                                                             else if b then return_spmf (- y) 
+                                                                                                                                  else return_spmf y)))
+                                                                             x)
+       )
+      )"
+          by(simp add: nn_integral_count_space_finite UNIV_bool)
+        also have "... = "
+
       then show ?thesis by simp
     qed
   qed
   show "(\<Sum>\<^sup>+ x. ennreal ((exp (t/s) - 1) / (exp (t/s) + 1) * exp (- \<bar>real_of_int x\<bar> * t/s))) = ennreal (weight_spmf (discrete_laplace_rat t s))"
-    apply(simp add: lossless_discrete_laplace_rat)
+  proof - 
+    have 1:"ennreal (weight_spmf (discrete_laplace_rat t s)) = 1"
+      using lossless_discrete_laplace_rat lossless_spmf_def by auto
+    have 2:"(\<Sum>\<^sup>+ x. ennreal ((exp (t/s) - 1) / (exp (t/s) + 1) * exp (- \<bar>real_of_int x\<bar> * t/s))) = 1" 
+    
 end
