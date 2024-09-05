@@ -184,7 +184,6 @@ next
 qed
 
 lemma spmf_loop [simp]: 
-  assumes "1\<le>m"
   shows "spmf (loop 0) m = (exp(-1))^(m) * (1-exp(-1))"
 proof -
   have P:"\<forall>k l::nat .  ennreal (spmf (loop k) (k+l)) = ennreal ((exp(-1))^(l) * (1-exp(-1)))"
@@ -226,7 +225,7 @@ proof -
   have "ennreal (spmf (loop 0) m) = ennreal ((exp(-1))^(m) * (1-exp(-1)))"
   proof -
     have "ennreal (spmf (loop 0) m) = ennreal (spmf (loop 0) (0+m))"
-      using assms by auto
+      by auto
     also have "... = ennreal ((exp(-1))^(m) * (1-exp(-1)))"
       using P by blast
     finally show ?thesis by simp
@@ -236,21 +235,6 @@ qed
 
 thm discrete_laplace_rat.simps
 
-context notes [[function_internals]] begin
-partial_function (spmf) test :: "bool \<Rightarrow> bool spmf" where
-"test b = do {
-              a \<leftarrow> bernoulli_exp_minus_rat 1;
-              if a = False then return_spmf b
-              else  test b
-}"
-end
-thm test.fixp_induct
-lemma test_fixp_induct [case_names adm bottom step]:
-  assumes "spmf.admissible P"
-and "P (\<lambda>test. return_pmf None)"
-and "(\<And>b. P b \<Longrightarrow> P (\<lambda>ba. bernoulli_exp_minus_rat 1 \<bind> (\<lambda>a. if a = False then return_spmf ba else b ba)))"
-shows "P test"
-  using assms by (rule test.fixp_induct)
 
 context
   fixes body :: "bool \<times> nat \<times> nat \<times> int \<Rightarrow> (bool \<times> nat \<times> nat \<times> int) spmf"
@@ -507,7 +491,6 @@ qed
 lemma lossless_discrete_laplace_rat:
 "lossless_spmf (discrete_laplace_rat t s)"
   sorry
-find_theorems "bind_spmf (return_spmf _) _ "
 end
 
 (*declare[[s
@@ -518,25 +501,20 @@ end
 lemma spmf_discrete_laplace_rat[simp]:
   assumes "1\<le>s" and "1\<le>t"
   shows "spmf (discrete_laplace_rat t s) z = (exp(t/s)-1)/(exp(t/s)+1) * exp (- abs z * t/s)"
-proof (rule spmf_ub_tight)
-  show "\<And>x. spmf (discrete_laplace_rat t s) x \<le> (exp (t/s) - 1) / (exp (t/s) + 1) * exp (- \<bar>real_of_int x\<bar> * t/s)"
-  proof -
-    fix x
-    show "spmf (discrete_laplace_rat t s) x \<le> (exp (t/s) - 1) / (exp (t/s) + 1) * exp (- \<bar>real_of_int x\<bar> * t/s)"
-    proof -
-      have "ennreal (spmf (discrete_laplace_rat t s) x) \<le>ennreal ((exp (t/s) - 1) / (exp (t/s) + 1) * exp (- \<bar>real_of_int x\<bar> * t/s))"
-        apply(rewrite discrete_laplace_rat.simps)
-        apply(simp add: ennreal_spmf_bind nn_integral_measure_spmf)
-        apply(simp add: nn_integral_count_space_finite UNIV_bool)
-        apply(simp add: ennreal_spmf_bind nn_integral_measure_spmf)
-      proof-
-        have "ennreal (spmf (discrete_laplace_rat t s) x) = 
-              ennreal (spmf (fast_uniform t \<bind>
-                              (\<lambda>u. bernoulli_exp_minus_rat (Fract u t) \<bind>
-                                (\<lambda>d. if \<not> d then discrete_laplace_rat t s
-                                     else loop 0 \<bind>
-                                      (\<lambda>v. let x = u + t * v; y = \<lfloor>x/s\<rfloor>
-                                       in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then discrete_laplace_rat t s else if b then return_spmf (- y) else return_spmf y)))))x)"
+proof -
+  have "ennreal (spmf (discrete_laplace_rat t s) z) \<le>ennreal ((exp (t/s) - 1) / (exp (t/s) + 1) * exp (- \<bar>real_of_int z\<bar> * t/s))"  
+    apply(rewrite discrete_laplace_rat.simps)
+    apply(simp add: ennreal_spmf_bind nn_integral_measure_spmf)
+    apply(simp add: nn_integral_count_space_finite UNIV_bool)    
+    apply(simp add: ennreal_spmf_bind nn_integral_measure_spmf)
+  proof-
+    have "ennreal (spmf (discrete_laplace_rat t s) z) = 
+          ennreal (spmf (fast_uniform t \<bind>
+                        (\<lambda>u. bernoulli_exp_minus_rat (Fract u t) \<bind>
+                         (\<lambda>d. if \<not> d then discrete_laplace_rat t s
+                              else loop 0 \<bind>
+                                (\<lambda>v. let x = u + t * v; y = \<lfloor>x/s\<rfloor>
+                                 in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then discrete_laplace_rat t s else if b then return_spmf (- y) else return_spmf y)))))z)"
           by (simp add: discrete_laplace_rat.simps)
         also have "... =
                   (\<Sum>\<^sup>+ u. ennreal (spmf (fast_uniform t) u) *
@@ -545,61 +523,61 @@ proof (rule spmf_ub_tight)
                                                  else loop 0 \<bind>
                                                     (\<lambda>v. let x = u + t * v; y = \<lfloor>x/s\<rfloor> in
                                                      bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then discrete_laplace_rat t s 
-                                                                                else if b then return_spmf (- y) else return_spmf y)))x)))"
+                                                                                else if b then return_spmf (- y) else return_spmf y)))z)))"
           by (simp add: ennreal_spmf_bind nn_integral_measure_spmf)
         also have "... =  (\<Sum>\<^sup>+ u. ennreal (spmf (fast_uniform t) u) *
-       (ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) False) * ennreal (spmf (discrete_laplace_rat t s) x) +
+       (ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) False) * ennreal (spmf (discrete_laplace_rat t s) z) +
         ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) True) * ennreal (spmf (loop 0 \<bind>
                                                                                     (\<lambda>v. let y = \<lfloor>(real u + real t * real v) / real s\<rfloor>
                                                                                          in bernoulli_rat (Suc 0) 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then discrete_laplace_rat t s 
                                                                                                                              else if b then return_spmf (- y) 
                                                                                                                                   else return_spmf y)))
-                                                                             x)
+                                                                             z)
        )
       )"
           by(simp add: nn_integral_count_space_finite UNIV_bool)
         also have "... = (\<Sum> u::nat. ennreal (spmf (fast_uniform t) u) *
-       (ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) False) * ennreal (spmf (discrete_laplace_rat t s) x) +
+       (ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) False) * ennreal (spmf (discrete_laplace_rat t s) z) +
         ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) True) * ennreal (spmf (loop 0 \<bind>
                                                                                     (\<lambda>v. let y = \<lfloor>(real u + real t * real v) / real s\<rfloor>
                                                                                          in bernoulli_rat (Suc 0) 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then discrete_laplace_rat t s 
                                                                                                                              else if b then return_spmf (- y) 
                                                                                                                                   else return_spmf y)))
-                                                                             x)
+                                                                             z)
        )
       )"
           using nn_integral_count_space_nat by blast
         also have "... = (\<Sum> u\<in>{0::nat..t-1}. ennreal (spmf (fast_uniform t) u) *
-       (ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) False) * ennreal (spmf (discrete_laplace_rat t s) x) +
+       (ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) False) * ennreal (spmf (discrete_laplace_rat t s) z) +
         ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) True) * ennreal (spmf (loop 0 \<bind>
                                                                                     (\<lambda>v. let y = \<lfloor>(real u + real t * real v) / real s\<rfloor>
                                                                                          in bernoulli_rat (Suc 0) 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then discrete_laplace_rat t s 
                                                                                                                              else if b then return_spmf (- y) 
                                                                                                                                   else return_spmf y)))
-                                                                             x)
+                                                                             z)
        )
       )"
         proof (rule suminf_finite)
           show "finite {0::nat..t-1}" by simp
           show "\<And>u. u \<notin>  {0::nat..t-1} \<Longrightarrow> ennreal (spmf (fast_uniform t) u) *
-       (ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) False) * ennreal (spmf (discrete_laplace_rat t s) x) +
+       (ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) False) * ennreal (spmf (discrete_laplace_rat t s) z) +
         ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) True) * ennreal (spmf (loop 0 \<bind>
                                                                                     (\<lambda>v. let y = \<lfloor>(real u + real t * real v) / real s\<rfloor>
                                                                                          in bernoulli_rat (Suc 0) 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then discrete_laplace_rat t s 
                                                                                                                              else if b then return_spmf (- y) 
                                                                                                                                   else return_spmf y)))
-                                                                             x))= 0"
+                                                                             z))= 0"
           proof -
             fix u::nat
             assume u:"u \<notin> {0..t - 1}"
             then show "ennreal (spmf (fast_uniform t) u) *
-       (ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) False) * ennreal (spmf (discrete_laplace_rat t s) x) +
+       (ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) False) * ennreal (spmf (discrete_laplace_rat t s) z) +
         ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) True) * ennreal (spmf (loop 0 \<bind>
                                                                                     (\<lambda>v. let y = \<lfloor>(real u + real t * real v) / real s\<rfloor>
                                                                                          in bernoulli_rat (Suc 0) 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then discrete_laplace_rat t s 
                                                                                                                              else if b then return_spmf (- y) 
                                                                                                                                   else return_spmf y)))
-                                                                             x))= 0"
+                                                                             z))= 0"
             proof -
             have "spmf (fast_uniform t) u = 0"
               using u spmf_fast_uniform by simp 
@@ -608,13 +586,13 @@ proof (rule spmf_ub_tight)
         qed
       qed
       also have "... = (\<Sum> u\<in>{0::nat..t-1}. ennreal (1/t) *
-       (ennreal (1-exp(-(of_rat (Fract u t)))) * ennreal (spmf (discrete_laplace_rat t s) x) +
+       (ennreal (1-exp(-(of_rat (Fract u t)))) * ennreal (spmf (discrete_laplace_rat t s) z) +
         ennreal (exp(-(of_rat (Fract u t)))) * ennreal (spmf (loop 0 \<bind>
                                                                                     (\<lambda>v. let y = \<lfloor>(real u + real t * real v) / real s\<rfloor>
                                                                                          in bernoulli_rat (Suc 0) 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then discrete_laplace_rat t s 
                                                                                                                              else if b then return_spmf (- y) 
                                                                                                                                   else return_spmf y)))
-                                                                             x)
+                                                                             z)
        )
       )" 
       proof -
@@ -625,59 +603,59 @@ proof (rule spmf_ub_tight)
         show ?thesis using 1 2 spmf_fast_uniform by simp
       qed
       also have "... = (\<Sum> u\<in>{0::nat..t-1}. ennreal (1/t) *
-       (ennreal (1-exp(-(of_rat (Fract u t)))) * ennreal (spmf (discrete_laplace_rat t s) x) +
+       (ennreal (1-exp(-(of_rat (Fract u t)))) * ennreal (spmf (discrete_laplace_rat t s) z) +
         ennreal (exp(-(of_rat (Fract u t)))) * (\<Sum>\<^sup>+ v. ennreal (spmf (loop 0) v) *
                                                        ennreal (spmf (let y = \<lfloor>(u+t*real v)/s\<rfloor> in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then discrete_laplace_rat t s 
                                                                                                                             else if b then return_spmf (- y) 
                                                                                                                                  else return_spmf y))
-              x))))" 
+              z))))" 
         by (simp add: ennreal_spmf_bind nn_integral_measure_spmf)
       also have "... = (\<Sum> u\<in>{0::nat..t-1}. ennreal (1/t) *
-       (ennreal (1-exp(-(of_rat (Fract u t)))) * ennreal (spmf (discrete_laplace_rat t s) x) +
+       (ennreal (1-exp(-(of_rat (Fract u t)))) * ennreal (spmf (discrete_laplace_rat t s) z) +
         ennreal (exp(-(of_rat (Fract u t)))) * (\<Sum>\<^sup>+ v. ennreal (spmf (loop 0) v) *(let y = \<lfloor>(u+t*real v)/s\<rfloor> in
                                                        ennreal (spmf (bernoulli_rat 1 2 \<bind>  (\<lambda>b. if \<not> b \<and> y = 0 then discrete_laplace_rat t s 
                                                                                                   else if b then return_spmf (- y) 
-                                                                                                       else return_spmf y))x)))
+                                                                                                       else return_spmf y))z)))
       ))"
         by metis
       also have "... = (\<Sum> u\<in>{0::nat..t-1}. ennreal (1/t) *
-       (ennreal (1-exp(-(of_rat (Fract u t)))) * ennreal (spmf (discrete_laplace_rat t s) x) +
+       (ennreal (1-exp(-(of_rat (Fract u t)))) * ennreal (spmf (discrete_laplace_rat t s) z) +
         ennreal (exp(-(of_rat (Fract u t)))) * (\<Sum>\<^sup>+ v. ennreal (spmf (loop 0) v) * (let y = \<lfloor>(u+t*real v)/s\<rfloor> in 
                                              (inverse 2 * ennreal (spmf ((\<lambda>b. if \<not> b \<and> y = 0 then discrete_laplace_rat t s 
                                                                                                           else if b then return_spmf (- y) 
-                                                                                                               else return_spmf y) False) x) 
+                                                                                                               else return_spmf y) False) z) 
                                                +
                                               inverse 2 * ennreal (spmf ((\<lambda>b. if \<not> b \<and> y = 0 then discrete_laplace_rat t s 
                                                                                                           else if b then return_spmf (- y) 
-                                                                                                                  else return_spmf y) True) x)
+                                                                                                                  else return_spmf y) True) z)
                                              ))
      )))"
         by(simp add: ennreal_spmf_bind nn_integral_measure_spmf nn_integral_count_space_finite UNIV_bool) 
       also have  "... = (\<Sum> u\<in>{0::nat..t-1}. ennreal (1/t) *
-       (ennreal (1-exp(-(of_rat (Fract u t)))) * ennreal (spmf (discrete_laplace_rat t s) x) +
+       (ennreal (1-exp(-(of_rat (Fract u t)))) * ennreal (spmf (discrete_laplace_rat t s) z) +
         ennreal (exp(-(of_rat (Fract u t)))) * (\<Sum>\<^sup>+ v. ennreal (spmf (loop 0) v) *(let y = \<lfloor>(u+t*real v)/s\<rfloor> in
                                              (inverse 2 * ennreal (spmf (if y = 0 then discrete_laplace_rat t s 
-                                                                              else return_spmf y) x) 
+                                                                              else return_spmf y) z) 
                                                +
-                                              inverse 2 * ennreal (spmf (return_spmf (- y)) x)
+                                              inverse 2 * ennreal (spmf (return_spmf (- y)) z)
                                              )))))"
         by presburger
       also have "... = (\<Sum> u\<in>{0::nat..t-1}. ennreal (1/t) *
-       (ennreal (1-exp(-(of_rat (Fract u t)))) * ennreal (spmf (discrete_laplace_rat t s) x) +
+       (ennreal (1-exp(-(of_rat (Fract u t)))) * ennreal (spmf (discrete_laplace_rat t s) z) +
         ennreal (exp(-(of_rat (Fract u t)))) * (\<Sum>\<^sup>+ v. ennreal (spmf (loop 0) v) *(let y = \<lfloor>(u+t*real v)/s\<rfloor> in
                                              (1/(2::nat) * ennreal (spmf (if y = 0 then discrete_laplace_rat t s 
-                                                                              else return_spmf y) x) 
+                                                                              else return_spmf y) z) 
                                                +
-                                              1/(2::nat) * ennreal (spmf (return_spmf (- y)) x)
+                                              1/(2::nat) * ennreal (spmf (return_spmf (- y)) z)
                                              )))))"
         using inverse_eq_divide[of "2"] by simp
       also have "... = (\<Sum> u\<in>{0::nat..t-1}. ennreal (1/t) *
-       (ennreal (1-exp(-(of_rat (Fract u t)))) * ennreal (spmf (discrete_laplace_rat t s) x) +
+       (ennreal (1-exp(-(of_rat (Fract u t)))) * ennreal (spmf (discrete_laplace_rat t s) z) +
         ennreal (exp(-(of_rat (Fract u t)))) * (\<Sum>\<^sup>+ v. ennreal (spmf (loop 0) v) *(let y = \<lfloor>(u+t*real v)/s\<rfloor> in
-                                             (1/(2::nat) * ennreal ((if y = 0 then spmf (discrete_laplace_rat t s) x 
-                                                                     else spmf (return_spmf y) x)) 
+                                             (1/(2::nat) * ennreal ((if y = 0 then spmf (discrete_laplace_rat t s) z
+                                                                     else spmf (return_spmf y) z)) 
                                                +
-                                              1/(2::nat) * ennreal (spmf (return_spmf (- y)) x)
+                                              1/(2::nat) * ennreal (spmf (return_spmf (- y)) z)
                                              )))))"
       proof-
         have "\<forall>y x. (spmf (if y = 0 then discrete_laplace_rat t s else return_spmf y) x) 
@@ -686,18 +664,27 @@ proof (rule spmf_ub_tight)
         then show ?thesis by simp
       qed
       also have "... = (\<Sum> u\<in>{0::nat..t-1}. ennreal (1/t) *
-       (ennreal (1-exp(-(of_rat (Fract u t)))) * ennreal (spmf (discrete_laplace_rat t s) x) +
-        ennreal (exp(-(of_rat (Fract u t)))) * (\<Sum>\<^sup>+ v. ennreal (spmf (loop 0) v) *(let y = \<lfloor>(u+t*real v)/s\<rfloor> in
-                                             (1/(2::nat) * ennreal ((if y = 0 then spmf (discrete_laplace_rat t s) x 
-                                                                     else if y = x then 1 else 0)) 
+       (ennreal (1-exp(-(of_rat (Fract u t)))) * ennreal (spmf (discrete_laplace_rat t s) z) +
+        ennreal (exp(-(of_rat (Fract u t)))) * (\<Sum>\<^sup>+ v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) *(let y = \<lfloor>(u+t*real v)/s\<rfloor> in
+                                             (1/(2::nat) * ennreal ((if y = 0 then spmf (discrete_laplace_rat t s) z
+                                                                     else if y = z then 1 else 0)) 
                                                +
-                                              1/(2::nat) * ennreal ( (if (- y)=x then 1 else 0))
+                                              1/(2::nat) * ennreal ( (if (- y)=z then 1 else 0))
                                              )))))"
       proof -
         have 1:"\<forall> x y. spmf (return_spmf y) x = (if y=x then 1 else 0)" by simp
         have 2:"\<forall> x y. spmf (return_spmf (uminus y)) x = (if (uminus y)=x then 1 else 0)" by simp
         show ?thesis by(rewrite 1,rewrite 2,simp) 
       qed
+      finally have "ennreal (spmf (discrete_laplace_rat t s) z) =
+                   (\<Sum>u = 0..t - 1. ennreal (1/t)*
+                   (ennreal (1 - exp (- real_of_rat (Fract u t))) * ennreal (spmf (discrete_laplace_rat t s) z) +
+                    ennreal (exp (- real_of_rat (Fract u t))) *
+                            (\<Sum>\<^sup>+ v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) *
+                                   (let y = \<lfloor>(u+t*real v)/s\<rfloor>
+                                    in ennreal (1 / real 2) * ennreal (if y = 0 then spmf (discrete_laplace_rat t s) z else if y = z then 1 else 0) 
+                                     + ennreal (1 / real 2) * ennreal (if - y = z then 1 else 0))))) "
+        by simp
 
 
       then show ?thesis by simp
