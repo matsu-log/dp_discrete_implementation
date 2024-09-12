@@ -132,6 +132,14 @@ proof -
   qed
   then show ?thesis using loop_conv_while by simp
 qed
+
+lemma lossless_loop_zero[simp]:
+"lossless_spmf (loop 0)"
+  apply(rewrite loop.simps)
+proof(simp, auto, simp add:lossless_bernoulli_exp_minus_rat)
+  show "lossless_spmf (loop (Suc 0)) " using lossless_loop by simp
+qed
+
 end
 
 lemma spmf_loop_zero_fixp_induct_case_adm:
@@ -602,75 +610,407 @@ proof -
       qed
       finally show ?thesis
         by simp
-    qed
-(*
+    qed 
+
+lemma set_spmf_if:"set_spmf \<circ> (\<lambda>x. if b x then f x else g x) = (\<lambda>x. if b x then set_spmf(f x) else set_spmf(g x))"
+  by fastforce
+
+lemma set_spmf_bind_set: 
+  assumes "\<And>x. A x \<subseteq> B "
+  shows "Set.bind (set_spmf p) (\<lambda>x. A x) \<subseteq> B "
+  unfolding Set.bind_def using assms by auto
+
+(*declare[[show_types,show_sorts]]*)
 lemma lossless_discrete_laplace_rat:
   assumes "1\<le>s" and "1\<le>t"
   shows "lossless_spmf (discrete_laplace_rat t s)"
 proof- 
   have "lossless_spmf (while (True,t,s,0))"
-  proof (rule termination_0_1_immediate,clarify)
-    fix b::bool and t s::nat and z::int
-    assume "fst (b,t,s,z)"
-    show "p \<le> spmf (map_spmf fst
-                    (fast_uniform t \<bind>
-                     (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind>
-                          (\<lambda>d. if \<not> d then return_spmf (True, t, s, 0)
+  proof (rule termination_0_1_immediate_invar,clarify)
+    fix b::bool and t1 s1::nat and z::int
+    assume "fst (b,t1,s1,z)"
+    and I:"(\<lambda>(b,t1,s1,z). t1=t \<and> s1=s) (b,t1,s1,z)"
+    show "1/t * (1 - exp (- 1)) *  (inverse (2::nat)) \<le> spmf (map_spmf fst
+                    (fast_uniform t1 \<bind>
+                     (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t1)) \<bind>
+                          (\<lambda>d. if \<not> d then return_spmf (True, t1, s1, 0)
                                else loop 0 \<bind>
-                                    (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                    (\<lambda>v. let x = u + t1 * v; y = \<lfloor>real x / real s1\<rfloor>
                                          in bernoulli_rat 1 2 \<bind>
-                                            (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y)))))))
+                                            (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t1, s1, 0) else if b then return_spmf (False, t1, s1, - y) else return_spmf (False, t1, s1, y)))))))
               False"
     proof -
-      have "ennreal (spmf (map_spmf fst (fast_uniform t \<bind>
-                     (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind>
-                          (\<lambda>d. if \<not> d then return_spmf (True, t, s, 0)
+      have "ennreal (spmf (map_spmf fst (fast_uniform t1 \<bind>
+                     (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t1)) \<bind>
+                          (\<lambda>d. if \<not> d then return_spmf (True, t1, s1, 0)
                                else loop 0 \<bind>
-                                    (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                    (\<lambda>v. let x = u + t1 * v; y = \<lfloor>real x / real s1\<rfloor>
                                          in bernoulli_rat 1 2 \<bind>
-                                            (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y))))))) False) =
-            ennreal (spmf (fast_uniform t \<bind>
-      (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind>
+                                            (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t1, s1, 0) else if b then return_spmf (False, t1, s1, - y) else return_spmf (False, t1, s1, y))))))) False) =
+            ennreal (spmf (fast_uniform t1 \<bind>
+      (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t1)) \<bind>
            (\<lambda>d. if \<not> d then return_spmf True
                 else (loop 0 \<bind>
-                     (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                     (\<lambda>v. let x = u + t1 * v; y = \<lfloor>real x / real s1\<rfloor>
                           in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf True else if b then return_spmf False else return_spmf False)))))) False)"
         by(simp add: discrete_laplace_rat_body_map_spmf_fst)
-      also have "... = (\<Sum>u::nat. ennreal (spmf (fast_uniform t) u) *
-       (ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) True) *
-        (\<Sum>\<^sup>+ v. ennreal (exp (-1)^v * (1 - exp (- 1))) * (inverse 2 * ennreal (spmf (if \<lfloor>(u+t*real v)/s\<rfloor> = 0 then return_spmf True else return_spmf False) False) + inverse 2))))"
+      also have "... = (\<Sum>u::nat. ennreal (spmf (fast_uniform t1) u) *
+       (ennreal (spmf (bernoulli_exp_minus_rat (Fract u t1)) True) *
+        (\<Sum>\<^sup>+ v. ennreal (exp (-1)^v * (1 - exp (- 1))) * (inverse 2 * ennreal (spmf (if \<lfloor>(u+t1*real v)/s1\<rfloor> = 0 then return_spmf True else return_spmf False) False) + inverse 2))))"
         apply(simp add:ennreal_spmf_bind nn_integral_measure_spmf nn_integral_count_space_finite UNIV_bool)
         using nn_integral_count_space_nat by blast
-      also have "... = (\<Sum>u\<in>{0::nat..t-1}. ennreal (spmf (fast_uniform t) u) *
-       (ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) True) *
-        (\<Sum>\<^sup>+ v. ennreal (exp (-1)^v * (1 - exp (- 1))) * (inverse 2 * ennreal (spmf (if \<lfloor>(u+t*real v)/s\<rfloor> = 0 then return_spmf True else return_spmf False) False) + inverse 2))))"
+      also have "... = (\<Sum>u\<in>{0::nat..t1-1}. ennreal (spmf (fast_uniform t1) u) *
+       (ennreal (spmf (bernoulli_exp_minus_rat (Fract u t1)) True) *
+        (\<Sum>\<^sup>+ v. ennreal (exp (-1)^v * (1 - exp (- 1))) * (inverse 2 * ennreal (spmf (if \<lfloor>(u+t1*real v)/s1\<rfloor> = 0 then return_spmf True else return_spmf False) False) + inverse 2))))"
       proof (rule suminf_finite)
-        show "finite {0::nat..t-1}" by simp
+        show "finite {0::nat..t1-1}" by simp
         fix u 
-        assume u:"u \<notin> {0..t - 1}"
-        show "ennreal (spmf (fast_uniform t) u) *
-         (ennreal (spmf (bernoulli_exp_minus_rat (Fract (int u) (int t))) True) *
-          (\<Sum>\<^sup>+ v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) * (inverse 2 * ennreal (spmf (if \<lfloor>(u+t*real v)/s\<rfloor> = 0 then return_spmf True else return_spmf False) False) + inverse 2)))=0"
+        assume u:"u \<notin> {0..t1 - 1}"
+        show "ennreal (spmf (fast_uniform t1) u) *
+         (ennreal (spmf (bernoulli_exp_minus_rat (Fract (int u) (int t1))) True) *
+          (\<Sum>\<^sup>+ v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) * (inverse 2 * ennreal (spmf (if \<lfloor>(u+t1*real v)/s1\<rfloor> = 0 then return_spmf True else return_spmf False) False) + inverse 2)))=0"
         proof -
-          have "spmf (fast_uniform t) u = 0"
+          have "spmf (fast_uniform t1) u = 0"
             using u spmf_fast_uniform by simp 
           then show ?thesis by simp
         qed
       qed
-      also have "... \<ge> (\<Sum>u\<in>{0::nat..t-1}. ennreal 1/t *
-       (ennreal (spmf (bernoulli_exp_minus_rat (Fract u t)) True) *
-        (\<Sum>\<^sup>+ v. ennreal (exp (-1)^v * (1 - exp (- 1))) * inverse 2)))"
-        sorry
-            
-
-    show ?thesis
-      sorry
+      also have "... \<ge> (\<Sum>u\<in>{0::nat..t1-1}. ennreal (1/t1) *
+       (ennreal (exp(-(of_rat(Fract u t1)))) *
+         (\<Sum>\<^sup>+ v.
+               ennreal (exp (- 1) ^ v * (1 - exp (- 1))) * (inverse 2 * ennreal (spmf (if \<lfloor>(real u + real t1 * real v) / real s1\<rfloor> = 0 then return_spmf True else return_spmf False) False) + inverse 2))))"
+      proof -
+        have 1:"\<forall>u\<in>{0::nat..t1-1}. 0 \<le> (Fract u t1)" using I assms
+          by (simp add: zero_le_Fract_iff)
+        have 2:"\<forall>u\<in>{0::nat..t1-1}. u < t1" 
+          using I assms by auto
+        show ?thesis using 1 2 spmf_fast_uniform  
+          by(simp)
+      qed
+      finally have 1:"
+        ennreal (spmf (map_spmf fst (fast_uniform t1 \<bind>
+                     (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t1)) \<bind>
+                          (\<lambda>d. if \<not> d then return_spmf (True, t1, s1, 0)
+                               else loop 0 \<bind>
+                                    (\<lambda>v. let x = u + t1 * v; y = \<lfloor>real x / real s1\<rfloor>
+                                         in bernoulli_rat 1 2 \<bind>
+                                            (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t1, s1, 0) else if b then return_spmf (False, t1, s1, - y) else return_spmf (False, t1, s1, y))))))) False)
+  \<ge> (\<Sum>u\<in>{0::nat..t1-1}. ennreal (1/t1) *
+       (ennreal (exp(-(of_rat(Fract u t1)))) *
+         (\<Sum>\<^sup>+ v.
+               ennreal (exp (- 1) ^ v * (1 - exp (- 1))) * (inverse 2 * ennreal (spmf (if \<lfloor>(real u + real t1 * real v) / real s1\<rfloor> = 0 then return_spmf True else return_spmf False) False) + inverse 2))))"
+        by simp
+      have 2:"(\<Sum>u\<in>{0::nat..t1-1}. ennreal (1/t1) *
+       (ennreal (exp(-(of_rat(Fract u t1)))) *
+         (\<Sum>\<^sup>+ v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) *  (inverse (2::nat)))))
+      \<le>  (\<Sum>u\<in>{0::nat..t1-1}. ennreal (1/t1) *
+       (ennreal (exp(-(of_rat(Fract u t1)))) *
+         (\<Sum>\<^sup>+ v.
+               ennreal (exp (- 1) ^ v * (1 - exp (- 1))) * (inverse (2::nat) * ennreal (spmf (if \<lfloor>(u+t1*real v)/s1\<rfloor> = 0 then return_spmf True else return_spmf False) False) + inverse (2::nat)))))"
+      proof (rule ordered_comm_monoid_add_class.sum_mono)
+        fix u
+        have 1:"(\<Sum>\<^sup>+ v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) * ennreal (inverse (real 2))) \<le> 
+               (\<Sum>\<^sup>+ v.
+               ennreal (exp (- 1) ^ v * (1 - exp (- 1))) *
+               (ennreal (inverse (real 2)) * ennreal (spmf (if \<lfloor>(real u + real t1 * real v) / real s1\<rfloor> = 0 then return_spmf True else return_spmf False) False) + ennreal (inverse (real 2))))"
+        proof (rewrite nn_integral_mono,simp_all,clarify)
+          fix x
+          show "ennreal (exp (- 1) ^ x * (1 - exp (- 1))) * (inverse 2::ennreal) \<le> ennreal (exp (- 1) ^ x * (1 - exp (- 1))) * ((inverse 2 + inverse 2)::ennreal)"
+          proof -
+            have "(inverse 2::ennreal) \<le> (inverse 2 + inverse 2)"
+              by simp
+            then show ?thesis 
+              by (simp add: distrib_left)
+          qed
+        qed
+        have 2:"ennreal (1 / real t1) * (ennreal (exp (- real_of_rat (Fract (int u) (int t1))))) \<le> ennreal (1 / real t1) * (ennreal (exp (- real_of_rat (Fract (int u) (int t1)))))"
+          by simp
+        then show "ennreal (1 / real t1) * (ennreal (exp (- real_of_rat (Fract (int u) (int t1)))) * (\<Sum>\<^sup>+ v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) * ennreal (inverse (real 2))))
+         \<le> ennreal (1 / real t1) * (ennreal (exp (- real_of_rat (Fract (int u) (int t1)))) *
+             (\<Sum>\<^sup>+ v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) *
+                (ennreal (inverse (real 2)) * ennreal (spmf (if \<lfloor>(real u + real t1 * real v) / real s1\<rfloor> = 0 then return_spmf True else return_spmf False) False) + ennreal (inverse (real 2)))))"
+          using 1 2 
+          by (metis (no_types, lifting) ennreal_eq_0_iff ennreal_mult_cancel_left ennreal_mult_le_mult_iff not_exp_le_zero top_neq_ennreal)
+      qed
+      have 3:"(\<Sum>u\<in>{0::nat..t1-1}. ennreal (1/t1) *
+       (ennreal (exp(-(of_rat(Fract u t1)))) *
+         (\<Sum>\<^sup>+ v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) *  (inverse (2::nat))))) \<le> 
+         ennreal (spmf (map_spmf fst (fast_uniform t1 \<bind>
+                     (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t1)) \<bind>
+                          (\<lambda>d. if \<not> d then return_spmf (True, t1, s1, 0)
+                               else loop 0 \<bind>
+                                    (\<lambda>v. let x = u + t1 * v; y = \<lfloor>real x / real s1\<rfloor>
+                                         in bernoulli_rat 1 2 \<bind>
+                                            (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t1, s1, 0) else if b then return_spmf (False, t1, s1, - y) else return_spmf (False, t1, s1, y))))))) False)"
+        using 1 2 by simp
+      have 4:" (\<Sum>u\<in>{0::nat..t1-1}. ennreal (1/t1) *
+       (ennreal (exp(-(of_rat(Fract u t1)))) *
+         (ennreal (1 - exp (- 1)) *  (inverse (2::nat))))) \<le>
+      (\<Sum>u\<in>{0::nat..t1-1}. ennreal (1/t1) *
+       (ennreal (exp(-(of_rat(Fract u t1)))) *
+         (\<Sum>\<^sup>+ v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) *  (inverse (2::nat))))) "
+      proof -
+        have "ennreal (1 - exp (- 1)) *  (inverse (2::nat)) = (\<Sum> v\<in>{0::nat}. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) *  (inverse (2::nat)))"
+          by simp
+        also have "...\<le> (\<Sum> v::nat. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) *  (inverse (2::nat)))"
+          by(rule sum_le_suminf,simp_all)
+        also have "... = (\<Sum>\<^sup>+ v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) *  (inverse (2::nat)))" 
+          using nn_integral_count_space_nat by simp
+        finally have 1:"ennreal (1 - exp (- 1)) *  (inverse (2::nat)) \<le> (\<Sum>\<^sup>+ v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) *  (inverse (2::nat)))"
+          by simp
+        show ?thesis 
+        proof (rewrite sum_mono,simp_all)
+          fix u 
+          show "ennreal (1 / real t1) * (ennreal (exp (- real_of_rat (Fract (int u) (int t1)))) * (ennreal (1 - exp (- 1)) * inverse 2))
+         \<le> ennreal (1 / real t1) * (ennreal (exp (- real_of_rat (Fract (int u) (int t1)))) * (\<Sum>\<^sup>+ v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) * inverse 2))"
+          proof(rule mult_mono,simp_all,rule mult_mono,simp_all)
+            show "ennreal (1 - exp (- 1)) * inverse 2 \<le> (\<Sum>\<^sup>+ v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) * inverse 2)"
+            proof -
+              have "ennreal (1 - exp (- 1)) *  (inverse 2) = (\<Sum> v\<in>{0::nat}. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) *  (inverse (2::nat)))"
+                by simp
+              also have "...\<le> (\<Sum> v::nat. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) *  (inverse (2::nat)))"
+                by(rule sum_le_suminf,simp_all)
+              also have "... = (\<Sum>\<^sup>+ v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) *  (inverse 2))" 
+                using nn_integral_count_space_nat by simp
+              finally show ?thesis by simp
+            qed
+          qed
+        qed
+      qed
+      have 5:"ennreal (1/t * (1 - exp (- 1)) *  (inverse (2::nat))) \<le>
+       (\<Sum>u\<in>{0::nat..t1-1}. ennreal (1/t1) *
+       (ennreal (exp(-(of_rat(Fract u t1)))) *
+         (ennreal (1 - exp (- 1)) *  (inverse (2::nat)))))"
+      proof -
+        have "(ennreal (1/t * (1 - exp (- 1)) *  (inverse (2::nat)))) = (ennreal (1/t1 * (1 - exp (- 1)) *  (inverse (2::nat))))"
+          using I by simp
+        also have "... = (ennreal (1/t1) * (ennreal 1 * (ennreal (1 - exp (- 1)) *  (inverse 2))))"
+        proof(rewrite ennreal_mult,simp_all)
+          have " ennreal ((1 - exp (- 1)) / real t1) * inverse 2 =  ennreal (1/ t1) * ennreal (1 - exp (- 1)) * inverse 2"
+            by(simp add: divide_inverse ennreal_mult' mult.commute)
+          also have "... = (ennreal (1/t1) * (ennreal 1 * (ennreal (1 - exp (- 1)) *  (inverse 2))))"
+            by (simp add: mult.assoc)
+          finally show "ennreal ((1 - exp (- 1)) / real t1) * inverse 2 = ennreal (1 / real t1) * (ennreal (1 - exp (- 1)) * inverse 2)"
+            by simp
+        qed
+        also have "... = (ennreal (1/t1) * (ennreal (exp(-(of_rat(Fract 0 t1)))) * (ennreal (1 - exp (- 1)) *  (inverse 2)))) "
+        proof- 
+          have "Fract 0 t1 = 0" by(rule rat_number_collapse)
+          then show ?thesis by simp
+        qed
+        also have "... \<le> 
+              (\<Sum>u\<in>{0::nat}. ennreal (1/t1) * (ennreal (exp(-(of_rat(Fract u t1)))) * (ennreal (1 - exp (- 1)) *  (inverse 2))))"
+          by simp
+        also have "... \<le> (\<Sum>u\<in>{0::nat..t1-1}. ennreal (1/t1) * (ennreal (exp(-(of_rat(Fract u t1)))) * (ennreal (1 - exp (- 1)) *  (inverse 2))))"
+          by(rule sum_mono2, simp_all)
+        finally show ?thesis by simp
+      qed
+      have "ennreal (1/t * (1 - exp (- 1)) *  (inverse (2::nat)))\<le>
+             ennreal (spmf (map_spmf fst (fast_uniform t1 \<bind>
+                     (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t1)) \<bind>
+                          (\<lambda>d. if \<not> d then return_spmf (True, t1, s1, 0)
+                               else loop 0 \<bind>
+                                    (\<lambda>v. let x = u + t1 * v; y = \<lfloor>real x / real s1\<rfloor>
+                                         in bernoulli_rat 1 2 \<bind>
+                                            (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t1, s1, 0) else if b then return_spmf (False, t1, s1, - y) else return_spmf (False, t1, s1, y))))))) False)"
+        using 3 4 5 by order
+      then show ?thesis by simp
+    qed
+  next
+    show "0< 1/t * (1 - exp (- 1)) *  (inverse (2::nat))"
+    proof -
+      have 1:"0 < 1/t" using assms by auto
+      have "exp(-1::real)< 1" 
+        by(rewrite exp_less_one_iff,simp)
+      then have 2:"0 < 1-exp(-1::real)" by simp
+      have 3:"0<inverse (2::nat)" by simp
+      show ?thesis using 1 2 3 by auto
+    qed
+  next
+    show "case (True, t, s, 0) of (b, t1, s1, z) \<Rightarrow> t1 = t \<and> s1 = s" by simp
+  next
+    show "\<And>sa. fst sa \<Longrightarrow>
+          (case sa of (b, t1, s1, z) \<Rightarrow> t1 = t \<and> s1 = s) \<Longrightarrow>
+          lossless_spmf
+           (case sa of
+            (b, t, s, z) \<Rightarrow>
+              fast_uniform t \<bind>
+              (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind>
+                   (\<lambda>d. if \<not> d then return_spmf (True, t, s, 0)
+                        else loop 0 \<bind>
+                             (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                  in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y))))))"
+    proof(clarify,auto)
+      show "0<t" using assms by simp
+    next
+      fix x::nat
+      assume A1:"x \<in> set_spmf (fast_uniform t)"
+      show "lossless_spmf (bernoulli_exp_minus_rat (Fract (int x) (int t)))"
+      proof-
+        have "0\<le> Fract (int x) (int t)"
+          using assms(2) zero_le_Fract_iff by auto 
+        then show ?thesis by(rule lossless_bernoulli_exp_minus_rat)
+      qed
+    next
+      fix a x xa xb
+      show "lossless_spmf
+        (let y = \<lfloor>(x + real t * xb) / real s\<rfloor>
+         in bernoulli_rat (Suc 0) 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y)))"
+      proof -
+        have 1:"\<And>y. lossless_spmf (bernoulli_rat (Suc 0) 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y)))"
+          by simp
+        show ?thesis 
+          by (metis (no_types) "1")
+      qed
+    qed
+  next
+    show "\<And>sa s'.
+       s' \<in> set_spmf
+              (case sa of
+               (b, t, s, z) \<Rightarrow>
+                 fast_uniform t \<bind>
+                 (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind>
+                      (\<lambda>d. if \<not> d then return_spmf (True, t, s, 0)
+                           else loop 0 \<bind>
+                                (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                     in bernoulli_rat 1 2 \<bind>
+                                        (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y)))))) \<Longrightarrow>
+       (case sa of (b, t1, s1, z) \<Rightarrow> t1 = t \<and> s1 = s) \<Longrightarrow> fst sa \<Longrightarrow> (case s' of (b, t1, s1, z) \<Rightarrow> t1 = t \<and> s1 = s)"
+    proof (clarify)
+      fix b1 t1 s1 z1 b2 t2 s2 z2
+      assume H:"(b2,t2,s2,z2)\<in> set_spmf
+           (fast_uniform t \<bind>
+            (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind>
+                 (\<lambda>d. if \<not> d then return_spmf (True, t, s, 0)
+                      else loop 0 \<bind>
+                           (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y))))))"
+      then show "t2 = t \<and> s2 = s"
+      proof -
+        have "set_spmf
+           (fast_uniform t \<bind>
+            (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind>
+                 (\<lambda>d. if \<not> d then return_spmf (True, t, s, 0)
+                      else loop 0 \<bind>
+                           (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y))))))
+            = (set_spmf (fast_uniform t))\<bind>
+             (\<lambda>u. set_spmf (bernoulli_exp_minus_rat (Fract (int u) (int t))) \<bind>
+                 (set_spmf \<circ> (\<lambda>d. if \<not> d then return_spmf (True, t, s, 0)
+                      else loop 0 \<bind>
+                           (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y))))))"
+          by (simp add: set_bind_spmf o_def)
+        also have "... = (set_spmf (fast_uniform t))\<bind>
+             (\<lambda>u. set_spmf (bernoulli_exp_minus_rat (Fract (int u) (int t))) \<bind>
+                 (\<lambda>d. if \<not> d then set_spmf (return_spmf (True, t, s, 0))
+                      else set_spmf (loop 0 \<bind>
+                           (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y))))))"
+          by(rewrite set_spmf_if,simp)
+        also have "... = (set_spmf (fast_uniform t))\<bind>
+             (\<lambda>u. set_spmf (bernoulli_exp_minus_rat (Fract (int u) (int t))) \<bind>
+                 (\<lambda>d. if \<not> d then set_spmf (return_spmf (True, t, s, 0))
+                      else set_spmf (loop 0) \<bind>
+                           (set_spmf \<circ> (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y))))))"
+          using set_bind_spmf 
+          by metis
+        also have "... =  (set_spmf (fast_uniform t))\<bind>
+             (\<lambda>u. set_spmf (bernoulli_exp_minus_rat (Fract (int u) (int t))) \<bind>
+                 (\<lambda>d. if \<not> d then set_spmf (return_spmf (True, t, s, 0))
+                      else set_spmf (loop 0) \<bind>
+                           (\<lambda>v. (let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                in set_spmf (bernoulli_rat 1 2 \<bind>  (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y)))))))"
+        proof -
+          have "\<And>u. set_spmf \<circ> (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y)))
+                  =  (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                in set_spmf (bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y))))"
+            by (metis set_spmf_if)
+          then show ?thesis by auto
+        qed
+        also have "... =  (set_spmf (fast_uniform t))\<bind>
+             (\<lambda>u. set_spmf (bernoulli_exp_minus_rat (Fract (int u) (int t))) \<bind>
+                 (\<lambda>d. if \<not> d then set_spmf (return_spmf (True, t, s, 0))
+                      else set_spmf (loop 0) \<bind>
+                           (\<lambda>v. (let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                in set_spmf (bernoulli_rat 1 2) \<bind>  set_spmf \<circ> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y))))))"
+        proof - 
+          have "\<And>u. (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                in set_spmf (bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y))))
+                  =  (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                in set_spmf (bernoulli_rat 1 2) \<bind> set_spmf \<circ> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y)))"
+            by (meson set_bind_spmf)
+          then show ?thesis by auto
+        qed
+        also have "... =  (set_spmf (fast_uniform t))\<bind>
+             (\<lambda>u. set_spmf (bernoulli_exp_minus_rat (Fract (int u) (int t))) \<bind>
+                 (\<lambda>d. if \<not> d then set_spmf (return_spmf (True, t, s, 0))
+                      else set_spmf (loop 0) \<bind>
+                           (\<lambda>v. (let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                in set_spmf (bernoulli_rat 1 2) \<bind>  (\<lambda>b. if \<not> b \<and> y = 0 then set_spmf (return_spmf (True, t, s, 0)) else set_spmf (if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y)))))))"
+          by(rewrite set_spmf_if,simp)
+        also have "... =  (set_spmf (fast_uniform t))\<bind>
+             (\<lambda>u. set_spmf (bernoulli_exp_minus_rat (Fract (int u) (int t))) \<bind>
+                 (\<lambda>d. if \<not> d then set_spmf (return_spmf (True, t, s, 0))
+                      else set_spmf (loop 0) \<bind>
+                           (\<lambda>v. (let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                in set_spmf (bernoulli_rat 1 2) \<bind>  (\<lambda>b. if \<not> b \<and> y = 0 then set_spmf (return_spmf (True, t, s, 0)) else if b then set_spmf(return_spmf (False, t, s, - y)) else set_spmf (return_spmf (False, t, s, y)))))))"
+          by(rewrite if_distrib,simp)
+        also have "... =  (set_spmf (fast_uniform t))\<bind>
+             (\<lambda>u. set_spmf (bernoulli_exp_minus_rat (Fract (int u) (int t))) \<bind>
+                 (\<lambda>d. if \<not> d then {(True, t, s, 0)}
+                      else set_spmf (loop 0) \<bind>
+                           (\<lambda>v. (let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                in set_spmf (bernoulli_rat 1 2) \<bind>  (\<lambda>b. if \<not> b \<and> y = 0 then {(True, t, s, 0)} else if b then {(False, t, s, - y)} else {(False, t, s, y)})))))"
+          by(rewrite set_return_spmf, rewrite set_return_spmf, rewrite set_return_spmf, rewrite set_return_spmf, simp)
+        also have "... \<subseteq> {(True,t,s,0)} \<union> {(False, t1, s1, z). z \<in> \<int> \<and> t1=t \<and>s1 = s}"  
+        proof (rewrite set_spmf_bind_set,simp_all)
+          fix u
+          show "set_spmf (bernoulli_exp_minus_rat (Fract (int u) (int t))) \<bind>
+         (\<lambda>d. if \<not> d then {(True, t, s, 0)}
+              else set_spmf (loop 0) \<bind>
+                   (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                        in set_spmf (bernoulli_rat 1 2) \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then {(True, t, s, 0)} else if b then {(False, t, s, - y)} else {(False, t, s, y)})))
+         \<subseteq> insert (True, t, s, 0) {(False, t1, s1, z). z \<in> \<int> \<and> t1=t \<and>s1 = s}"
+          proof (rewrite set_spmf_bind_set,simp_all,rule)
+            fix d
+            show "set_spmf (loop 0) \<bind>
+         (\<lambda>v. let y = \<lfloor>(real u + real t * real v) / real s\<rfloor>
+              in set_spmf (bernoulli_rat (Suc 0) 2) \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then {(True, t, s, 0)} else if b then {(False, t, s, - y)} else {(False, t, s, y)}))
+         \<subseteq> insert (True, t, s, 0) {(False, t1, s1, z). z \<in> \<int> \<and> t1=t \<and>s1 = s} "
+            proof(rewrite set_spmf_bind_set,simp_all)
+              fix v::nat 
+              have 1:"\<And>y::int. set_spmf (bernoulli_rat (Suc 0) 2) \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then {(True, t, s, 0)} else if b then {(False, t, s, - y)} else {(False, t, s, y)})
+         \<subseteq> insert (True, t, s, 0) {(False, t1, s1, z). z \<in> \<int> \<and> t1=t \<and>s1 = s}"
+                unfolding Ints_def
+                by(rewrite set_spmf_bind_set,auto)
+              show "(let y = \<lfloor>(real u + real t * real v) / real s\<rfloor> in set_spmf (bernoulli_rat (Suc 0) 2) \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then {(True, t, s, 0)} else if b then {(False, t, s, - y)} else {(False, t, s, y)}))
+         \<subseteq> insert (True, t, s, 0) {(False, t1, s1, z). z \<in> \<int> \<and> t1=t \<and>s1 = s} "
+                using 1 by meson
+            qed
+          qed
+        qed
+        finally have "set_spmf
+           (fast_uniform t \<bind>
+            (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind>
+                 (\<lambda>d. if \<not> d then return_spmf (True, t, s, 0)
+                      else loop 0 \<bind>
+                           (\<lambda>v. let x = u + t * v; y = \<lfloor>real x / real s\<rfloor>
+                                in bernoulli_rat 1 2 \<bind> (\<lambda>b. if \<not> b \<and> y = 0 then return_spmf (True, t, s, 0) else if b then return_spmf (False, t, s, - y) else return_spmf (False, t, s, y))))))
+            \<subseteq> insert (True, t, s, 0) {(False, t1, s1, z). z \<in> \<int> \<and> t1=t \<and>s1 = s} "
+          by simp
+        then show ?thesis using H by auto
+      qed
+    qed
   qed
-*)
+  then show ?thesis by (simp add:discrete_laplace_rat_cov_while)
+qed
+               
 end
 
-(*declare[[s
-  qedhow_types,show_sorts]]*)
+
 
 
 
