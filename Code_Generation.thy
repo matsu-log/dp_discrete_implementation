@@ -44,6 +44,17 @@ lemma fast_uniform_ra_correct:
   by (simp add: fast_dice_roll_ra_correct)
 
 
+context
+  includes lifting_syntax
+begin
+
+lemma fast_uniform_ra_transfer [transfer_rule]:
+  "((=) ===> rel_spmf_of_ra) fast_uniform fast_uniform_ra"
+  unfolding rel_fun_def rel_spmf_of_ra_def 
+  using fast_uniform_ra_correct by auto
+
+end
+
 
 definition bernoulli_rat_ra :: "nat \<Rightarrow> nat \<Rightarrow> bool random_alg" where
 "bernoulli_rat_ra n d = 
@@ -263,7 +274,16 @@ lemma loop_ra_transfer [transfer_rule]:
   using loop_ra_correct by auto
 end
 
-lemma "(let x = e1;y=e2 in e3 x) = e2 e1"
+lemma let_2_simps: "(let x = e1;y=e2 x in e3 y) = e3 (e2 e1)"
+  by simp
+
+lemma bernoulli_rat_lambda:
+"bernoulli_rat n d = (\<lambda>(n,d). bernoulli_rat n d) (n,d)"
+  by simp
+
+
+lemma bernoulli_rat_ra_lambda:
+"bernoulli_rat_ra n d = (\<lambda>(n,d). bernoulli_rat_ra n d) (n,d)"
   by simp
 
 lemma discrete_laplace_rat_ra_correct:
@@ -278,10 +298,7 @@ proof -
     unfolding curry_def apply(simp)
     using discrete_laplace_rat_ra.mono 
     unfolding curry_def apply(simp)
-  proof-
-ML \<open>\<^term>\<open>let n = 1 in n+1\<close>\<close>
-term"HOL.Let"
-  qed
+    by(rewrite let_2_simps,rewrite let_2_simps,rewrite bernoulli_rat_lambda, rewrite bernoulli_rat_ra_lambda, transfer_prover)
   thus ?thesis
     unfolding rel_fun_def rel_spmf_of_ra_def by simp
 qed
