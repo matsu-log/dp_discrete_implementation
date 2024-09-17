@@ -1,8 +1,13 @@
+section \<open>Bernoulli distribution that take exp(-p) as parameter\<close>
 theory Bernoulli_exp_minus_real
   imports "Probabilistic_While.While_SPMF"
           "HOL-Probability.Probability"
           "Probabilistic_While.Bernoulli"
 begin
+
+subsection \<open>auxiliary lemmas\<close>
+
+subsection \<open>Define bernou\<close>
 
 context notes [[function_internals]] begin
 partial_function (spmf) loop1 :: "real  \<Rightarrow> nat  \<Rightarrow> nat spmf" where
