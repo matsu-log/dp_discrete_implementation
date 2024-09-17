@@ -1,19 +1,12 @@
+section \<open>Bernoulli distribution that take rational n/d as parameter\<close>
+
 theory Bernoulli_rat
   imports "HOL-Probability.Probability"
           "Probabilistic_While.While_SPMF"
           "Probabilistic_While.Fast_Dice_Roll"
 begin
 
-
-
-definition bernoulli_rat :: "nat \<Rightarrow> nat \<Rightarrow> bool spmf" where
-"bernoulli_rat n d = 
-  (if d=0 then return_spmf False
-   else do {
-            x \<leftarrow> fast_uniform d;
-            return_spmf (x<n)
-})"
-
+subsection \<open>auxiliary lemmas\<close>
 lemma spmf_of_set_d:
   fixes d::nat
   assumes"0 < d"
@@ -23,7 +16,29 @@ proof -
   then show ?thesis by simp
 qed
 
+lemma spmf_if_split:
+  "spmf (if b then p else q) x = (if b then spmf p x else spmf q x)"
+  by simp
 
+lemma spmf_return_spmf_1: 
+  shows "spmf (return_spmf True) True = 1" 
+  by simp
+
+lemma spmf_return_spmf_0:
+  shows "spmf (return_spmf False) True = 0"
+  by simp
+
+subsection \<open>Define bernoulli_rat\<close>
+
+definition bernoulli_rat :: "nat \<Rightarrow> nat \<Rightarrow> bool spmf" where
+"bernoulli_rat n d = 
+  (if d=0 then return_spmf False
+   else do {
+            x \<leftarrow> fast_uniform d;
+            return_spmf (x<n)
+})"
+
+subsection \<open>Properties of bernoulli_rat\<close>
 
 lemma pmf_bernoulli_rat_None: "pmf (bernoulli_rat n d) None = 0"
 proof (cases "d=0")
@@ -44,30 +59,8 @@ next
   qed
 qed
 
-
 lemma lossless_bernoulli_rat [simp]: "lossless_spmf (bernoulli_rat n d)"
   by(simp add: lossless_iff_pmf_None pmf_bernoulli_rat_None)
-
-lemma spmf_if_split:
-  "spmf (if b then p else q) x = (if b then spmf p x else spmf q x)"
-  by simp
-
-lemma spmf_return_spmf_1: 
-  shows "spmf (return_spmf True) True = 1" 
-  by simp
-lemma spmf_return_spmf_0:
-  shows "spmf (return_spmf False) True = 0"
-  by (simp)
-
-find_theorems "\<Sum>_\<in>_. if _ then _ else _"
-find_theorems "\<Sum>_\<in>_.   indicat_real _ _"
-thm "sum.mono_neutral_left"
-thm "sum.delta"
-thm "sum.union_disjoint"
-thm "sum.If_cases"
-value "(real 1/real 0)"
-value "(real 0/ real 0)"
-find_theorems "indicat_real"
 
 lemma [simp]: assumes "n/d\<le>1"
   shows bernoulli_rat_True: "spmf (bernoulli_rat n d) True = n/d" 
