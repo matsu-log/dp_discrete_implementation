@@ -1,4 +1,5 @@
 section \<open>Bernoulli distribution that take exp(-p) as parameter\<close>
+
 theory Bernoulli_exp_minus_real
   imports "Probabilistic_While.While_SPMF"
           "HOL-Probability.Probability"
@@ -7,15 +8,120 @@ begin
 
 subsection \<open>auxiliary lemmas\<close>
 
-subsection \<open>Define bernou\<close>
+lemma Prod_sequence:
+  fixes k:: nat and l:: nat
+  shows "k*\<Prod>{k+1..k + l} = \<Prod>{k..k + l}"
+proof -
+  have "{k..k+l} = {k} \<union> {k+1..k+l}"
+    by auto
+  then show ?thesis by simp
+qed
+
+lemma Prod_sequence2:
+  fixes k::nat and l::nat
+  shows "(k * \<Prod>{k+1..k+l+1}) = \<Prod>{k..k+l+1}"
+proof-
+  have "{k..k+l+1} = {k} \<union> {k+1..k+l+1}" by auto
+  then show ?thesis by simp
+qed
+
+lemma Prod_sequence_eq_fact_divide:
+  fixes k::nat and l::nat
+  shows "\<Prod>{k+1..k+l}=fact (k+l)/ fact k"
+proof-
+  have "\<Prod>{1..k+l}=\<Prod>{1..k}*\<Prod>{k+1..k+l}" 
+  proof -
+    have "{1..k+l} = {1..k}\<union>{k+1..k+l}" by auto
+    then show "\<Prod>{1..k+l}=\<Prod>{1..k}*\<Prod>{k+1..k+l}" 
+      using le_add2 prod.ub_add_nat by blast
+  qed
+  then have "\<Prod>{k+1..k+l} = \<Prod>{1..k+l}/\<Prod>{1..k}" by auto
+  then show "\<Prod>{k+1..k+l} = fact (k+l)/fact k"
+    apply(rewrite fact_prod[of "k"]) 
+    apply(rewrite fact_prod[of "k+l"]) 
+    by simp
+qed
+
+(*this lemma for summable_2i_2i_plus_1*)
+lemma power_divide_fact :
+  fixes p::real and n m::nat
+  assumes "0\<le>p" and "p\<le>1" and "n\<le>m"
+  shows "p^m/fact m \<le> p^n/ fact n"
+proof -
+  have 1:"0\<le> p^n"
+    using assms by simp
+  have 2:"p^m \<le> p^n" 
+    using assms by(simp add: power_decreasing)
+  show ?thesis 
+    using 1 2
+    by (simp add: assms(3) fact_mono frac_le)
+qed
+
+(* these two lemma  for lemma spmf_bernoulli_exp_minus_real_from_0_to_1*)
+lemma summable_2i_2i_plus_1:
+  fixes p:: real
+  assumes "0\<le>p" and "p\<le>1"
+  shows "summable (\<lambda>i. p ^ (2 * i) / fact (2 * i) - p ^ (2 * i + 1) / fact (2 * i + 1))"
+proof (rule summable_diff)
+  have 1: "summable (\<lambda>i. p^i / fact i)"
+    using summable_exp_generic[of "p"] by (simp add:inverse_eq_divide)
+  show summable_2i:"summable (\<lambda>i. p ^ (2 * i) / fact (2 * i))"
+  proof (subst summable_comparison_test[of "\<lambda>i. p^(2*i) / fact (2*i)" "\<lambda>i. p^i / fact i"],simp_all)
+    show "\<exists>N. \<forall>n\<ge>N. p ^ (2 * n) / fact (2 * n) \<le> p ^ n / fact n"
+    proof -
+      have "\<forall>n. p ^ (2 * n) / fact (2 * n) \<le> p ^ n / fact n"
+      proof 
+        fix n
+        show "p ^ (2 * n) / fact (2 * n) \<le> p ^ n / fact n"
+          using assms by(rule power_divide_fact[of "p" "n" "2*n"],simp_all)
+      qed
+      then show ?thesis
+        by simp
+    qed
+    show "summable (\<lambda>i. p ^ i / fact i)" 
+      using 1 by simp
+  qed
+  show summable_2i_plus_1:"summable (\<lambda>i. p ^ (2 * i + 1) / fact (2 * i + 1))"
+  proof (subst summable_comparison_test[of "\<lambda>i. p^(2*i+1) / fact (2*i+1)" "\<lambda>i. p^i / fact i"])
+    show "\<exists>N. \<forall>n\<ge>N. norm (p^(2*n+1)/fact (2*n+1)) \<le> p^n/fact n"
+    proof -
+      have "\<forall>n. norm (p^(2*n+1)/fact (2*n+1)) \<le> p^n/fact n"
+      proof 
+        fix n
+        show "norm (p^(2*n+1)/fact (2*n+1)) \<le> p^n/fact n"
+        proof -
+          have 1:"norm (p^(2*n+1)/fact (2*n+1)) = p^(2*n+1)/fact (2*n+1)"
+          proof-
+            have 1:"norm (p^(2*n+1)/fact (2*n+1)) = \<bar>(p^(2*n+1)/fact (2*n+1))\<bar>"
+              by simp
+            have 2:"0\<le> p^(2*n+1)/fact (2*n+1)"
+              by (simp add: assms(1))
+            show ?thesis using 1 2 
+              by argo
+          qed
+          have 2:"p^(2*n+1)/fact (2*n+1)\<le> p^n/fact n"
+            using assms by(rule power_divide_fact[of "p" "n" "2*n+1"],simp_all)
+          show ?thesis using 1 2 by simp
+        qed
+      qed
+      then show ?thesis
+        by simp
+    qed
+    show "summable (\<lambda>i. p ^ i / fact i)" 
+      using 1 by simp
+    show "True" by simp
+  qed
+qed
+
+subsection \<open>Define bernoulli_exp_minus_real\<close>
 
 context notes [[function_internals]] begin
-partial_function (spmf) loop1 :: "real  \<Rightarrow> nat  \<Rightarrow> nat spmf" where
- "loop1 p k =
+partial_function (spmf) bernoulli_exp_minus_real_from_0_to_1_loop :: "real  \<Rightarrow> nat  \<Rightarrow> nat spmf" where
+ "bernoulli_exp_minus_real_from_0_to_1_loop p k =
     (
     do {
       a \<leftarrow> bernoulli (p/k);
-      if a then loop1 p (k+1) else return_spmf k
+      if a then bernoulli_exp_minus_real_from_0_to_1_loop p (k+1) else return_spmf k
     }
 )
 "
@@ -24,16 +130,16 @@ end
 definition  bernoulli_exp_minus_real_from_0_to_1 :: "real \<Rightarrow> bool spmf" where
   "bernoulli_exp_minus_real_from_0_to_1 p = 
     do {
-        k \<leftarrow> loop1 p 1;
+        k \<leftarrow> bernoulli_exp_minus_real_from_0_to_1_loop p 1;
         if odd k then return_spmf True else return_spmf False
     }
   "
 
 context notes [[function_internals]] begin
-partial_function (spmf) loop2 :: "real \<Rightarrow> nat \<Rightarrow> bool spmf" where
-  "loop2 p k = (if 1\<le>k then do {
+partial_function (spmf) bernoulli_exp_minus_real_loop :: "real \<Rightarrow> nat \<Rightarrow> bool spmf" where
+  "bernoulli_exp_minus_real_loop p k = (if 1\<le>k then do {
                                 b \<leftarrow> bernoulli_exp_minus_real_from_0_to_1 1;
-                                if b then loop2 p (k-1) else return_spmf False
+                                if b then bernoulli_exp_minus_real_loop p (k-1) else return_spmf False
                                 } 
                 else return_spmf True)"
 end
@@ -45,30 +151,28 @@ definition bernoulli_exp_minus_real :: "real  \<Rightarrow> bool spmf" where
     else if 0 \<le> p & p\<le>1  then bernoulli_exp_minus_real_from_0_to_1 p
     else
      do {
-        b \<leftarrow> loop2 p (nat (floor p));
+        b \<leftarrow> bernoulli_exp_minus_real_loop p (nat (floor p));
         if b then bernoulli_exp_minus_real_from_0_to_1 (p-floor p) else return_spmf b
       }
   )
 "
 
-thm "loop1.fixp_induct"
+subsection \<open>Properties of bernoulli_exp_minus_real\<close>
 
-lemma loop1_fixp_induct [case_names adm bottom step]:
-  assumes "spmf.admissible (\<lambda>loop1. P (curry loop1))"
-    and "P (\<lambda>loop1 p. return_pmf None)"
-    and "(\<And>loop1'. P loop1' \<Longrightarrow> P (\<lambda>a b. bernoulli (a / b) \<bind> (\<lambda>aa. if aa then loop1' a (b + 1) else return_spmf b)))"
-  shows "P loop1"
-  using assms by (rule loop1.fixp_induct)
+lemma bernoulli_exp_minus_real_from_0_to_1_loop_fixp_induct [case_names adm bottom step]:
+  assumes "spmf.admissible (\<lambda>bernoulli_exp_minus_real_from_0_to_1_loop. P (curry bernoulli_exp_minus_real_from_0_to_1_loop))"
+    and "P (\<lambda>bernoulli_exp_minus_real_from_0_to_1_loop p. return_pmf None)"
+    and "(\<And>bernoulli_exp_minus_real_from_0_to_1_loop'. P bernoulli_exp_minus_real_from_0_to_1_loop' \<Longrightarrow> P (\<lambda>a b. bernoulli (a / b) \<bind> (\<lambda>aa. if aa then bernoulli_exp_minus_real_from_0_to_1_loop' a (b + 1) else return_spmf b)))"
+  shows "P bernoulli_exp_minus_real_from_0_to_1_loop"
+  using assms by (rule bernoulli_exp_minus_real_from_0_to_1_loop.fixp_induct)
 
-thm "loop2.fixp_induct"
-
-lemma loop2_fixp_induct [case_names adm bottom step]:
-  assumes "spmf.admissible (\<lambda>loop2. P (curry loop2))"
-    and "P (\<lambda>loop2 p. return_pmf None)"
-    and "(\<And>loop2. P loop2 \<Longrightarrow> P (\<lambda>a b. if 1 \<le> b then bernoulli_exp_minus_real_from_0_to_1 1 \<bind> (\<lambda>ba. if ba then loop2 a (b - 1) else return_spmf False) 
+lemma bernoulli_exp_minus_real_loop_fixp_induct [case_names adm bottom step]:
+  assumes "spmf.admissible (\<lambda>bernoulli_exp_minus_real_loop. P (curry bernoulli_exp_minus_real_loop))"
+    and "P (\<lambda>bernoulli_exp_minus_real_loop2 p. return_pmf None)"
+    and "(\<And>bernoulli_exp_minus_real_loop. P bernoulli_exp_minus_real_loop \<Longrightarrow> P (\<lambda>a b. if 1 \<le> b then bernoulli_exp_minus_real_from_0_to_1 1 \<bind> (\<lambda>ba. if ba then bernoulli_exp_minus_real_loop a (b - 1) else return_spmf False) 
                                         else return_spmf True))"
-  shows "P loop2"
-  using assms by (rule loop2.fixp_induct)
+  shows "P bernoulli_exp_minus_real_loop"
+  using assms by (rule bernoulli_exp_minus_real_loop.fixp_induct)
 
 context
   fixes p :: "real"
@@ -81,13 +185,13 @@ interpretation loop_spmf fst body
   rewrites "body \<equiv>  (\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (True,k'+1) else (False,k'))) (bernoulli (p/k')))" 
   by(fact body_def)
 
- lemma loop1_conv_while:
- "loop1 p 1 = map_spmf snd (while (True, 1))"
+ lemma bernoulli_exp_minus_real_from_0_to_1_loop_conv_while:
+ "bernoulli_exp_minus_real_from_0_to_1_loop p 1 = map_spmf snd (while (True, 1))"
 proof -
-  have "loop1 p x = map_spmf snd (while (True, x))" (is "?lhs = ?rhs") for x
+  have "bernoulli_exp_minus_real_from_0_to_1_loop p x = map_spmf snd (while (True, x))" (is "?lhs = ?rhs") for x
   proof (rule spmf.leq_antisym)
     show "ord_spmf (=) ?lhs ?rhs"
-    proof (induction arbitrary: x rule: loop1_fixp_induct)
+    proof (induction arbitrary: x rule: bernoulli_exp_minus_real_from_0_to_1_loop_fixp_induct)
       case adm show ?case by simp
       case bottom show ?case by simp
       case (step loop1')
@@ -110,7 +214,7 @@ proof -
     next
       case (step while')
       case 1 show ?case using step.IH(1)[of "Suc x"] step.IH(2)[of x]
-        by(rewrite loop1.simps)(clarsimp simp add: map_spmf_bind_spmf bind_map_spmf spmf.map_comp o_def intro!: ord_spmf_bind_reflI)
+        by(rewrite bernoulli_exp_minus_real_from_0_to_1_loop.simps)(clarsimp simp add: map_spmf_bind_spmf bind_map_spmf spmf.map_comp o_def intro!: ord_spmf_bind_reflI)
       case 2 show ?case by simp
     qed
     then show "ord_spmf (=) ?rhs ?lhs" by -
@@ -118,7 +222,7 @@ proof -
   from this[of 1] show ?thesis by(simp cong:map_spmf_cong)
 qed
 
-lemma lossless_loop1 [simp]: "lossless_spmf (loop1 p 1)"
+lemma lossless_bernoulli_exp_minus_real_from_0_to_1_loop [simp]: "lossless_spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1)"
 proof-
   let ?body = "(\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (True,k'+1) else (False,k'))) (bernoulli (p/k')))" 
   have "lossless_spmf (while (True, 1))"
@@ -197,27 +301,13 @@ proof-
       qed
     qed
   qed
-  then show "lossless_spmf (loop1 p 1)" 
-    using loop1_conv_while by simp
+  then show "lossless_spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1)" 
+    using bernoulli_exp_minus_real_from_0_to_1_loop_conv_while by simp
 qed
- 
-    
-  
-
-
 end
-(* declare[[show_types,show_sorts]]*)
 
-term List.bind
-ML \<open>@{term  "(\<Squnion>p\<in>{y. \<exists>f\<in>A. y = f ((n, d), l)}. spmf p m)"}\<close>
-
-thm admissible_leI[OF ccpo_spmf, cont_intro]
-term spmf.lub_fun
-term measure_pmf.prob
-term lub_spmf
-
-lemma spmf_loop1_zero_fixp_induct_case_adm:
-  shows "spmf.admissible (\<lambda>loop1. \<forall>l>m. spmf ((curry loop1) p l) m = 0)"
+lemma spmf_bernoulli_exp_minus_real_from_0_to_1_loop_zero_fixp_induct_case_adm:
+  shows "spmf.admissible (\<lambda>bernoulli_exp_minus_real_from_0_to_1_loop. \<forall>l>m. spmf ((curry bernoulli_exp_minus_real_from_0_to_1_loop) p l) m = 0)"
 proof(simp add: ccpo.admissible_def fun_lub_def spmf_lub_spmf, clarify)
   fix A l
   assume CA: "Complete_Partial_Order.chain spmf.le_fun A" and A: "A \<noteq> {}" and
@@ -241,12 +331,12 @@ proof(simp add: ccpo.admissible_def fun_lub_def spmf_lub_spmf, clarify)
     using P by presburger
 qed
 
-lemma spmf_loop1_zero:
-  shows "\<forall>l.  l>m \<longrightarrow> spmf (loop1 p l) m = 0"
-proof (induction rule: loop1_fixp_induct)
+lemma spmf_bernoulli_exp_minus_real_from_0_to_1_loop_zero:
+  shows "\<forall>l.  l>m \<longrightarrow> spmf (bernoulli_exp_minus_real_from_0_to_1_loop p l) m = 0"
+proof (induction rule: bernoulli_exp_minus_real_from_0_to_1_loop_fixp_induct)
   case adm
   then show ?case 
-    using spmf_loop1_zero_fixp_induct_case_adm by fastforce
+    using spmf_bernoulli_exp_minus_real_from_0_to_1_loop_zero_fixp_induct_case_adm by fastforce
 next
   case bottom
   then show ?case by simp
@@ -264,67 +354,29 @@ next
   qed
 qed
 
-lemma Prod_sequence:
-  fixes k:: nat and l:: nat
-  shows "k*\<Prod>{k+1..k + l} = \<Prod>{k..k + l}"
-proof -
-  have "{k..k+l} = {k} \<union> {k+1..k+l}"
-    by auto
-  then show ?thesis by simp
-qed
-
-lemma Prod_sequence2:
-  fixes k::nat and l::nat
-  shows "(k * \<Prod>{k+1..k+l+1}) = \<Prod>{k..k+l+1}"
-proof-
-  have "{k..k+l+1} = {k} \<union> {k+1..k+l+1}" by auto
-  then show ?thesis by simp
-qed
-
-lemma Prod_sequence_eq_fact_divide:
-  fixes k::nat and l::nat
-  shows "\<Prod>{k+1..k+l}=fact (k+l)/ fact k"
-proof-
-  have "\<Prod>{1..k+l}=\<Prod>{1..k}*\<Prod>{k+1..k+l}" 
-  proof -
-    have "{1..k+l} = {1..k}\<union>{k+1..k+l}" by auto
-    then show "\<Prod>{1..k+l}=\<Prod>{1..k}*\<Prod>{k+1..k+l}" 
-      using le_add2 prod.ub_add_nat by blast
-  qed
-  then have "\<Prod>{k+1..k+l} = \<Prod>{1..k+l}/\<Prod>{1..k}" by auto
-  then show "\<Prod>{k+1..k+l} = fact (k+l)/fact k"
-    apply(rewrite fact_prod[of "k"]) 
-    apply(rewrite fact_prod[of "k+l"]) 
-    by simp
-qed
-
-find_theorems "ennreal _ = ennreal _"
-find_theorems "fact _ \<le> fact _"
-
-
-lemma spmf_loop1[simp]:
+lemma spmf_bernoulli_exp_minus_real_from_0_to_1_loop[simp]:
   assumes asm1:"0\<le>p" "p\<le> 1" and asm2:"1\<le>m"
-  shows "spmf (loop1 p 1) m = p^(m-1)/fact (m-1) - p^m/fact m" (is "?lhs m = ?rhs m")
+  shows "spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) m = p^(m-1)/fact (m-1) - p^m/fact m" (is "?lhs m = ?rhs m")
 proof -
-  have P:"\<forall>k l::nat . 1\<le>k \<longrightarrow> ennreal (spmf (loop1 p k) (k+l)) = p^l /\<Prod>{k..(k+l-1)} - p^(l+1)/\<Prod>{k..(k+l)}"
+  have P:"\<forall>k l::nat . 1\<le>k \<longrightarrow> ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p k) (k+l)) = p^l /\<Prod>{k..(k+l-1)} - p^(l+1)/\<Prod>{k..(k+l)}"
   proof rule+
     fix l
     show "\<And>k.1 \<le> k \<Longrightarrow>
-           ennreal (spmf (loop1 p k) (k + l)) =
+           ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p k) (k + l)) =
            ennreal (p^l /(\<Prod>{k..k + l - 1}) - p^(l+1)/(\<Prod>{k..k + l}))"
     proof (induct l)
       case 0
       then show ?case
       proof -
-        have "ennreal (spmf (loop1 p k) (k + 0)) = ennreal (spmf (bernoulli (p/k)) False) + ennreal (spmf (bernoulli (p/k)) True) * ennreal (spmf (loop1 p (k+1)) k)"
-          apply(rewrite loop1.simps)
+        have "ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p k) (k + 0)) = ennreal (spmf (bernoulli (p/k)) False) + ennreal (spmf (bernoulli (p/k)) True) * ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p (k+1)) k)"
+          apply(rewrite bernoulli_exp_minus_real_from_0_to_1_loop.simps)
           apply(simp add: ennreal_spmf_bind nn_integral_measure_spmf UNIV_bool nn_integral_count_space_finite)
           done
         also have "... =  ennreal (1-(p/k))"
           proof - 
             have p_divide_k_0_1: "p/k\<le>1" "0\<le>p/k"using asm1 0 by auto
-            then show "ennreal (spmf (bernoulli (p/k)) False) + ennreal (spmf (bernoulli (p/k)) True) * ennreal (spmf (loop1 p (k + 1)) k) =  ennreal (1-(p/k))"
-              using spmf_loop1_zero by simp
+            then show "ennreal (spmf (bernoulli (p/k)) False) + ennreal (spmf (bernoulli (p/k)) True) * ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p (k + 1)) k) =  ennreal (1-(p/k))"
+              using spmf_bernoulli_exp_minus_real_from_0_to_1_loop_zero by simp
           qed
         also have "... = ennreal (p^0/\<Prod>{k..k+0-1} - p^(0+1)/\<Prod>{k..k + 0})" 
           proof - 
@@ -333,29 +385,29 @@ proof -
             then show "ennreal (1-(p/k)) = ennreal (p^0/\<Prod>{k..k+0-1} - p^(0+1)/\<Prod>{k..k + 0})"
               by simp
           qed
-        finally show "ennreal (spmf (loop1 p k) (k + 0)) = ennreal (p^0/\<Prod>{k..k+0-1} - p^(0+1)/\<Prod>{k..k + 0})" by simp
+        finally show "ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p k) (k + 0)) = ennreal (p^0/\<Prod>{k..k+0-1} - p^(0+1)/\<Prod>{k..k + 0})" by simp
       qed 
     next
       case (Suc l)
       then show ?case
       proof - 
           assume step:"\<And>k. 1 \<le> k \<Longrightarrow>
-          ennreal (spmf (loop1 p k) (k + l)) =
+          ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p k) (k + l)) =
           ennreal (p^l/\<Prod>{k..k+l-1} - p^(l+1)/\<Prod>{k..k + l})"
             and K: "1\<le>k"
-          have "ennreal (spmf (loop1 p k) (k + Suc l)) = ennreal ((spmf (bernoulli (p/k)) True) * (spmf (loop1 p (k+1)) (k+l+1)))"
-            apply(rewrite loop1.simps)
+          have "ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p k) (k + Suc l)) = ennreal ((spmf (bernoulli (p/k)) True) * (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p (k+1)) (k+l+1)))"
+            apply(rewrite bernoulli_exp_minus_real_from_0_to_1_loop.simps)
             apply(simp add: ennreal_spmf_bind nn_integral_measure_spmf UNIV_bool nn_integral_count_space_finite ennreal_mult)
             done
           also have "... = ennreal (p^(l+1) / \<Prod>{k..k+l} - p^(l+2) / \<Prod>{k..k+l+1})"
           proof -
             have n_divide_p_0_1: "0\<le> p/k" "p/k\<le>1" using K asm1 by auto
             then have Bernoulli:"ennreal (spmf (bernoulli  (p/k)) True) = p/k" by simp
-            have H:"ennreal (spmf (loop1 p (k+1)) (k+1+l)) = ennreal (p^l/\<Prod>{k+1..k+l} - p^(l+1)/\<Prod>{k+1..k+l+1})" 
+            have H:"ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p (k+1)) (k+1+l)) = ennreal (p^l/\<Prod>{k+1..k+l} - p^(l+1)/\<Prod>{k+1..k+l+1})" 
               apply (rewrite step)
               apply(simp_all)
               done
-            have "ennreal (spmf (bernoulli (p/k)) True * spmf (loop1 p (k + 1)) (k + l + 1))=ennreal (spmf (bernoulli (p/k)) True) *ennreal (spmf (loop1 p (k + 1)) (k + 1 + l))"
+            have "ennreal (spmf (bernoulli (p/k)) True * spmf (bernoulli_exp_minus_real_from_0_to_1_loop p (k + 1)) (k + l + 1))=ennreal (spmf (bernoulli (p/k)) True) *ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p (k + 1)) (k + 1 + l))"
               by(simp add: ennreal_mult)
             also have "...=ennreal (p/k) * ennreal (p^l/\<Prod>{k+1..k+l} - p^(l+1)/\<Prod>{k+1..k+l+1})"
               apply(rewrite Bernoulli)
@@ -411,24 +463,24 @@ proof -
                   using left_ge_zero right_ge_zero eq1 by presburger
               qed
             qed
-            finally show "ennreal (spmf (bernoulli (p/k)) True * spmf (loop1 p (k + 1)) (k + l + 1))
+            finally show "ennreal (spmf (bernoulli (p/k)) True * spmf (bernoulli_exp_minus_real_from_0_to_1_loop p (k + 1)) (k + l + 1))
                           = ennreal ( p^(l+1)/(\<Prod>{k..k+l}) - p^(l+2)/(\<Prod>{k..k+l+1}))"
               by simp
           qed
           also have "ennreal (p^(l+1) / \<Prod>{k..k+l} - p^(l+2) / \<Prod>{k..k+l+1}) = ennreal (p^Suc l/\<Prod>{k..k + Suc l - 1} - p^(Suc l+1)/\<Prod>{k..k + Suc l})"
             by simp
-          finally show "ennreal (spmf (loop1 p k) (k + Suc l)) = ennreal (p^Suc l/\<Prod>{k..k+Suc l-1} - p^(Suc l+1)/\<Prod>{k..k+Suc l})"
+          finally show "ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p k) (k + Suc l)) = ennreal (p^Suc l/\<Prod>{k..k+Suc l-1} - p^(Suc l+1)/\<Prod>{k..k+Suc l})"
             by simp
       qed
     qed
   qed
-  then have ennreal_eq:"ennreal (spmf (loop1 p 1) m) = ennreal (p^(m-1)/(fact (m-1)) - p^m/(fact (m)))" 
+  then have ennreal_eq:"ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) m) = ennreal (p^(m-1)/(fact (m-1)) - p^m/(fact (m)))" 
   proof - 
-    have "ennreal (spmf (loop1 p 1) m) = ennreal (spmf (loop1 p 1) (1+(m-1)))" using asm2 by simp
+    have "ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) m) = ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) (1+(m-1)))" using asm2 by simp
     also have "... = p^(m-1) /\<Prod>{1..1+(m-1)-1} - p^(m-1+1)/\<Prod>{1..1+(m-1)}" using P
     proof -
       have "(1::nat)\<le>1" by simp 
-      then show "ennreal (spmf (loop1 p 1) (1 + (m - 1))) =
+      then show "ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) (1 + (m - 1))) =
                  ennreal ( p^(m-1) /\<Prod>{1..1+(m-1)-1} - p^(m-1+1)/\<Prod>{1..1+(m-1)})"
         apply(rewrite P)
          apply(simp_all)
@@ -436,11 +488,11 @@ proof -
     qed
     also have "... =  p^(m-1) /\<Prod>{1..m-1} - p^(m)/\<Prod>{1..m}" using assms by simp
     also have "... = p^(m-1) /fact (m-1) - p^(m)/fact m" by (simp add:fact_prod)
-    finally show "ennreal (spmf (loop1 p 1) m) = ennreal (p^(m-1)/(fact (m-1)) - p^m/(fact (m)))" by simp
+    finally show "ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) m) = ennreal (p^(m-1)/(fact (m-1)) - p^m/(fact (m)))" by simp
   qed
-  then show "spmf (loop1 p 1) m = p^(m-1)/fact (m-1) - p^m/fact m"
+  then show "spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) m = p^(m-1)/fact (m-1) - p^m/fact m"
   proof - 
-    have 1:"0 \<le> spmf (loop1 p 1) m" by simp
+    have 1:"0 \<le> spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) m" by simp
     then have 2:"0 \<le> p^(m-1)/fact (m-1) - p^m/fact m" 
     proof -
       have 1:"p^m \<le> p^(m-1)" 
@@ -455,7 +507,7 @@ proof -
         by (simp add: fact_mono)
       then show "0 \<le> p^(m-1)/fact (m-1) - p^m/fact m" by simp
     qed
-    show "spmf (loop1 p 1) m = p^(m-1)/fact (m-1) - p^m/fact m" using 1 2 ennreal_eq by simp
+    show "spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) m = p^(m-1)/fact (m-1) - p^m/fact m" using 1 2 ennreal_eq by simp
   qed
 qed
 
@@ -463,78 +515,7 @@ lemma lossless_bernoulli_exp_minus_real_from_0_to_1 [simp]:
   assumes "0\<le>p" and "p\<le>1"
   shows "lossless_spmf (bernoulli_exp_minus_real_from_0_to_1 p)"
   apply(rewrite bernoulli_exp_minus_real_from_0_to_1_def)
-  using assms lossless_loop1 by fastforce
-
-(*this lemma for summable_2i_2i_plus_1*)
-lemma power_divide_fact :
-  fixes p::real and n m::nat
-  assumes "0\<le>p" and "p\<le>1" and "n\<le>m"
-  shows "p^m/fact m \<le> p^n/ fact n"
-proof -
-  have 1:"0\<le> p^n"
-    using assms by simp
-  have 2:"p^m \<le> p^n" 
-    using assms by(simp add: power_decreasing)
-  show ?thesis 
-    using 1 2
-    by (simp add: assms(3) fact_mono frac_le)
-qed
-
-(* these two lemma  for lemma spmf_bernoulli_exp_minus_real_from_0_to_1*)
-lemma summable_2i_2i_plus_1:
-  fixes p:: real
-  assumes "0\<le>p" and "p\<le>1"
-  shows "summable (\<lambda>i. p ^ (2 * i) / fact (2 * i) - p ^ (2 * i + 1) / fact (2 * i + 1))"
-proof (rule summable_diff)
-  have 1: "summable (\<lambda>i. p^i / fact i)"
-    using summable_exp_generic[of "p"] by (simp add:inverse_eq_divide)
-  show summable_2i:"summable (\<lambda>i. p ^ (2 * i) / fact (2 * i))"
-  proof (subst summable_comparison_test[of "\<lambda>i. p^(2*i) / fact (2*i)" "\<lambda>i. p^i / fact i"],simp_all)
-    show "\<exists>N. \<forall>n\<ge>N. p ^ (2 * n) / fact (2 * n) \<le> p ^ n / fact n"
-    proof -
-      have "\<forall>n. p ^ (2 * n) / fact (2 * n) \<le> p ^ n / fact n"
-      proof 
-        fix n
-        show "p ^ (2 * n) / fact (2 * n) \<le> p ^ n / fact n"
-          using assms by(rule power_divide_fact[of "p" "n" "2*n"],simp_all)
-      qed
-      then show ?thesis
-        by simp
-    qed
-    show "summable (\<lambda>i. p ^ i / fact i)" 
-      using 1 by simp
-  qed
-  show summable_2i_plus_1:"summable (\<lambda>i. p ^ (2 * i + 1) / fact (2 * i + 1))"
-  proof (subst summable_comparison_test[of "\<lambda>i. p^(2*i+1) / fact (2*i+1)" "\<lambda>i. p^i / fact i"])
-    show "\<exists>N. \<forall>n\<ge>N. norm (p^(2*n+1)/fact (2*n+1)) \<le> p^n/fact n"
-    proof -
-      have "\<forall>n. norm (p^(2*n+1)/fact (2*n+1)) \<le> p^n/fact n"
-      proof 
-        fix n
-        show "norm (p^(2*n+1)/fact (2*n+1)) \<le> p^n/fact n"
-        proof -
-          have 1:"norm (p^(2*n+1)/fact (2*n+1)) = p^(2*n+1)/fact (2*n+1)"
-          proof-
-            have 1:"norm (p^(2*n+1)/fact (2*n+1)) = \<bar>(p^(2*n+1)/fact (2*n+1))\<bar>"
-              by simp
-            have 2:"0\<le> p^(2*n+1)/fact (2*n+1)"
-              by (simp add: assms(1))
-            show ?thesis using 1 2 
-              by argo
-          qed
-          have 2:"p^(2*n+1)/fact (2*n+1)\<le> p^n/fact n"
-            using assms by(rule power_divide_fact[of "p" "n" "2*n+1"],simp_all)
-          show ?thesis using 1 2 by simp
-        qed
-      qed
-      then show ?thesis
-        by simp
-    qed
-    show "summable (\<lambda>i. p ^ i / fact i)" 
-      using 1 by simp
-    show "True" by simp
-  qed
-qed
+  using assms lossless_bernoulli_exp_minus_real_from_0_to_1_loop by fastforce
 
 lemma lim_zero_for_spmf_bernoulli_exp_minus_real_from_0_to_1:
   fixes p::real
@@ -646,9 +627,6 @@ proof -
   show ?thesis using 1 2 3 by simp
 qed
 
-find_theorems "lim"
-find_theorems "suminf _ = suminf _"
-
 lemma spmf_bernoulli_exp_minus_real_from_0_to_1_True[simp]:
   assumes  "0\<le>p" and "p\<le>1"
   shows "spmf (bernoulli_exp_minus_real_from_0_to_1 p) True = exp(-p) "
@@ -656,36 +634,36 @@ proof -
   have "ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1 p) True) = exp(-p)"
     apply(simp add:bernoulli_exp_minus_real_from_0_to_1_def ennreal_spmf_bind nn_integral_measure_spmf exp_def inverse_eq_divide)
   proof -
-     have " (\<Sum>\<^sup>+ x::nat. ennreal (spmf (loop1 p (Suc (0::nat))) x) * ennreal (spmf (if odd x then return_spmf True else return_spmf False) True))
-                =   (\<Sum>\<^sup>+ x::nat. ennreal (spmf (loop1 p 1) x) * (if odd x then 1 else 0))"
+     have " (\<Sum>\<^sup>+ x::nat. ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p (Suc (0::nat))) x) * ennreal (spmf (if odd x then return_spmf True else return_spmf False) True))
+                =   (\<Sum>\<^sup>+ x::nat. ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) x) * (if odd x then 1 else 0))"
      proof - 
        have 1:"\<And> x. ennreal (spmf (if odd x then return_spmf True else return_spmf False) True) = (if odd x then 1 else 0)" by simp
        show ?thesis
          by(simp add: 1)  
      qed
-     also have "... = (\<Sum>\<^sup>+ x::nat. (if odd x then ennreal (spmf (loop1 p 1) x)* 1 else ennreal (spmf (loop1 p 1) x) * 0))"
+     also have "... = (\<Sum>\<^sup>+ x::nat. (if odd x then ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) x)* 1 else ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) x) * 0))"
      proof -
-       have "(\<forall>n. (ennreal (spmf (loop1 p 1) n) * (if odd n then 1 else 0) = ennreal (spmf (loop1 p 1) n) * 0 \<or> odd n) \<and> (ennreal (spmf (loop1 p 1) n) * (if odd n then 1 else 0) = ennreal (spmf (loop1 p 1) n) * 1 \<or> even n)) \<or> (\<Sum>\<^sup>+ n. ennreal (spmf (loop1 p 1) n) * (if odd n then 1 else 0)) = (\<Sum>\<^sup>+ n. if odd n then ennreal (spmf (loop1 p 1) n) * 1 else ennreal (spmf (loop1 p 1) n) * 0)"
+       have "(\<forall>n. (ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) n) * (if odd n then 1 else 0) = ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) n) * 0 \<or> odd n) \<and> (ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) n) * (if odd n then 1 else 0) = ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) n) * 1 \<or> even n)) \<or> (\<Sum>\<^sup>+ n. ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) n) * (if odd n then 1 else 0)) = (\<Sum>\<^sup>+ n. if odd n then ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) n) * 1 else ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) n) * 0)"
          by presburger
        then show ?thesis
          by meson
      qed
-     also have "... = (\<Sum>\<^sup>+ x::nat. (if odd x then ennreal (spmf (loop1 p 1) x) else  0))" 
+     also have "... = (\<Sum>\<^sup>+ x::nat. (if odd x then ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) x) else  0))" 
        by (meson mult.right_neutral mult_zero_right)
-     also have "... = (\<Sum> x::nat. (if odd x then ennreal (spmf (loop1 p 1) x) else  0))" 
+     also have "... = (\<Sum> x::nat. (if odd x then ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) x) else  0))" 
        by (simp add: nn_integral_count_space_nat)
-     also have "... = (\<Sum>n::nat. if odd (2 * n + 1) then ennreal (spmf (loop1 p 1) (2 * n + 1)) else 0)" 
-     proof(subst suminf_mono_reindex[of "\<lambda>n::nat. 2*n+1" "(\<lambda>x::nat. (if odd x then ennreal (spmf (loop1 p 1) x) else  0))",symmetric])
+     also have "... = (\<Sum>n::nat. if odd (2 * n + 1) then ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) (2 * n + 1)) else 0)" 
+     proof(subst suminf_mono_reindex[of "\<lambda>n::nat. 2*n+1" "(\<lambda>x::nat. (if odd x then ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) x) else  0))",symmetric])
        show "strict_mono (\<lambda>n::nat. 2 * n + 1)" 
          by (simp add: strict_mono_Suc_iff)
-       show "\<And>n. n \<notin> range (\<lambda>n::nat. 2 * n + 1) \<Longrightarrow> (if odd n then ennreal (spmf (loop1 p 1) n) else 0) = 0" using oddE by fastforce
-       show "(\<Sum>n. if odd (2 * n + 1) then ennreal (spmf (loop1 p 1) (2 * n + 1)) else 0) =
-             (\<Sum>n. if odd (2 * n + 1) then ennreal (spmf (loop1 p 1) (2 * n + 1)) else 0)" by simp
+       show "\<And>n. n \<notin> range (\<lambda>n::nat. 2 * n + 1) \<Longrightarrow> (if odd n then ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) n) else 0) = 0" using oddE by fastforce
+       show "(\<Sum>n. if odd (2 * n + 1) then ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) (2 * n + 1)) else 0) =
+             (\<Sum>n. if odd (2 * n + 1) then ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) (2 * n + 1)) else 0)" by simp
      qed
-     also have "... = (\<Sum>n::nat. ennreal (spmf (loop1 p 1) (2 * n + 1)))" 
+     also have "... = (\<Sum>n::nat. ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1) (2 * n + 1)))" 
        by auto 
      also have "... = (\<Sum>n::nat. ennreal (p^(2*n)/fact (2*n) - p^(2*n+1)/fact (2*n+1)))" 
-       by(subst spmf_loop1,auto simp:assms)
+       by(subst spmf_bernoulli_exp_minus_real_from_0_to_1_loop,auto simp:assms)
      also have "... = (\<Sum>n::nat. p^(2*n)/fact (2*n) - p^(2*n+1)/fact (2*n+1))"
      proof (rule suminf_ennreal2)
        show "\<And>n::nat. 0 \<le> p ^ (2 * n) / fact (2 * n) - p ^ (2 * n + 1) / fact (2 * n + 1)"
@@ -745,7 +723,7 @@ proof -
        qed
        then show ?thesis by simp
      qed
-     finally show "(\<Sum>\<^sup>+ x::nat. ennreal (spmf (loop1 p (Suc (0::nat))) x) * ennreal (spmf (if odd x then return_spmf True else return_spmf False) True))
+     finally show "(\<Sum>\<^sup>+ x::nat. ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop p (Suc (0::nat))) x) * ennreal (spmf (if odd x then return_spmf True else return_spmf False) True))
                   = ennreal (\<Sum>n. (- p) ^ n / fact n)"  by simp
    qed
    then show ?thesis by simp
@@ -769,7 +747,7 @@ interpretation loop_spmf id body
   rewrites "body \<equiv>  (\<lambda>b. map_spmf (\<lambda>b'. (if b' then True else False)) (bernoulli_exp_minus_real_from_0_to_1 1))"
   by(fact body_def)
 
-lemma iter_simps_for_loop2:
+lemma iter_simps_for_bernoulli_exp_minus_real_loop:
   shows "iter k True = (if 1\<le>k then (bernoulli_exp_minus_real_from_0_to_1 1) \<bind> (\<lambda>b. if b then iter (k-1) True else return_spmf False) else return_spmf True)"
 proof (cases "1\<le>k")
   case True
@@ -797,47 +775,47 @@ next
   qed
 qed  
 
-lemma loop2_conv_iter:
-  shows "loop2 p k = iter k True" (is "?lhs = ?rhs")
+lemma bernoulli_exp_minus_real_loop_conv_iter:
+  shows "bernoulli_exp_minus_real_loop p k = iter k True" (is "?lhs = ?rhs")
 proof (induction k)
   case 0
   then show ?case
-    apply(rewrite iter_simps_for_loop2)
-    apply(rewrite loop2.simps)
+    apply(rewrite iter_simps_for_bernoulli_exp_minus_real_loop)
+    apply(rewrite bernoulli_exp_minus_real_loop.simps)
     by(simp)
 next
   case (Suc k)
   then show ?case 
-    apply(rewrite iter_simps_for_loop2)
-    apply(rewrite loop2.simps)
+    apply(rewrite iter_simps_for_bernoulli_exp_minus_real_loop)
+    apply(rewrite bernoulli_exp_minus_real_loop.simps)
     using diff_Suc_1 by presburger
 qed
 
-lemma lossless_loop2 [simp]:
-  shows "lossless_spmf (loop2 p k)"
+lemma lossless_bernoulli_exp_minus_real_loop[simp]:
+  shows "lossless_spmf (bernoulli_exp_minus_real_loop p k)"
 proof -
   have "lossless_spmf (iter k True)"
     using lossless_iter by simp
   then show ?thesis
-    using loop2_conv_iter by simp
+    using bernoulli_exp_minus_real_loop_conv_iter by simp
 qed
 end
 
-lemma spmf_loop2_True [simp]: 
+lemma spmf_bernoulli_exp_minus_real_loop_True [simp]: 
   assumes "1\<le>p" 
-  shows "spmf (loop2 p k) True = exp(-k)"
+  shows "spmf (bernoulli_exp_minus_real_loop p k) True = exp(-k)"
 proof (induct k)
   case 0
   then show ?case 
-    apply(rewrite loop2.simps)
+    apply(rewrite bernoulli_exp_minus_real_loop.simps)
     using 0 by simp
 next
   case (Suc k)
   then show ?case 
   proof -
-    assume step:"spmf (loop2 p k) True = exp (- real k)"
-    have "ennreal (spmf (loop2 p (Suc k)) True) = exp(-(Suc k))"
-      apply(rewrite loop2.simps)
+    assume step:"spmf (bernoulli_exp_minus_real_loop p k) True = exp (- real k)"
+    have "ennreal (spmf (bernoulli_exp_minus_real_loop p (Suc k)) True) = exp(-(Suc k))"
+      apply(rewrite bernoulli_exp_minus_real_loop.simps)
       apply(simp add: ennreal_spmf_bind nn_integral_measure_spmf UNIV_bool nn_integral_count_space_finite)
       apply(simp add: step)
     proof -
@@ -853,10 +831,10 @@ next
   qed
 qed
 
-lemma spmf_loop2_False [simp]:
+lemma spmf_bernoulli_exp_minus_real_loop_False [simp]:
   assumes "1\<le>p"
-  shows "spmf (loop2 p k) False = 1 - exp(-k)"
-  using assms lossless_loop2 spmf_False_conv_True spmf_loop2_True by auto
+  shows "spmf (bernoulli_exp_minus_real_loop p k) False = 1 - exp(-k)"
+  using assms lossless_bernoulli_exp_minus_real_loop spmf_False_conv_True spmf_bernoulli_exp_minus_real_loop_True by simp
 
 lemma lossless_bernoulli_exp_minus_real[simp]:
   shows "lossless_spmf (bernoulli_exp_minus_real p)"
@@ -866,7 +844,7 @@ proof -
     by linarith
   show ?thesis
     apply(rewrite bernoulli_exp_minus_real_def)
-    using 1 2 lossless_bernoulli_exp_minus_real_from_0_to_1 lossless_loop2
+    using 1 2 lossless_bernoulli_exp_minus_real_from_0_to_1 lossless_bernoulli_exp_minus_real_loop
     by simp
 qed
 
@@ -879,11 +857,11 @@ lemma spmf_bernoulli_exp_minus_real_True[simp]:
      apply(subst order_class.leD, simp add: assms, simp)
 proof-
   assume cond: "\<not> p \<le> 1"
-  have "ennreal (spmf (loop2 p (nat \<lfloor>p\<rfloor>) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_real_from_0_to_1 (p - real_of_int \<lfloor>p\<rfloor>) else return_spmf b)) True)
-        = ennreal (spmf (loop2 p (nat \<lfloor>p\<rfloor>)) True) * ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1 (p - real_of_int \<lfloor>p\<rfloor>)) True)"
+  have "ennreal (spmf (bernoulli_exp_minus_real_loop p (nat \<lfloor>p\<rfloor>) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_real_from_0_to_1 (p - real_of_int \<lfloor>p\<rfloor>) else return_spmf b)) True)
+        = ennreal (spmf (bernoulli_exp_minus_real_loop p (nat \<lfloor>p\<rfloor>)) True) * ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1 (p - real_of_int \<lfloor>p\<rfloor>)) True)"
     by(simp add:ennreal_spmf_bind nn_integral_measure_spmf UNIV_bool nn_integral_count_space_finite)
   also have "... = ennreal (exp (- nat \<lfloor>p\<rfloor>)) * ennreal (exp (-p+ \<lfloor>p\<rfloor>))"
-  proof(rewrite spmf_loop2_True)
+  proof(rewrite spmf_bernoulli_exp_minus_real_loop_True)
     show "1\<le>p" using cond by simp
     show "ennreal (exp (- real (nat \<lfloor>p\<rfloor>))) * ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1 (p - \<lfloor>p\<rfloor>)) True)
         = ennreal (exp (- (nat \<lfloor>p\<rfloor>))) * ennreal (exp (- p + \<lfloor>p\<rfloor>))"
@@ -895,11 +873,11 @@ proof-
     using ennreal_mult' assms  by auto
   also have "... = exp (-p)"
     by (simp add: mult_exp_exp)
-  finally show "spmf (loop2 p (nat \<lfloor>p\<rfloor>) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_real_from_0_to_1 (p - real_of_int \<lfloor>p\<rfloor>) else return_spmf b)) True = exp (- p)"
+  finally show "spmf (bernoulli_exp_minus_real_loop p (nat \<lfloor>p\<rfloor>) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_real_from_0_to_1 (p - real_of_int \<lfloor>p\<rfloor>) else return_spmf b)) True = exp (- p)"
     by simp
 qed
     
-lemma spmf_bernoulli_exp_minus_rat_False[simp]:
+lemma spmf_bernoulli_exp_minus_real_False[simp]:
   assumes "0\<le>p"
   shows "spmf (bernoulli_exp_minus_real p) False = 1-exp(-p)"
   by (simp add: assms spmf_False_conv_True)
