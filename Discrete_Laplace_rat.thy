@@ -36,6 +36,10 @@ lemma map_spmf_lambda:
 "map_spmf f \<circ> (\<lambda>d. g d) = (\<lambda>d. map_spmf f (g d))"
 by auto
 
+lemma map_spmf_if:
+"map_spmf f (if b then p1 else p2) = (if b then map_spmf f p1 else map_spmf f p2)"
+  by auto
+
 lemma map_spmf_lambda_if:
 "map_spmf f \<circ> (\<lambda>d. if b d then spmf_1 else spmf2) = (\<lambda>d. if b d then map_spmf f spmf_1 else map_spmf f spmf2)"
   by auto
@@ -51,6 +55,78 @@ lemma set_spmf_bind_set:
   assumes "\<And>x. A x \<subseteq> B "
   shows "Set.bind (set_spmf p) (\<lambda>x. A x) \<subseteq> B "
   unfolding Set.bind_def using assms by auto
+
+lemma exp_sum:
+  fixes t::nat
+  assumes "1\<le>t"
+  shows "(\<Sum>x = 0..t - 1. exp (- x/t)) = (1-exp(-1))/(1-exp(-1/t))"
+proof -
+  have "(\<Sum>x = 0..t - 1. exp (- x/t)) * exp(-1/t) = (\<Sum>x = 1..t. exp (- x/t))"
+  proof(rewrite sum_distrib_right, simp add:Fract_of_int_quotient of_rat_divide)
+    have "\<And>n::nat. exp (-n/t) * exp(-1/t) = exp(-(n+1)/t)"
+      apply(simp add: mult_exp_exp)
+      by argo
+    then have "(\<Sum>n = 0..t - Suc 0. exp (- (n/t)) * exp (- (1/t))) = (\<Sum>n = 0..t - Suc 0. exp (- (n+1)/t))"
+      by simp
+    also have "... = (\<Sum>n = 1..t. exp (- n/t))"
+    proof -
+      have "((\<lambda>n::nat. exp (-n/t)) \<circ> Suc) = (\<lambda>n::nat. exp (-(n+1)/real t))"
+        apply(simp add: o_def)
+        by (simp add: minus_diff_commute minus_divide_left)
+      then have "(\<Sum>n = 0..t - Suc 0. exp (real_of_int (- int (n + 1)) / real t)) = sum ((\<lambda>n. exp (real_of_int (- int n) / real t)) \<circ> Suc) {0..t - 1}"
+        by simp
+      also have "... = (\<Sum>n = Suc 0..Suc (t - 1). exp (real_of_int (- int n) / real t))"
+        using sum.atLeast_Suc_atMost_Suc_shift[of "(\<lambda>n. exp(-n/t))" "0" "t-1"]
+        by auto
+      also have "... = (\<Sum>n = 1..t. exp (- n/t))" 
+        using assms(1) by auto
+      finally show ?thesis by simp
+    qed
+    finally show "(\<Sum>n = 0..t - Suc 0. exp (- (real n / real t)) * exp (- (1 / real t))) = (\<Sum>x = Suc 0..t. exp (- (real x / real t)))"
+      by simp
+  qed
+  then have "(\<Sum>x = 0..t - 1. exp (- x/t)) * (1 -exp(-1/t)) = (\<Sum>x = 0..t - 1. exp (- x/t)) - (\<Sum>x = 1..t. exp (- x/t))"
+    by(rewrite right_diff_distrib, simp)    
+  also have "... = 1 - exp(-1)"
+  proof -
+    have 1:"(\<Sum>x = 0..t - 1. exp (- x/t))  = (\<Sum>x = 0..t. exp (- x/t)) - exp(-1)"
+    proof -
+      have "(\<Sum>x = 0..t - 1. exp (- x/t)) = (\<Sum>x<t. exp (real_of_int (- int x) / real t))"
+      proof - 
+        have "{0..t-1} = {0..<t}" 
+          using assms by auto
+        then show ?thesis 
+          using lessThan_atLeast0 by presburger
+      qed
+      also have "... =  (\<Sum>x = 0..t. exp (- x/t)) - exp(-1)"
+        using assms apply(rewrite sum_lessThan_conv_atMost_nat[of "\<lambda>x. exp(-x/t)" "t"],simp)
+        by (simp add: atMost_atLeast0)
+      finally show ?thesis 
+        by simp
+    qed
+    have 2:"(\<Sum>x = 1..t. exp (- x/t)) = (\<Sum>x = 0..t. exp (- x/t)) - 1"
+    proof -
+      have "(\<Sum>x = 0..t. exp (- x/t)) - 1 = (\<Sum>x = 1..t. exp (- x/t)) + (\<Sum>x = 0..0. exp (- x/t))  - 1"
+      proof-
+        have "{0..t} = {0} \<union> {1..t}" by auto
+        then show ?thesis by simp
+      qed
+      also have "... = (\<Sum>x = 1..t. exp (- x/t))"
+        by simp
+      finally show ?thesis
+        by simp
+    qed 
+    show ?thesis
+      using 1 2 by simp
+  qed
+  finally have 1:"(\<Sum>x = 0..t - 1. exp (- x/t)) * (1 -exp(-1/t)) = 1-exp(-1)"
+    by simp
+  have 2:"0<1-exp(-1/t)"
+    using assms by simp
+  then show "(\<Sum>x = 0..t - 1. exp (- x/t)) = (1-exp(-1))/(1-exp(-1/t))"
+    using 1 2
+    by (simp add: nonzero_eq_divide_eq)
+qed
 
 context notes [[function_internals]] begin
 partial_function (spmf) discrete_laplace_rat_unit_loop1 :: "nat \<Rightarrow> nat spmf" where 
@@ -69,14 +145,13 @@ partial_function (spmf) discrete_laplace_rat_unit_loop2 :: "nat \<Rightarrow> na
 }"
 end
 
-context notes [[function_internals]] begin
-partial_function (spmf) discrete_laplace_rat_unit :: "nat \<Rightarrow> nat spmf" where
+
+definition discrete_laplace_rat_unit :: "nat \<Rightarrow> nat spmf" where
 "discrete_laplace_rat_unit t = do {
   u::nat \<leftarrow> discrete_laplace_rat_unit_loop1 t;
   v::nat \<leftarrow> discrete_laplace_rat_unit_loop2 0;
   return_spmf ((u::nat)+t * v)
 }"
-end
 
 definition calculate_y :: "nat \<Rightarrow> nat \<Rightarrow> nat" where 
 "calculate_y x s= nat(floor(x/s))"
@@ -111,15 +186,6 @@ and "(\<And>discrete_laplace_rat_unit_loop2'. P discrete_laplace_rat_unit_loop2'
 shows "P discrete_laplace_rat_unit_loop2"
   using assms by (rule discrete_laplace_rat_unit_loop2.fixp_induct)
 
-thm discrete_laplace_rat_unit.fixp_induct
-
-lemma discrete_laplace_rat_unit_fixp_induct[case_names adm bottom step]:
-  assumes "spmf.admissible P"
-and "P (\<lambda>discrete_laplace_rat_unit. return_pmf None)"
-and "(\<And>t. P t \<Longrightarrow> P (\<lambda>t. discrete_laplace_rat_unit_loop1 t \<bind> (\<lambda>u. discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v. return_spmf (u + t * v)))))"
-shows "P discrete_laplace_rat_unit"
-  using assms by (rule discrete_laplace_rat_unit.fixp_induct)
-
 thm discrete_laplace_rat.fixp_induct
 
 lemma discrete_laplace_rat_fixp_induct [case_names adm bottom step]:
@@ -147,7 +213,357 @@ interpretation loop_spmf fst body
 })"
   by(fact body_def)
 
-lemma 
+lemma discrete_laplace_rat_unit_loop1_conv_while:
+  assumes "1\<le>t"
+  shows "discrete_laplace_rat_unit_loop1 t = map_spmf (\<lambda>triple. snd(snd(triple))) (while (True, t, 0))" (is "?lhs = ?rhs")
+proof (rule spmf.leq_antisym)
+  show "ord_spmf (=) ?lhs ?rhs"
+  proof (induction rule: discrete_laplace_rat_unit_loop1_fixp_induct)
+    case adm
+    then show ?case by simp
+  next
+    case bottom
+    then show ?case by simp
+  next
+    case (step t)
+    then show ?case
+      apply(rewrite while.simps)
+      apply(clarsimp)
+      apply(clarsimp simp add: map_spmf_bind_spmf map_spmf_bind_spmf_lambda)
+      apply(clarsimp intro!: ord_spmf_bind_reflI)
+      apply(rewrite while.simps)
+      apply(clarsimp)
+      done
+  qed
+next
+  have "ord_spmf (=) ?rhs ?lhs"
+and "\<And>u. ord_spmf (=) (map_spmf (\<lambda>triple. snd(snd(triple))) (while (False, t, u))) (return_spmf u)"
+  proof (induction rule:while_fixp_induct)
+    case adm show ?case by simp
+    case bottom case 1 show ?case by simp
+    case bottom case 2 show ?case by simp
+  next
+    case (step while')
+    case 1 show ?case using step
+      by(rewrite discrete_laplace_rat_unit_loop1.simps)(clarsimp simp add: map_spmf_bind_spmf bind_map_spmf spmf.map_comp o_def intro!: ord_spmf_bind_reflI)
+    case 2 show ?case by simp
+  qed
+  then show "ord_spmf (=) ?rhs ?lhs" by simp
+qed
+
+lemma lossless_discrete_laplace_rat_unit_loop1:
+  assumes "1\<le>t"
+  shows "lossless_spmf (discrete_laplace_rat_unit_loop1 t)"
+proof -
+  have "lossless_spmf (while (True, t, 0))"
+  proof (rule termination_0_1_immediate_invar,clarify)
+    show " 0 < (\<Sum>x = 0..t - 1. 1/t * exp (- real_of_rat (Fract (int x) (int t))))" 
+    proof -
+      have "0 < 1/t * exp (- real_of_rat (Fract (int 0) (int t)))" 
+        using assms by simp
+      also have "... = (\<Sum>x = 0..0. 1/t * exp (- real_of_rat (Fract (int x) (int t))))"
+        by simp
+      also have "... \<le> (\<Sum>x = 0..t - 1. 1/t * exp (- real_of_rat (Fract (int x) (int t))))"
+      proof - 
+        have 1:"{0} \<subseteq> {0..t-1}" by simp
+        have 2:"\<And>x. x\<in>{0..t-1} \<Longrightarrow> 0\<le> 1/t * exp (- real_of_rat (Fract (int x) (int t)))"
+          by simp
+        show ?thesis  
+          using 1 2 by(rewrite sum_mono2,simp_all)
+      qed
+      finally show ?thesis by simp
+    qed
+  next
+    fix b::bool and t1 u::nat
+    assume I:"(\<lambda>(b,t1,u).t1 = t) (b,t1,u)"
+    show "(\<Sum>x = 0..t - 1. 1/t * exp (- real_of_rat (Fract (int x) (int t)))) \<le> spmf (map_spmf fst
+                    (fast_uniform t1 \<bind>
+                     (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t1)) \<bind> (\<lambda>d. if d then return_spmf (False, t1, u) else return_spmf (True, t1, 0)))))
+              False"
+    proof -
+      have 1:"spmf (map_spmf fst
+                    (fast_uniform t1 \<bind>
+                     (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t1)) \<bind> (\<lambda>d. if d then return_spmf (False, t1, u) else return_spmf (True, t1, 0))))) False
+          = spmf (fast_uniform t1 \<bind> (\<lambda>x. bernoulli_exp_minus_rat (Fract (int x) (int t1)) \<bind> (\<lambda>x. if x then return_spmf False else return_spmf True))) False"
+        by (simp add: map_spmf_bind_spmf map_spmf_bind_spmf_lambda map_spmf_if o_def, rewrite map_spmf_return_spmf, rewrite map_spmf_return_spmf, rewrite fst_conv, rewrite fst_conv, simp)
+      have "ennreal (spmf (fast_uniform t1 \<bind> (\<lambda>x. bernoulli_exp_minus_rat (Fract (int x) (int t1)) \<bind> (\<lambda>x. if x then return_spmf False else return_spmf True))) False)
+          = (\<Sum>x. ennreal (spmf (fast_uniform t1) x) * ennreal (spmf (bernoulli_exp_minus_rat (Fract (int x) (int t1))) True))"
+        by(simp add: ennreal_spmf_bind nn_integral_measure_spmf nn_integral_count_space_nat nn_integral_count_space_finite UNIV_bool)
+      also have "... = (\<Sum>x=0..t1-1. ennreal (1/t1) * ennreal (spmf (bernoulli_exp_minus_rat (Fract (int x) (int t1))) True))"
+      proof (rewrite suminf_finite[of "{0..t1-1}"],simp_all add: spmf_fast_uniform)
+        have "\<And>n. n\<in>{0..t1-1} \<Longrightarrow> (if n < t1 then 1 / real t1 else 0) = 1/t1"
+          by auto
+        then show "(\<Sum>n = 0..t1 - Suc 0. ennreal (if n < t1 then 1 / real t1 else 0) * ennreal (spmf (bernoulli_exp_minus_rat (Fract (int n) (int t1))) True))
+                = (\<Sum>x = 0..t1 - Suc 0. ennreal (1 / real t1) * ennreal (spmf (bernoulli_exp_minus_rat (Fract (int x) (int t1))) True))"
+          by(simp)
+      qed
+      also have "... = (\<Sum>x = 0..t1 - Suc 0. ennreal (1/t1) * ennreal (exp(-(of_rat (Fract x t1)))))"
+      proof(rewrite spmf_bernoulli_exp_minus_rat_True,simp_all)
+        show "\<And>x::nat. 0 \<le> Fract (int x) (int t1)" 
+          using I assms by (simp add: zero_le_Fract_iff)
+      qed
+      also have "... = (\<Sum>x = 0..t1 - Suc 0. ennreal ((1/t1) * exp(-(of_rat (Fract x t1)))))"
+      proof -
+        have "\<And>x. ennreal (1 / real t1) * ennreal (exp (- real_of_rat (Fract (int x) (int t1)))) = ennreal ((1/t1) * exp(-(of_rat (Fract x t1))))"
+          by(rewrite ennreal_mult', simp_all)
+        then show ?thesis by simp
+      qed
+      also have "... = (\<Sum>x = 0..t - Suc 0. (1/t) * exp(-(of_rat (Fract x t))))"
+        using I by simp
+      finally have nn:"ennreal (spmf (fast_uniform t1 \<bind> (\<lambda>x. bernoulli_exp_minus_rat (Fract (int x) (int t1)) \<bind> (\<lambda>x. if x then return_spmf False else return_spmf True))) False)
+                  = ennreal (\<Sum>x = 0..t - 1. 1/t * exp (- real_of_rat (Fract (int x) (int t)))) "
+        by simp
+      then have "spmf (fast_uniform t1 \<bind> (\<lambda>x. bernoulli_exp_minus_rat (Fract (int x) (int t1)) \<bind> (\<lambda>x. if x then return_spmf False else return_spmf True))) False
+                = (\<Sum>x = 0..t - 1. 1/t * exp (- real_of_rat (Fract (int x) (int t))))"
+      proof -
+        have 1:"0\<le>spmf (fast_uniform t1 \<bind> (\<lambda>x. bernoulli_exp_minus_rat (Fract (int x) (int t1)) \<bind> (\<lambda>x. if x then return_spmf False else return_spmf True))) False"
+          by simp
+        have 2:"0 < (\<Sum>x = 0..t - 1. 1/t * exp (- real_of_rat (Fract (int x) (int t))))"
+        proof -
+          have "0 < 1/t * exp (- real_of_rat (Fract (int 0) (int t)))" 
+            using assms by simp
+          also have "... = (\<Sum>x = 0..0. 1/t * exp (- real_of_rat (Fract (int x) (int t))))"
+            by simp
+          also have "... \<le> (\<Sum>x = 0..t - 1. 1/t * exp (- real_of_rat (Fract (int x) (int t))))"
+          proof - 
+            have 1:"{0} \<subseteq> {0..t-1}" by simp
+            have 2:"\<And>x. x\<in>{0..t-1} \<Longrightarrow> 0\<le> 1/t * exp (- real_of_rat (Fract (int x) (int t)))"
+              by simp
+            show ?thesis  
+              using 1 2 by(rewrite sum_mono2,simp_all)
+          qed
+          finally show ?thesis by simp
+        qed
+        show ?thesis using 1 2 nn by simp
+      qed
+      then have 2:"(\<Sum>x = 0..t - 1. 1/t * exp (- real_of_rat (Fract (int x) (int t)))) \<le> spmf (fast_uniform t1 \<bind> (\<lambda>x. bernoulli_exp_minus_rat (Fract (int x) (int t1)) \<bind> (\<lambda>x. if x then return_spmf False else return_spmf True))) False"
+        by simp
+      show ?thesis using 1 2 by simp
+    qed
+  next
+    fix s:: "bool\<times>nat\<times>nat" 
+    show " (case s of (b, t1, u) \<Rightarrow> t1 = t) \<Longrightarrow>
+         lossless_spmf
+          (case s of
+           (b, t, u1) \<Rightarrow> fast_uniform t \<bind> (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind> (\<lambda>d. if d then return_spmf (False, t, u) else return_spmf (True, t, 0))))"
+    proof (clarify,auto)
+      show "0 < t" using assms by simp
+      show "\<And>xa::nat. xa \<in> set_spmf (fast_uniform t) \<Longrightarrow> lossless_spmf (bernoulli_exp_minus_rat (Fract (int xa) (int t))) "
+      proof(rewrite lossless_bernoulli_exp_minus_rat,simp_all)
+        show "\<And>x::nat. 0 \<le> Fract (int x) (int t) "
+          using assms by (simp add:zero_le_Fract_iff)
+      qed
+    qed
+  next
+    show "\<And>s s'.
+       s' \<in> set_spmf
+              (case s of
+               (b, t, u1) \<Rightarrow>
+                 fast_uniform t \<bind> (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind> (\<lambda>d. if d then return_spmf (False, t, u) else return_spmf (True, t, 0)))) \<Longrightarrow>
+       (case s of (b, t1, u) \<Rightarrow> t1 = t) \<Longrightarrow> fst s \<Longrightarrow> case s' of (b, t1, u) \<Rightarrow> t1 = t"
+    proof (clarify)
+      fix b1 t1 u1 b2 t2 u2
+      assume H:"(b2, t2, u2)
+       \<in> set_spmf (fast_uniform t \<bind> (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind> (\<lambda>d. if d then return_spmf (False, t, u) else return_spmf (True, t, 0))))"
+      show "t2 = t"
+      proof -
+        have "set_spmf (fast_uniform t \<bind> (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind> (\<lambda>d. if d then return_spmf (False, t, u) else return_spmf (True, t, 0))))
+            \<subseteq> {(True,t,0)}\<union>{(b,t3,u). b=False\<and>t3=t }"
+          by(simp add: set_bind_spmf o_def,rewrite set_spmf_if,rewrite set_return_spmf, rewrite set_return_spmf,simp add:set_spmf_bind_set)
+        then have "(b2, t2, u2)\<in> {(True,t,0)}\<union>{(b,t3,u). b=False\<and>t3=t }" 
+          using H by auto
+        then show "t2 =t"
+          by auto
+      qed
+    qed
+  next
+    show "case (True, t, 0) of (b, t1, u) \<Rightarrow> t1 = t"
+      by simp
+  qed
+  then show ?thesis 
+    using discrete_laplace_rat_unit_loop1_conv_while assms by auto
+qed
+
+lemma spmf_discrete_laplace_rat_unit_loop1:
+  fixes u::nat
+  assumes "1\<le>t" and "u<t"
+  shows "spmf (discrete_laplace_rat_unit_loop1 t) u = exp (-u/t)* (1 - exp (- 1/t))/ (1 - exp (- 1))"
+proof -
+  have "ennreal (spmf (discrete_laplace_rat_unit_loop1 t) u) 
+      = ennreal (spmf (fast_uniform t \<bind> (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind> (\<lambda>d. if d then return_spmf u else discrete_laplace_rat_unit_loop1 t))) u)"
+    by(simp add:discrete_laplace_rat_unit_loop1.simps)
+  also have "... = (\<Sum>x. ennreal (spmf (fast_uniform t) x) *
+          (ennreal (spmf (bernoulli_exp_minus_rat (Fract (int x) (int t))) False) * ennreal (spmf (discrete_laplace_rat_unit_loop1 t) u) +
+           ennreal (spmf (bernoulli_exp_minus_rat (Fract (int x) (int t))) True) * ennreal (indicat_real {Some u} (Some x))))"
+    by(simp add: ennreal_spmf_bind nn_integral_measure_spmf nn_integral_count_space_nat UNIV_bool nn_integral_count_space_finite)
+  also have "... = (\<Sum>x\<in>{0..t-1}. ennreal (1/t) *
+          (ennreal (spmf (bernoulli_exp_minus_rat (Fract (int x) (int t))) False) * ennreal (spmf (discrete_laplace_rat_unit_loop1 t) u) +
+           ennreal (spmf (bernoulli_exp_minus_rat (Fract (int x) (int t))) True) * ennreal (indicat_real {Some u} (Some x))))"
+  proof (rewrite spmf_fast_uniform,rewrite suminf_finite[of"{0..t-1}"],simp_all)
+    have "\<And>x. x\<in>{0..t-1} \<Longrightarrow> (if x < t then 1 / real t else 0) = 1/t" 
+      using assms by simp
+    then show "(\<Sum>n = 0..t - Suc 0.
+        ennreal (if n < t then 1 / real t else 0) *
+        (ennreal (spmf (bernoulli_exp_minus_rat (Fract (int n) (int t))) False) * ennreal (spmf (discrete_laplace_rat_unit_loop1 t) u) +
+         ennreal (spmf (bernoulli_exp_minus_rat (Fract (int n) (int t))) True) * ennreal (indicat_real {Some u} (Some n)))) =
+    (\<Sum>x = 0..t - Suc 0.
+        ennreal (1 / real t) *
+        (ennreal (spmf (bernoulli_exp_minus_rat (Fract (int x) (int t))) False) * ennreal (spmf (discrete_laplace_rat_unit_loop1 t) u) +
+         ennreal (spmf (bernoulli_exp_minus_rat (Fract (int x) (int t))) True) * ennreal (indicat_real {Some u} (Some x))))"
+      by simp
+  qed
+  also have "... = (\<Sum>x\<in>{0..t-1}. ennreal (1/t) *
+          (ennreal (1-exp(-(of_rat (Fract x t)))) * ennreal (spmf (discrete_laplace_rat_unit_loop1 t) u) +
+           ennreal (exp(-(of_rat (Fract x t)))) * ennreal (indicat_real {Some u} (Some x))))"
+  proof(rewrite spmf_bernoulli_exp_minus_rat_True)
+    show 1:"\<And>x::nat. 0 \<le> Fract (int x) (int t)" 
+      using assms by (simp add: zero_le_Fract_iff)
+    show "(\<Sum>x = 0..t - 1. ennreal (1 / real t) *
+        (ennreal (spmf (bernoulli_exp_minus_rat (Fract (int x) (int t))) False) * ennreal (spmf (discrete_laplace_rat_unit_loop1 t) u) +
+         ennreal (exp (- real_of_rat (Fract (int x) (int t)))) * ennreal (indicat_real {Some u} (Some x)))) =
+    (\<Sum>x = 0..t - 1. ennreal (1 / real t) *
+        (ennreal (1 - exp (- real_of_rat (Fract (int x) (int t)))) * ennreal (spmf (discrete_laplace_rat_unit_loop1 t) u) +
+         ennreal (exp (- real_of_rat (Fract (int x) (int t)))) * ennreal (indicat_real {Some u} (Some x))))"
+      by(rewrite spmf_bernoulli_exp_minus_rat_False, simp_all add:1)
+  qed
+  also have "... = (\<Sum>x\<in>{0..t-1}. ennreal (1/t) * (ennreal (1-exp(-(of_rat (Fract x t)))) * ennreal (spmf (discrete_laplace_rat_unit_loop1 t) u))
+                                 + ennreal (1/t) * (ennreal (exp(-(of_rat (Fract x t)))) * ennreal (indicat_real {Some u} (Some x))))"
+    by(simp add: ring_distribs(1))
+  also have "... = (\<Sum>x\<in>{0..t-1}. ennreal ((1/t) * (1-exp(-(of_rat (Fract x t)))) * (spmf (discrete_laplace_rat_unit_loop1 t) u))
+                                 + ennreal ((1/t) * (exp(-(of_rat (Fract x t)))) * (indicat_real {Some u} (Some x))))"
+    apply(rewrite ennreal_mult'', simp, rewrite ennreal_mult', simp, rewrite ennreal_mult'', simp, rewrite ennreal_mult', simp)
+    by (simp add: mult.commute mult.left_commute)
+  also have "... = (\<Sum>x\<in>{0..t-1}. ennreal ((1/t) * (1-exp(-(of_rat (Fract x t)))) * (spmf (discrete_laplace_rat_unit_loop1 t) u)))
+                 + (\<Sum>x\<in>{0..t-1}. ennreal ((1/t) * (exp(-(of_rat (Fract x t)))) * (indicat_real {Some u} (Some x))))"
+    by(simp add: sum.distrib)
+  also have "... = (\<Sum>x\<in>{0..t-1}. ennreal ((1/t) * (1-exp(-(of_rat (Fract x t)))) * (spmf (discrete_laplace_rat_unit_loop1 t) u)))
+                 + (ennreal ((1/t) * (exp(-(of_rat (Fract u t))))))"
+  proof(simp)
+    have "(\<Sum>x = 0..t - Suc 0. exp (- real_of_rat (Fract (int x) (int t))) * indicat_real {Some u} (Some x)/t) =
+          (\<Sum>x \<in> {u}. exp (- real_of_rat (Fract (int x) (int t))) * indicat_real {Some u} (Some x)/t)
+        + (\<Sum>x \<in> {0..t-1} - {u}. exp (- real_of_rat (Fract (int x) (int t))) * indicat_real {Some u} (Some x)/t) "
+    proof(rewrite sum.subset_diff[of"{u}"],simp_all)  
+      show "u \<le> t - Suc 0"
+        using assms by simp
+    qed
+    also have "... = exp (- real_of_rat (Fract (int u) (int t)))/t"
+      by simp
+    finally have " (\<Sum>x = 0..t - Suc 0. exp (- real_of_rat (Fract (int x) (int t))) * indicat_real {Some u} (Some x)/t)
+                  = exp (- real_of_rat (Fract (int u) (int t)))/t"
+      by simp
+    then show "ennreal (\<Sum>x = 0..t - Suc 0. exp (- real_of_rat (Fract (int x) (int t))) * indicat_real {Some u} (Some x)/t) 
+             = ennreal (exp (- real_of_rat (Fract (int u) (int t)))/t)"
+      by simp
+  qed
+  also have "... = ennreal (\<Sum>x = 0..t - 1. (1/t * (1 - exp (- real_of_rat (Fract (int x) (int t)))) * spmf (discrete_laplace_rat_unit_loop1 t) u)) 
+                 + ennreal (1/t * exp (- real_of_rat (Fract (int u) (int t))))"
+  proof -
+    have "(\<Sum>x = 0..t - 1. ennreal (1/t * (1 - exp (- real_of_rat (Fract (int x) (int t)))) * spmf (discrete_laplace_rat_unit_loop1 t) u)) 
+        = ennreal (\<Sum>x = 0..t - 1. (1/t * (1 - exp (- real_of_rat (Fract (int x) (int t)))) * spmf (discrete_laplace_rat_unit_loop1 t) u))"
+    proof (rule sum_ennreal)
+      fix x::nat
+      assume x:"x \<in> {0..t - 1}"
+      have 1:"0 \<le> 1/t" 
+        using assms by simp
+      have " exp (- real_of_rat (Fract (int x) (int t)))\<le> 1 "
+      proof(rewrite exp_le_one_iff,simp)
+        show "0 \<le> Fract (int x) (int t)"
+          using x assms by (simp add: zero_le_Fract_iff)
+      qed
+      then have 2:"0 \<le> (1 - exp (- real_of_rat (Fract (int x) (int t))))"
+        by simp
+      have 3:"0 \<le> spmf (discrete_laplace_rat_unit_loop1 t) u"
+        by simp
+      show "0 \<le> 1/t * (1 - exp (- real_of_rat (Fract (int x) (int t)))) * spmf (discrete_laplace_rat_unit_loop1 t) u"
+        using 1 2 3 by simp
+    qed
+    then show ?thesis by simp
+  qed
+  also have "... = ennreal (1/t * (\<Sum>x = 0..t - 1. (1 - exp (- real_of_rat (Fract (int x) (int t))))) * spmf (discrete_laplace_rat_unit_loop1 t) u)
+                 + ennreal (1/t * exp (- real_of_rat (Fract (int u) (int t))))"
+  proof -
+    have "(\<Sum>x = 0..t - 1. 1 / real t * (1 - exp (- real_of_rat (Fract (int x) (int t)))) * spmf (discrete_laplace_rat_unit_loop1 t) u) 
+        = 1/t * (\<Sum>x = 0..t - 1. 1 - exp (- real_of_rat (Fract (int x) (int t)))) *  spmf (discrete_laplace_rat_unit_loop1 t) u"
+      by(rewrite sum_distrib_left,rewrite sum_distrib_right, simp)
+    then show ?thesis 
+      by simp
+  qed
+  also have "... = ennreal (1/t * (\<Sum>x = 0..t - 1. 1 - exp (- x/t)) * spmf (discrete_laplace_rat_unit_loop1 t) u) 
+                 + ennreal (1/t * exp (-u/t))"
+    by(simp add:Fract_of_int_quotient of_rat_divide)
+  also have "... = ennreal (1/t * (t-(1-exp(-1))/(1-exp(-1/t))) * spmf (discrete_laplace_rat_unit_loop1 t) u)
+                 + ennreal (1/t * exp (-u/t))"
+  proof -
+    have " (\<Sum>x = 0..t - 1. 1 - exp (- x/t)) = t -  (\<Sum>x = 0..t - 1. exp (- x/t))"
+      apply(rewrite sum_subtractf,simp)
+      using assms(1) by force
+    also have "... = t - (1-exp(-1))/(1-exp(-1/t))"
+      using exp_sum assms by simp
+    finally have "(\<Sum>x = 0..t - 1. 1 - exp (- x/t)) =  t - (1-exp(-1))/(1-exp(-1/t))"
+      by simp
+    then show ?thesis 
+      by simp
+  qed
+  finally have 1:"ennreal (spmf (discrete_laplace_rat_unit_loop1 t) u) 
+              = ennreal (1/t * (t - (1 - exp (- 1)) / (1 - exp (- 1/t))) * spmf (discrete_laplace_rat_unit_loop1 t) u) + ennreal (1/t * exp (-u/t))"
+    by simp
+  have "spmf (discrete_laplace_rat_unit_loop1 t) u
+           = 1/t * (t - (1 - exp (- 1)) / (1 - exp (- 1/t))) * spmf (discrete_laplace_rat_unit_loop1 t) u + 1/t * exp (-u/t)"
+  proof -
+    have "0 \<le> (\<Sum>x = 0..t - 1. 1 - exp (- x/t))"
+    proof -
+      have "\<And>x::nat. x\<in>{0..t-1} \<Longrightarrow> 0\<le>1-exp(-x/t)"
+        by simp
+      then show ?thesis
+        by (simp add:sum_nonneg)
+    qed
+    also have "... = t - (\<Sum>x = 0..t - 1. exp (- x/t))"
+      apply(rewrite sum_subtractf,simp)
+      using assms(1) by force
+    also have "... = t - (1 - exp (- 1)) / (1 - exp (- 1/t))"
+      using assms exp_sum by simp
+    finally have "0\<le>  t - (1 - exp (- 1)) / (1 - exp (- 1/t))"
+      by simp
+    then have p1:"0\<le> 1/t * (t - (1 - exp (- 1)) / (1 - exp (- 1/t))) * spmf (discrete_laplace_rat_unit_loop1 t) u"
+      using assms by simp
+    have p2:"0\<le>1/t * exp (-u/t)"
+      by simp
+    have p3:"0 \<le> 1/t * (t - (1 - exp (- 1)) / (1 - exp (- 1/t))) * spmf (discrete_laplace_rat_unit_loop1 t) u + 1/t * exp (-u/t)"
+      using p1 p2 by simp
+    have p4:"0\<le>spmf (discrete_laplace_rat_unit_loop1 t) u"
+      by simp
+    have "ennreal (spmf (discrete_laplace_rat_unit_loop1 t) u) 
+        = ennreal (1/t * (t - (1 - exp (- 1)) / (1 - exp (- 1/t))) * spmf (discrete_laplace_rat_unit_loop1 t) u + 1/t * exp (-u/t))"
+      apply(rewrite ennreal_plus)
+      using p1 p2 1 by(simp_all)
+    then show ?thesis
+      using p3 p4 by(simp)
+  qed
+  then have 2:"spmf (discrete_laplace_rat_unit_loop1 t) u * (1- 1/t * (t - (1 - exp (- 1)) / (1 - exp (- 1/t))))
+           = 1/t * exp (-u/t) "
+    by argo
+  show "spmf (discrete_laplace_rat_unit_loop1 t) u = exp (-u/t)* (1 - exp (- 1/t))/ (1 - exp (- 1))"
+  proof -
+    have "(1- 1/t * (t - (1 - exp (- 1)) / (1 - exp (- 1/t)))) = 1/t * (1 - exp (- 1)) / (1 - exp (- 1/t))"
+      apply(rewrite right_diff_distrib)
+      using assms by simp
+    then have "1/t * spmf (discrete_laplace_rat_unit_loop1 t) u * (1 - exp (- 1)) / (1 - exp (- 1/t))
+             = 1/t * exp (-u/t) "
+      using 2 by simp
+    then have p1:"spmf (discrete_laplace_rat_unit_loop1 t) u * (1 - exp (- 1)) / (1 - exp (- 1/t))
+             = exp (-u/t) "
+      apply(rewrite scale_left_imp_eq[of "1/t"],simp_all)
+      using assms by simp
+    show ?thesis
+    proof -
+      have "spmf (discrete_laplace_rat_unit_loop1 t) u * (1 - exp (- 1)) / (1 - exp (- 1/t)) * (1 - exp (- 1/t))/ (1 - exp (- 1))
+          = spmf (discrete_laplace_rat_unit_loop1 t) u"
+        using assms by(simp)
+      then show ?thesis
+        using p1 by metis
+    qed
+  qed
+qed
 
 end
 context
@@ -335,279 +751,7 @@ qed
 
 thm discrete_laplace_rat.simps
 
-context 
-  fixes body :: "bool \<times> nat \<times> nat \<times> nat\<Rightarrow> (bool \<times> nat \<times> nat \<times> nat) spmf"
-  defines [simp]: "body \<equiv> (\<lambda>(b, t, s, y). do {
-  u::nat \<leftarrow> fast_uniform t;
-  d::bool \<leftarrow> bernoulli_exp_minus_rat (Fract u t);
-  if \<not>d then return_spmf (True, t, s, 0)
-  else do {
-    v::nat \<leftarrow> discrete_laplace_rat_unit_loop2 0;
-    return_spmf (False,t,s,(u::nat)+t * v)
-}
-})"
 
-begin
-interpretation loop_spmf "fst" body 
-  rewrites "body \<equiv> (\<lambda>(b, t, s, y). do {
-  u::nat \<leftarrow> fast_uniform t;
-  d::bool \<leftarrow> bernoulli_exp_minus_rat (Fract u t);
-  if \<not>d then return_spmf (True, t, s, 0)
-  else do {
-    v::nat \<leftarrow> discrete_laplace_rat_unit_loop2 0;
-    return_spmf (False,t,s,(u::nat)+t * v)
-}
-})"
-  by(fact body_def)
-
-lemma discrete_laplace_rat_unit_conv_while:
-"discrete_laplace_rat_unit t s = map_spmf (snd \<circ> snd \<circ> snd) (while (True,t,s,0))" (is "?lhs = ?rhs")
-proof(rule spmf.leq_antisym)
-  show "ord_spmf (=) ?lhs ?rhs"
-  proof(induction rule: discrete_laplace_rat_unit_fixp_induct)
-    case adm
-    then show ?case by simp
-  next
-    case bottom
-    then show ?case by simp
-  next
-    case (step discrete_laplace_rat_unit)
-    show ?case 
-      apply(rewrite while.simps)
-      apply(clarsimp)
-      apply(clarsimp simp add: map_spmf_bind_spmf)
-      apply(clarsimp simp add: map_spmf_bind_spmf_lambda)
-      apply(clarsimp intro!: ord_spmf_bind_reflI)
-      using step by(simp add:while.simps)
-  qed
-next 
-  have "ord_spmf (=) ?rhs ?lhs"
-and "\<And>x. ord_spmf (=) (map_spmf (\<lambda>a. snd (snd (snd a))) (while (False, t,s, x))) (return_spmf x)"
-  proof(induction rule: while_fixp_induct)
-    case adm show ?case by simp
-    case bottom case 1 show ?case by simp
-    case bottom case 2 show ?case by simp
-  next
-    case (step while')
-    case 1 show ?case
-      apply(rewrite discrete_laplace_rat_unit.simps)
-      apply(clarsimp)
-      apply(clarsimp simp add: map_spmf_bind_spmf)
-      apply(clarsimp simp add: map_spmf_bind_spmf_lambda)
-      apply(clarsimp intro!: ord_spmf_bind_reflI)
-      using step 
-      by (simp add: ord_spmf_bind)
-    case 2 show ?case by simp
-  qed
-  then show "ord_spmf (=) ?rhs ?lhs" by simp
-qed
-
-lemma lossless_discrete_laplace_rat_unit:
-  assumes "1\<le>t" and "1\<le>s"
-  shows "lossless_spmf (discrete_laplace_rat_unit t s)"
-proof -
-  have "lossless_spmf (while (True, t, s, 0))"
-  proof (rule termination_0_1_immediate_invar,clarify)
-    fix b::bool and  t1 s1 y::nat
-    assume "fst (b,t1,s1,y)"
-      and I:"(\<lambda>(b,t1,s1,y). t1 = t \<and> s1= s) (b,t1,s1,y)"
-    show "(\<Sum>x = 0..t - 1. (1 / t * (exp (- real_of_rat (Fract (int x) (int t))))))\<le> spmf (map_spmf fst
-                    (fast_uniform t1 \<bind>
-                     (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t1)) \<bind>
-                          (\<lambda>d. if \<not> d then return_spmf (True, t1, s1, 0) else discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v. return_spmf (False, t1, s1, u + t1 * v))))))
-              False"
-    proof - 
-      have 1:"spmf (map_spmf fst(fast_uniform t1 \<bind>
-               (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t1)) \<bind>
-                     (\<lambda>d. if \<not> d then return_spmf (True, t1, s1, 0) else discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v::nat. return_spmf (False, t1, s1, u + t1 * v))))))
-          False
-            = spmf (fast_uniform t1 \<bind>
-               (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t1)) \<bind>
-                  (\<lambda>d. if \<not> d then return_spmf True else discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v::nat. return_spmf False))))
-          False"       
-        apply(simp add:map_spmf_bind_spmf map_spmf_bind_spmf_lambda)
-        apply(rewrite map_spmf_lambda_if)
-        apply(rewrite map_spmf_return_spmf)
-        apply(rewrite map_spmf_bind_spmf)
-        apply(rewrite map_spmf_lambda)
-        apply(rewrite map_spmf_return_spmf)
-        apply(rewrite fst_conv, rewrite fst_conv)
-        by simp
-      have "ennreal (spmf (fast_uniform t1 \<bind>
-               (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t1)) \<bind>
-                  (\<lambda>d. if \<not> d then return_spmf True else discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v::nat. return_spmf False))))
-          False)
-          =(\<Sum>x\<in>{0..t1-1}. ennreal (1/t1) *
-       (\<Sum>\<^sup>+ xa.
-          ennreal (spmf (bernoulli_exp_minus_rat (Fract (int x) (int t1))) xa) *
-          ennreal (spmf (if \<not> xa then return_spmf True else discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v::nat. return_spmf False)) False)))"  
-        apply(simp add:ennreal_spmf_bind nn_integral_measure_spmf spmf_fast_uniform nn_integral_count_space_nat)
-        apply(rewrite suminf_finite[of"{0..t1-1}"],simp_all)
-      proof -
-        have "\<And>n. n\<in>{0..t1-1} \<Longrightarrow> (if n < t1 then 1 / real t1 else 0) = 1/t1" by auto
-        then show "(\<Sum>n = 0..t1 - Suc 0.
-        ennreal (if n < t1 then 1 / real t1 else 0) *
-        (\<Sum>\<^sup>+ x.
-           ennreal (spmf (bernoulli_exp_minus_rat (Fract (int n) (int t1))) x) *
-           ennreal (spmf (if \<not> x then return_spmf True else discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v::nat. return_spmf False)) False))) =
-    (\<Sum>x = 0..t1 - Suc 0.
-        ennreal (1 / real t1) *
-        (\<Sum>\<^sup>+ xa.
-           ennreal (spmf (bernoulli_exp_minus_rat (Fract (int x) (int t1))) xa) *
-           ennreal (spmf (if \<not> xa then return_spmf True else discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v::nat. return_spmf False)) False)))"
-          by simp
-      qed
-      also have "... = (\<Sum>x = 0..t1 - 1.
-        ennreal (1 / real t1) *
-        (ennreal (exp(-(of_rat(Fract x t1)))) * (ennreal (spmf (discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v::nat. return_spmf False)) False))))"
-      proof(simp add: UNIV_bool nn_integral_count_space_finite)
-        have "\<And>n::nat. n\<in>{0..(t1-1::nat)} \<Longrightarrow> 0\<le>n" by simp
-        then have "\<And>n::nat. n\<in>{0..(t1-1::nat)} \<Longrightarrow> 0\<le> Fract n t1"
-          by (metis Zero_rat_def eq_rat(2) gr0I int_ops(1) le_numeral_extra(3) of_nat_0_le_iff of_nat_0_less_iff zero_le_Fract_iff)
-        then have "\<And>n::nat. n\<in>{0..(t1-1::nat)} \<Longrightarrow> ennreal (spmf (bernoulli_exp_minus_rat (Fract (int n) (int t1))) True) = ennreal (exp(-(of_rat(Fract n t1))))"
-          by simp
-        then show "(\<Sum>x = 0..t1 - Suc 0.
-        ennreal (1 / real t1) *
-        (ennreal (spmf (bernoulli_exp_minus_rat (Fract (int x) (int t1))) True) * ennreal (spmf (discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v::nat. return_spmf False)) False))) =
-    (\<Sum>x = 0..t1 - Suc 0.
-        ennreal (1 / real t1) * (ennreal (exp (- real_of_rat (Fract (int x) (int t1)))) * ennreal (spmf (discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v::nat. return_spmf False)) False)))"
-          by simp
-      qed
-      also have "... = (\<Sum>x = 0..t1 - 1.
-        ennreal (1 / real t1) * (ennreal (exp (- real_of_rat (Fract (int x) (int t1))))))"
-      proof(simp add: spmf_bind)
-        have "weight_spmf (discrete_laplace_rat_unit_loop2 0) = 1"
-          using lossless_discrete_laplace_rat_unit_loop2_zero by (simp add:lossless_spmf_def)
-        then show "(\<Sum>x = 0..t1 - Suc 0. ennreal (1 / real t1) * (ennreal (exp (- real_of_rat (Fract (int x) (int t1)))) * ennreal (weight_spmf (discrete_laplace_rat_unit_loop2 0)))) =
-    (\<Sum>x = 0..t1 - Suc 0. ennreal (1 / real t1) * ennreal (exp (- real_of_rat (Fract (int x) (int t1)))))"
-          by simp
-      qed
-      also have "... =  (\<Sum>x = 0..t - 1.
-        ennreal (1 / t * (exp (- real_of_rat (Fract (int x) (int t))))))"
-        using I by(rewrite ennreal_mult,simp_all)
-      also have "... =  (\<Sum>x = 0..t - 1. (1 / t * (exp (- real_of_rat (Fract (int x) (int t))))))"
-        by simp
-      finally have "ennreal (spmf (fast_uniform t1 \<bind>
-               (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t1)) \<bind>
-                  (\<lambda>d. if \<not> d then return_spmf True else discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v::nat. return_spmf False))))
-          False) = (\<Sum>x = 0..t - 1. (1 / t * (exp (- real_of_rat (Fract (int x) (int t))))))"
-        by simp
-      then have "(\<Sum>x = 0..t - 1. (1 / t * (exp (- real_of_rat (Fract (int x) (int t))))))\<le>(spmf (fast_uniform t1 \<bind>
-               (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t1)) \<bind>
-                  (\<lambda>d. if \<not> d then return_spmf True else discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v::nat. return_spmf False))))
-          False)"
-        using ennreal_le_iff2 by fastforce
-      then show ?thesis using 1 by simp
-    qed
-  next
-    show " 0 < (\<Sum>x = 0..t - 1. 1 / real t * exp (- real_of_rat (Fract (int x) (int t))))"
-    proof -
-      have 1:"0<1/t" using assms by simp
-      have 2:"1/t * exp (- real_of_rat (Fract (int 0) (int t))) = 1/t"
-        by (simp add: rat_number_collapse(1))
-      have "0 < (\<Sum>x=0..0. 1/t * exp (- real_of_rat (Fract (int x) (int t))))" 
-        using 1 2 by simp
-      also have "... \<le> (\<Sum>x = 0..t - 1. 1 / real t * exp (- real_of_rat (Fract (int x) (int t))))"
-        by (rule sum_mono2,simp_all)
-      finally show ?thesis by simp
-    qed
-  next
-    show "\<And>sa. fst sa \<Longrightarrow>
-          (case sa of (b, t1, s1, y) \<Rightarrow> t1 = t \<and> s1 = s) \<Longrightarrow>
-          lossless_spmf
-           (case sa of
-            (b, t, s, y) \<Rightarrow>
-              fast_uniform t \<bind>
-              (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind>
-                   (\<lambda>d. if \<not> d then return_spmf (True, t, s, 0) else discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v. return_spmf (False, t, s, u + t * v)))))"
-    proof(clarify, simp,rewrite lossless_bernoulli_exp_minus_rat,simp_all)
-      fix u::nat
-      have "0\<le>u" by simp
-      then show "0 \<le> Fract (int u) (int t)"
-        using assms(1) zero_le_Fract_iff by auto
-      show "0<t" using assms by simp
-    qed
-  next
-    show "\<And>sa s'.
-       s' \<in> set_spmf
-              (case sa of
-               (b, t, s, y) \<Rightarrow>
-                 fast_uniform t \<bind>
-                 (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind>
-                      (\<lambda>d. if \<not> d then return_spmf (True, t, s, 0) else discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v. return_spmf (False, t, s, u + t * v))))) \<Longrightarrow>
-       (case sa of (b, t1, s1, y) \<Rightarrow> t1 = t \<and> s1 = s) \<Longrightarrow> fst sa \<Longrightarrow> case s' of (b, t1, s1, y) \<Rightarrow> t1 = t \<and> s1 = s"
-    proof(clarify,simp)
-      fix b1 t1 s1 y1 b2 t2 s2 y2
-      assume H:"(b2, t2, s2, y2)
-       \<in> set_spmf
-           (fast_uniform t \<bind>
-            (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind>
-                 (\<lambda>d. if \<not> d then return_spmf (True, t, s, 0) else discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v. return_spmf (False, t, s, u + t * v))))) "
-      then show "t2=t \<and> s2=s"
-      proof- 
-        have "set_spmf
-           (fast_uniform t \<bind>
-            (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind>
-                 (\<lambda>d. if \<not> d then return_spmf (True, t, s, 0) else discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v. return_spmf (False, t, s, u + t * v)))))
-= (set_spmf (fast_uniform t))\<bind>
-             (\<lambda>u. set_spmf (bernoulli_exp_minus_rat (Fract (int u) (int t))) \<bind>
-                 (\<lambda>d. if \<not> d then set_spmf (return_spmf (True, t, s, 0))
-                      else set_spmf (discrete_laplace_rat_unit_loop2 0  \<bind> (\<lambda>v::nat. return_spmf (False, t, s, u + t * v)))))"
-          apply(simp add: set_bind_spmf o_def)
-          by(rewrite set_spmf_if, simp)
-        also have "... = (set_spmf (fast_uniform t))\<bind>
-             (\<lambda>u. set_spmf (bernoulli_exp_minus_rat (Fract (int u) (int t))) \<bind>
-                 (\<lambda>d. if \<not> d then {(True,t,s,0)}
-                      else set_spmf (discrete_laplace_rat_unit_loop2 0)  \<bind> (\<lambda>v::nat. {(False, t, s, u + t * v)})))"
-          by(rewrite set_return_spmf, rewrite set_bind_spmf, rewrite o_def, rewrite set_return_spmf, simp)
-        also have "...\<subseteq> {(True,t,s,0)} \<union> {(False, t1, s1, y). y \<in> Nats \<and> t1=t \<and>s1 = s}"
-        proof (rewrite set_spmf_bind_set,simp_all)
-          fix u::nat
-          show "set_spmf (bernoulli_exp_minus_rat (Fract (int u) (int t))) \<bind>
-         (\<lambda>d. if \<not> d then {(True, t, s, 0)} else set_spmf (discrete_laplace_rat_unit_loop2 0) \<bind> (\<lambda>v. {(False, t, s, u + t * v)}))
-         \<subseteq> insert (True, t, s, 0) {(False, t1, s1, y). y \<in> \<nat> \<and> t1 = t \<and> s1 = s}"
-          proof (rewrite set_spmf_bind_set,simp_all,rule)
-            fix d
-            show "set_spmf (discrete_laplace_rat_unit_loop2 0) \<bind> (\<lambda>v. {(False, t, s, u + t * v)}) \<subseteq> insert (True, t, s, 0) {(False, t1, s1, y). y \<in> \<nat> \<and> t1 = t \<and> s1 = s}"
-            proof (rewrite set_spmf_bind_set,simp_all)
-              fix v::nat
-              show "u + t * v \<in> \<nat> " unfolding Nats_def by simp
-            qed
-          qed
-        qed
-        finally have "set_spmf
-   (fast_uniform t \<bind>
-    (\<lambda>u. bernoulli_exp_minus_rat (Fract (int u) (int t)) \<bind>
-         (\<lambda>d. if \<not> d then return_spmf (True, t, s, 0) else discrete_laplace_rat_unit_loop2 0 \<bind> (\<lambda>v. return_spmf (False, t, s, u + t * v)))))
-  \<subseteq> {(True, t, s, 0)} \<union> {(False, t1, s1, y). y \<in> \<nat> \<and> t1 = t \<and> s1 = s} "
-          by simp 
-        then show ?thesis using H by auto
-      qed
-    qed
-  next
-    show "case (True, t, s, 0) of (b, t1, s1, y) \<Rightarrow> t1 = t \<and> s1 = s" by simp
-  qed
-  then show ?thesis using discrete_laplace_rat_unit_conv_while by simp
-qed
-
-lemma spmf_discrete_laplace_rat_unit:
-  assumes "1\<le>t" and "1\<le>s"
-  shows "spmf (discrete_laplace_rat_unit t s) x = (1-exp(-1/t)) * (exp(-x/t))"
-proof (rule spmf_ub_tight)
-  fix x 
-  show "spmf (discrete_laplace_rat_unit t s) x \<le> (1 - exp (- 1 / real t)) * exp (- x / real t)"
-  proof (induction rule: discrete_laplace_rat_unit_fixp_induct)
-    case adm
-    then show ?case sorry
-  next
-    case bottom
-    then show ?case by simp
-  next
-    case (step s)
-    then show ?case sorry
-  qed
-
-end
 
 
 context
