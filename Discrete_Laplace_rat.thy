@@ -57,61 +57,63 @@ lemma set_spmf_bind_set:
   unfolding Set.bind_def using assms by auto
 
 lemma exp_sum:
-  fixes t::nat
+  fixes t n::nat
   assumes "1\<le>t"
-  shows "(\<Sum>x = 0..t - 1. exp (- x/t)) = (1-exp(-1))/(1-exp(-1/t))"
+  shows "(\<Sum>x = 0..n. exp (- x/t)) = (1-exp(-(n+1)/t))/(1-exp(-1/t))"
 proof -
-  have "(\<Sum>x = 0..t - 1. exp (- x/t)) * exp(-1/t) = (\<Sum>x = 1..t. exp (- x/t))"
+  have "(\<Sum>x = 0..n. exp (- x/t)) * exp(-1/t) = (\<Sum>x = 1..n+1. exp (- x/t))"
   proof(rewrite sum_distrib_right, simp add:Fract_of_int_quotient of_rat_divide)
     have "\<And>n::nat. exp (-n/t) * exp(-1/t) = exp(-(n+1)/t)"
       apply(simp add: mult_exp_exp)
       by argo
-    then have "(\<Sum>n = 0..t - Suc 0. exp (- (n/t)) * exp (- (1/t))) = (\<Sum>n = 0..t - Suc 0. exp (- (n+1)/t))"
+    then have "(\<Sum>n = 0..n. exp (- (n/t)) * exp (- (1/t))) = (\<Sum>n = 0..n. exp (- (n+1)/t))"
       by simp
-    also have "... = (\<Sum>n = 1..t. exp (- n/t))"
+    also have "... = (\<Sum>n = 1..Suc n. exp (- n/t))"
     proof -
       have "((\<lambda>n::nat. exp (-n/t)) \<circ> Suc) = (\<lambda>n::nat. exp (-(n+1)/real t))"
         apply(simp add: o_def)
         by (simp add: minus_diff_commute minus_divide_left)
-      then have "(\<Sum>n = 0..t - Suc 0. exp (real_of_int (- int (n + 1)) / real t)) = sum ((\<lambda>n. exp (real_of_int (- int n) / real t)) \<circ> Suc) {0..t - 1}"
+      then have "(\<Sum>n = 0..n. exp (real_of_int (- int (n + 1)) / real t)) = sum ((\<lambda>n. exp (real_of_int (- int n) / real t)) \<circ> Suc) {0..n}"
         by simp
-      also have "... = (\<Sum>n = Suc 0..Suc (t - 1). exp (real_of_int (- int n) / real t))"
-        using sum.atLeast_Suc_atMost_Suc_shift[of "(\<lambda>n. exp(-n/t))" "0" "t-1"]
+      also have "... = (\<Sum>n = Suc 0..Suc n. exp (real_of_int (- int n) / real t))"
+        using sum.atLeast_Suc_atMost_Suc_shift[of "(\<lambda>n. exp(-n/t))" "0" "n"]
         by auto
-      also have "... = (\<Sum>n = 1..t. exp (- n/t))" 
+      also have "... = (\<Sum>n = 1..Suc n. exp (- n/t))" 
         using assms(1) by auto
       finally show ?thesis by simp
     qed
-    finally show "(\<Sum>n = 0..t - Suc 0. exp (- (real n / real t)) * exp (- (1 / real t))) = (\<Sum>x = Suc 0..t. exp (- (real x / real t)))"
+    finally have "(\<Sum>n = 0..n. exp (- (real n / real t)) * exp (- (1 / real t))) = (\<Sum>x = Suc 0..Suc n. exp (- (real x / real t)))"
+      by simp
+    then show "(\<Sum>n = 0..n. exp (- (real n / real t)) * exp (- (1 / real t))) = (\<Sum>x = Suc 0..n. exp (- (real x / real t))) + exp (- ((1 + real n) / real t))"
       by simp
   qed
-  then have "(\<Sum>x = 0..t - 1. exp (- x/t)) * (1 -exp(-1/t)) = (\<Sum>x = 0..t - 1. exp (- x/t)) - (\<Sum>x = 1..t. exp (- x/t))"
+  then have "(\<Sum>x = 0..n. exp (- x/t)) * (1 -exp(-1/t)) = (\<Sum>x = 0..n. exp (- x/t)) - (\<Sum>x = 1..n+1. exp (- x/t))"
     by(rewrite right_diff_distrib, simp)    
-  also have "... = 1 - exp(-1)"
+  also have "... = 1 - exp(-(n+1)/t)"
   proof -
-    have 1:"(\<Sum>x = 0..t - 1. exp (- x/t))  = (\<Sum>x = 0..t. exp (- x/t)) - exp(-1)"
+    have 1:"(\<Sum>x = 0..n. exp (- x/t))  = (\<Sum>x = 0..n+1. exp (- x/t)) - exp(-(n+1)/t)"
     proof -
-      have "(\<Sum>x = 0..t - 1. exp (- x/t)) = (\<Sum>x<t. exp (real_of_int (- int x) / real t))"
+      have "(\<Sum>x = 0..n. exp (- x/t)) = (\<Sum>x<n+1. exp (real_of_int (- int x) / real t))"
       proof - 
-        have "{0..t-1} = {0..<t}" 
-          using assms by auto
+        have "{0..n} = {0..<n+1}" 
+          by auto
         then show ?thesis 
           using lessThan_atLeast0 by presburger
       qed
-      also have "... =  (\<Sum>x = 0..t. exp (- x/t)) - exp(-1)"
-        using assms apply(rewrite sum_lessThan_conv_atMost_nat[of "\<lambda>x. exp(-x/t)" "t"],simp)
+      also have "... =  (\<Sum>x = 0..n+1. exp (- x/t)) - exp(-(n+1)/t)"
+        apply(rewrite sum_lessThan_conv_atMost_nat[of "\<lambda>x. exp(-x/t)" "n+1"],simp)
         by (simp add: atMost_atLeast0)
       finally show ?thesis 
         by simp
     qed
-    have 2:"(\<Sum>x = 1..t. exp (- x/t)) = (\<Sum>x = 0..t. exp (- x/t)) - 1"
+    have 2:"(\<Sum>x = 1..n+1. exp (- x/t)) = (\<Sum>x = 0..n+1. exp (- x/t)) - 1"
     proof -
-      have "(\<Sum>x = 0..t. exp (- x/t)) - 1 = (\<Sum>x = 1..t. exp (- x/t)) + (\<Sum>x = 0..0. exp (- x/t))  - 1"
+      have "(\<Sum>x = 0..n+1. exp (- x/t)) - 1 = (\<Sum>x = 1..n+1. exp (- x/t)) + (\<Sum>x = 0..0. exp (- x/t))  - 1"
       proof-
-        have "{0..t} = {0} \<union> {1..t}" by auto
+        have "{0..n+1} = {0} \<union> {1..n+1}" by auto
         then show ?thesis by simp
       qed
-      also have "... = (\<Sum>x = 1..t. exp (- x/t))"
+      also have "... = (\<Sum>x = 1..n+1. exp (- x/t))"
         by simp
       finally show ?thesis
         by simp
@@ -119,13 +121,90 @@ proof -
     show ?thesis
       using 1 2 by simp
   qed
-  finally have 1:"(\<Sum>x = 0..t - 1. exp (- x/t)) * (1 -exp(-1/t)) = 1-exp(-1)"
+  finally have 1:"(\<Sum>x = 0..n. exp ((-x)/t)) * (1 - exp (- 1/t)) = 1 - exp ((- (n + 1))/t)"
     by simp
   have 2:"0<1-exp(-1/t)"
     using assms by simp
-  then show "(\<Sum>x = 0..t - 1. exp (- x/t)) = (1-exp(-1))/(1-exp(-1/t))"
+  then show ?thesis
     using 1 2
     by (simp add: nonzero_eq_divide_eq)
+qed
+
+lemma exp_sum_general:
+  fixes t m n::nat 
+  assumes "1\<le>t" and "n \<le> m"
+  shows "(\<Sum>x = n..m. exp (- x/t)) = (exp(-n/t)-exp(-(m+1)/t))/(1-exp(-1/t))"
+proof- 
+  have 1:"(\<Sum>x = n..m. exp (- x/t)) = exp (-n/t) * (\<Sum>x = 0..m-n. exp (- x/t))"
+    apply(rewrite sum.atLeastAtMost_shift_0)
+    using assms apply(simp)
+  proof(simp)
+    have "(\<Sum>x = 0..m - n. exp (- ((real n + real x) / real t))) = (\<Sum>x = 0..m - n. exp(-(n/t)) *exp (-(x/t)))"
+    proof -
+      have "\<And>x::nat. exp (- ((real n + real x) / real t)) = exp(-(n/t)) *exp (-(x/t))"
+      proof -
+        fix x
+        have "- ((n+ real x)/t) = (-(n/t)) + (-(x/t))"
+          by (simp add: add_divide_distrib)
+        then have "exp (- ((real n + real x) / real t)) =  exp((-(n/t)) + (-(x/t)))"
+          by simp
+        also have "... = exp(-(n/t)) *exp (-(x/t))"
+          by(rule exp_add)
+        finally show "exp (- ((real n + real x) / real t)) = exp (- (real n / real t)) * exp (- (real x / real t))"
+          by simp
+      qed
+      then show ?thesis 
+        by simp
+    qed
+    also have "... = exp (-n/t) * (\<Sum>x = 0..m-n. exp (- x/t))"
+      by(rewrite sum_distrib_left, simp)
+    finally show "(\<Sum>x = 0..m - n. exp (- ((real n + real x) / real t))) = exp (- (real n / real t)) * (\<Sum>x = 0..m - n. exp (- (real x / real t)))"
+      by simp
+  qed
+  have 2:"(\<Sum>x = 0..m-n. exp (- x/t)) = (1-exp(-(m-n+1)/t))/(1-exp(-1/t))"
+    apply(rewrite exp_sum[of "t" "m-n"])
+    using assms by(simp_all)
+  have "exp (-n/t) * (\<Sum>x = 0..m-n. exp (- x/t)) = exp (-n/t) * (1-exp(-(m-n+1)/t))/(1-exp(-1/t))"
+    using 2 by simp
+  also have "... = (exp(-n/t)-exp(-(m+1)/t))/(1-exp(-1/t))"
+  proof -
+    have "(-n) + (-(m-n+1)) = - (m+1)"
+      by (simp add: assms(2) of_nat_diff)
+    then have "-n/t + - (m - n + 1)/t = -(m+1)/t"
+      by (metis add_divide_distrib of_int_add)     
+    then have "exp(-n/t) * exp(-(m-n+1)/t) = exp(-(m+1)/t)"
+      using exp_add[of"-n/t" "-(m-n+1)/t"]
+      by auto
+    then show ?thesis
+      by (simp add: vector_space_over_itself.scale_right_diff_distrib)
+  qed
+  finally have "exp ((-n)/t) * (\<Sum>x = 0..m - n. exp ((-x)/t)) 
+             = (exp ((-n)/t) - exp ((- (m + 1))/t)) / (1 - exp (- 1/t))"
+    by simp
+  then show ?thesis
+    using 1 by auto
+qed
+  
+lemma summable_exp_rat:
+  fixes t::nat
+  assumes "1\<le>t"
+  shows "summable (\<lambda>x. exp (- (real x / real t)))"
+proof -
+  have 1:"(\<lambda>x::nat. exp (- (real x / real t))) = (\<lambda>x::nat. (exp (- (1/ real t))) ^ x)"
+  proof 
+    fix x ::nat
+    have "exp (-real x/t) = exp (x * (-1/t))"
+      by simp
+    also have "... = exp(-1/t)^x"
+      by (rule exp_of_nat_mult)
+    finally show "exp (- (real x / real t)) = exp (- (1 / real t)) ^ x" 
+      by simp
+  qed
+  have "summable (\<lambda>x::nat. (exp (- (1/ real t))) ^ x)"
+    apply(rewrite summable_geometric)
+    using assms by(simp_all)
+  then show "summable (\<lambda>x. exp (- (real x / real t)))"
+    using assms 1 by simp
 qed
 
 context notes [[function_internals]] begin
@@ -251,7 +330,7 @@ and "\<And>u. ord_spmf (=) (map_spmf (\<lambda>triple. snd(snd(triple))) (while 
   then show "ord_spmf (=) ?rhs ?lhs" by simp
 qed
 
-lemma lossless_discrete_laplace_rat_unit_loop1:
+lemma lossless_discrete_laplace_rat_unit_loop1[simp]:
   assumes "1\<le>t"
   shows "lossless_spmf (discrete_laplace_rat_unit_loop1 t)"
 proof -
@@ -384,7 +463,9 @@ proof -
     using discrete_laplace_rat_unit_loop1_conv_while assms by auto
 qed
 
-lemma spmf_discrete_laplace_rat_unit_loop1:
+end
+
+lemma spmf_discrete_laplace_rat_unit_loop1[simp]:
   fixes u::nat
   assumes "1\<le>t" and "u<t"
   shows "spmf (discrete_laplace_rat_unit_loop1 t) u = exp (-u/t)* (1 - exp (- 1/t))/ (1 - exp (- 1))"
@@ -498,7 +579,7 @@ proof -
       apply(rewrite sum_subtractf,simp)
       using assms(1) by force
     also have "... = t - (1-exp(-1))/(1-exp(-1/t))"
-      using exp_sum assms by simp
+      using exp_sum[of"t" "t-1"] assms by simp
     finally have "(\<Sum>x = 0..t - 1. 1 - exp (- x/t)) =  t - (1-exp(-1))/(1-exp(-1/t))"
       by simp
     then show ?thesis 
@@ -521,7 +602,7 @@ proof -
       apply(rewrite sum_subtractf,simp)
       using assms(1) by force
     also have "... = t - (1 - exp (- 1)) / (1 - exp (- 1/t))"
-      using assms exp_sum by simp
+      using assms exp_sum[of "t" "t-1"] by simp
     finally have "0\<le>  t - (1 - exp (- 1)) / (1 - exp (- 1/t))"
       by simp
     then have p1:"0\<le> 1/t * (t - (1 - exp (- 1)) / (1 - exp (- 1/t))) * spmf (discrete_laplace_rat_unit_loop1 t) u"
@@ -565,7 +646,13 @@ proof -
   qed
 qed
 
-end
+lemma spmf_spmf_discrete_laplace_rat_unit_loop1_zero[simp]:
+  fixes u::nat
+  assumes "1\<le>t" and "t\<le>u"
+  shows "spmf (discrete_laplace_rat_unit_loop1 t) u = 0"
+  sorry
+    
+
 context
   fixes body :: "bool \<times> nat \<Rightarrow> (bool \<times> nat) spmf"
 defines [simp]: "body \<equiv> (\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (True,k'+1) else (False,k'))) (bernoulli_exp_minus_rat 1))"
@@ -749,9 +836,466 @@ proof -
   then show ?thesis by simp
 qed
 
+lemma lossless_discrete_laplace_rat_unit:
+  assumes "1\<le>t"
+  shows "lossless_spmf (discrete_laplace_rat_unit t)"
+  using assms
+  apply(rewrite discrete_laplace_rat_unit_def)
+  by(simp)
+
 thm discrete_laplace_rat.simps
+(*declare [[show_types]]*)
+lemma spmf_discrete_laplace_rat_unit[simp]:
+  assumes "1\<le>t"
+  shows "spmf (discrete_laplace_rat_unit t) x = (1-exp(-1/t)) * exp(-x/t)"
+proof -
+  have "ennreal (spmf (discrete_laplace_rat_unit t) x)
+      = (\<Sum>u. ennreal (spmf (discrete_laplace_rat_unit_loop1 t) u) *
+           (\<Sum>v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) * ennreal (indicat_real {Some x} (Some (u + t * v)))))"
+    apply(rewrite discrete_laplace_rat_unit_def)
+    by(simp add: ennreal_spmf_bind nn_integral_measure_spmf nn_integral_count_space_nat)
+  also have "(\<Sum>u. ennreal (spmf (discrete_laplace_rat_unit_loop1 t) u) *
+           (\<Sum>v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) * ennreal (indicat_real {Some x} (Some (u + t * v)))))
+          = (\<Sum>u\<in>{0..t-1}. ennreal (exp (-u/t)* (1 - exp (- 1/t))/ (1 - exp (- 1))) *
+           (\<Sum>v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) * ennreal (indicat_real {Some x} (Some (u + t * v)))))"
+  proof (rewrite suminf_finite[of"{0..t-1}"],simp_all)
+    have 1:"\<And>u. u\<in>{0..t-1} \<Longrightarrow>  spmf (discrete_laplace_rat_unit_loop1 t) u = exp (-u/t)* (1 - exp (- 1/t))/ (1 - exp (- 1)) "
+      using assms by simp
+    have 2:"\<And>u::nat. u\<notin>{0..t-1} \<Longrightarrow>  spmf (discrete_laplace_rat_unit_loop1 t) u = 0"
+      using assms by simp
+    show "\<And>n. \<not> n \<le> t - Suc 0 \<Longrightarrow>
+         spmf (discrete_laplace_rat_unit_loop1 t) n = 0 \<or> (\<Sum>v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) * ennreal (indicat_real {Some x} (Some (n + t * v)))) = 0"
+      using 2 by simp
+    show "(\<Sum>n = 0..t - Suc 0.
+        ennreal (spmf (discrete_laplace_rat_unit_loop1 t) n) * (\<Sum>v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) * ennreal (indicat_real {Some x} (Some (n + t * v))))) =
+    (\<Sum>u = 0..t - Suc 0.
+        ennreal (exp (- (real u / real t)) * (1 - exp (- (1 / real t))) / (1 - exp (- 1))) *
+        (\<Sum>v. ennreal (exp (- 1) ^ v * (1 - exp (- 1))) * ennreal (indicat_real {Some x} (Some (u + t * v)))))"
+      using 1 by simp
+  qed
+  also have "... = (\<Sum>u = 0..t - 1. ennreal (exp (real_of_int (- int u) / real t) * (1 - exp (- 1 / real t)) / (1 - exp (- 1))) *
+       (\<Sum>v. ennreal ((exp (- 1) ^ v * (1 - exp (- 1))) * (indicat_real {Some x} (Some (u + t * v))))))"
+    by(simp add: ennreal_mult)
+  also have "... = (\<Sum>u = 0..t - 1. ennreal (exp (real_of_int (- int u) / real t) * (1 - exp (- 1 / real t)) / (1 - exp (- 1))) *
+       ennreal (\<Sum>v.(exp (- 1) ^ v * (1 - exp (- 1))) * (indicat_real {Some x} (Some (u + t * v)))))"
+  proof -
+    
+    have 1:"\<And>u::nat. (\<Sum>v. ennreal ((exp (- 1) ^ v * (1 - exp (- 1))) * (indicat_real {Some x} (Some (u + t * v))))) 
+        = ennreal (\<Sum>v.(exp (- 1) ^ v * (1 - exp (- 1))) * (indicat_real {Some x} (Some (u + t * v))))"
+    proof -
+      fix u 
+      show "(\<Sum>v. ennreal ((exp (- 1) ^ v * (1 - exp (- 1))) * (indicat_real {Some x} (Some (u + t * v))))) 
+        = ennreal (\<Sum>v.(exp (- 1) ^ v * (1 - exp (- 1))) * (indicat_real {Some x} (Some (u + t * v))))"
+      proof(rewrite suminf_ennreal,simp_all,rewrite ennreal_suminf_neq_top,simp_all)
+        have 1:"\<And>v. (\<lambda>v. exp (- 1) ^ v * (1 - exp (- 1)) * indicat_real {Some x} (Some (u + t * v)))v
+                   \<le> (\<lambda>v. exp (- 1) ^ v * (1 - exp (- 1)))v "
+          by simp
+        have 2:"summable (\<lambda>v::nat. exp (- 1::real) ^ v * (1 - exp (- 1))) "
+        proof -
+          have "norm (exp(-1::real)) < 1"
+            by simp
+          then show ?thesis
+            by (simp add: summable_mult2)
+        qed
+        show "summable (\<lambda>v. exp (- 1) ^ v * (1 - exp (- 1)) * indicat_real {Some x} (Some (u + t * v)))"
+          apply(rewrite summable_comparison_test [of"\<lambda>v. exp (- 1) ^ v * (1 - exp (- 1)) * indicat_real {Some x} (Some (u + t * v))" "\<lambda>v. exp (- 1) ^ v * (1 - exp (- 1))"],simp_all)
+          using 2 by simp
+      qed
+    qed
+    show ?thesis 
+      using 1 by(simp)
+  qed
+  also have "... = (\<Sum>u = 0..t - 1. ennreal ((exp (real_of_int (- int u) / real t) * (1 - exp (- 1 / real t)) / (1 - exp (- 1))) *
+        (\<Sum>v.(exp (- 1) ^ v * (1 - exp (- 1))) * (indicat_real {Some x} (Some (u + t * v))))))"
+    by(rewrite ennreal_mult',simp_all)
+  also have "... = (\<Sum>u = 0..t - 1. (exp (real_of_int (- int u) / real t) * (1 - exp (- 1 / real t)) / (1 - exp (- 1))) *
+        (\<Sum>v.(exp (- 1) ^ v * (1 - exp (- 1))) * (indicat_real {Some x} (Some (u + t * v)))))"
+  proof(rule sum_ennreal,simp_all)
+    fix u ::nat
+    assume "u\<le> t-Suc 0"
+    show "0 \<le> exp (- (real u / real t)) * (1 - exp (- (1 / real t))) * (\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * indicat_real {Some x} (Some (u + t * v))) / (1 - exp (- 1))"
+    proof -
+      have 1:"0 \<le> exp (- (u/t)) * (1 - exp (- (1/t)))" 
+        by simp
+      have 2:"0\<le>  (\<Sum>v. (\<lambda>v. exp (- 1) ^ v * (1 - exp (- 1)) * indicat_real {Some x} (Some (u + t * v)))v)"
+      proof (rewrite suminf_nonneg,simp_all)
+        have 1:"\<And>v. exp (- 1) ^ v * (1 - exp (- 1)) * indicat_real {Some x} (Some (u + t * v)) \<le> exp (- 1) ^ v * (1 - exp (- 1))"
+          by simp
+        have "summable  (\<lambda>v. exp (- 1::real) ^ v * (1 - exp (- 1)))"
+          by(rewrite summable_mult2,simp_all)
+        then show "summable (\<lambda>v::nat. exp (- (1::real)) ^ v * ((1::real) - exp (- (1::real))) * indicat_real {Some x} (Some (u + t * v)))"
+          by(rewrite summable_comparison_test[of "(\<lambda>v::nat. exp (- (1::real)) ^ v * ((1::real) - exp (- (1::real))) * indicat_real {Some x} (Some (u + t * v)))"
+                                          "(\<lambda>v::nat. exp (- (1::real)) ^ v * ((1::real) - exp (- (1::real))))"],simp_all)
+      qed
+      have 3:"0< (1 - exp (- 1::real))"
+        by simp
+      show ?thesis using 1 2 3 by simp
+    qed
+  qed
+  also have "... =  (\<Sum>u = 0..t - 1. (exp (real_of_int (- int u) / real t) * (1 - exp (- 1 / real t)) / (1 - exp (- 1))) *
+        (\<Sum>v.(exp (- 1) ^ v * (1 - exp (- 1))) * (if (u+t * v = x) then 1 else 0)))" 
+  proof -
+    fix v::nat
+    have "\<And>u. indicat_real {Some x} (Some (u + t * v)) = (if (u+t * v = x) then 1 else 0)"
+      by simp
+    then have "\<And>u. (exp (- 1) ^ v * (1 - exp (- 1))) * (indicat_real {Some x} (Some (u + t * v)))
+             = (exp (- 1) ^ v * (1 - exp (- 1))) * (if (u+t * v = x) then 1 else 0)"
+      by simp
+    then have 1:"\<And>u. (\<Sum>v.(exp (- 1) ^ v * (1 - exp (- 1))) * (indicat_real {Some x} (Some (u + t * v)))) 
+             = (\<Sum>v.(exp (- 1) ^ v * (1 - exp (- 1))) * (if (u+t * v = x) then 1 else 0))"
+    proof -
+      fix u
+      show "(\<Sum>v.(exp (- 1) ^ v * (1 - exp (- 1))) * (indicat_real {Some x} (Some (u + t * v)))) 
+             = (\<Sum>v.(exp (- 1) ^ v * (1 - exp (- 1))) * (if (u+t * v = x) then 1 else 0))"
+        by(rewrite suminf_cong,simp_all)
+    qed
+    then have "\<And>u. (\<Sum>v.(exp (- 1) ^ v * (1 - exp (- 1))) * (indicat_real {Some x} (Some (u + t * v)))) 
+             = (\<Sum>v.(exp (- 1) ^ v * (1 - exp (- 1))) * (if (u+t * v = x) then 1 else 0))"
+      by simp
+    then show ?thesis
+      by simp
+  qed
+  also have "... = exp(- real_of_nat(x mod t)/t) * (1-exp (- (1::real)/t)) / (1 - exp (- 1)) * exp(-(1::real))^((x-x mod t) div t) * (1 - exp (- 1))"
+  proof -
+    have 1:"\<And>u v::nat. u\<in>{0..t-1} \<Longrightarrow> u + t * v = x \<Longrightarrow> u = x mod t"
+      using assms less_imp_diff_less by auto
+    have 2:"(\<Sum>u = 0..t - 1. exp (real_of_int (- int u) / real t) * (1 - exp (- 1 / real t)) / (1 - exp (- 1)) *
+         (\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0)))
+        = (\<Sum>u \<in> {0..t - 1}-{x mod t}. exp (real_of_int (- int u) / real t) * (1 - exp (- 1 / real t)) / (1 - exp (- 1)) *
+         (\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0)))
+         + (\<Sum>u \<in> {x mod t}. exp (real_of_int (- int u) / real t) * (1 - exp (- 1 / real t)) / (1 - exp (- 1)) *
+         (\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0)))"
+    proof(rewrite sum.Int_Diff[of"{0..t-1}" "_" "{x mod t}"],simp)
+      have "{0..t - 1} \<inter> {x mod t} = {x mod t}"
+      proof -
+        have 1:"0 \<le> x mod  t" by simp
+        have 2:"x mod t \<le> t-1" 
+        proof -
+          have "(t-1) + 1 = t" 
+            using assms by(rule le_add_diff_inverse2)
+          then show ?thesis 
+            using mod_Suc_le_divisor[of "x" "t-1"] by simp
+        qed
+        show ?thesis using 1 2 by auto
+      qed
+      then show "(\<Sum>u\<in>{0..t - 1} \<inter> {x mod t}.
+       exp (real_of_int (- int u) / real t) * (1 - exp (- 1 / real t)) / (1 - exp (- 1)) *
+       (\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0))) +
+    (\<Sum>u\<in>{0..t - 1} - {x mod t}.
+       exp (real_of_int (- int u) / real t) * (1 - exp (- 1 / real t)) / (1 - exp (- 1)) *
+       (\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0))) =
+    (\<Sum>u\<in>{0..t - 1} - {x mod t}.
+       exp (real_of_int (- int u) / real t) * (1 - exp (- 1 / real t)) / (1 - exp (- 1)) *
+       (\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0))) +
+    (\<Sum>u\<in>{x mod t}.
+       exp (real_of_int (- int u) / real t) * (1 - exp (- 1 / real t)) / (1 - exp (- 1)) * (\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0)))"
+        by simp
+    qed
+    have 3:"(\<Sum>u \<in> {0..t - 1}-{x mod t}. exp (-u/t) * (1 - exp (- 1/t)) / (1 - exp (- 1)) *
+         (\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0))) = 0"
+    proof -
+      have "\<And>u. u \<in> {0..t - 1}-{x mod t} \<Longrightarrow>  exp (-u/t) * (1 - exp (- 1/t)) / (1 - exp (- 1)) *
+         (\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0)) = 0"
+      proof (simp)
+        fix u::nat
+        assume u:"u \<le> t - Suc 0 \<and> u \<noteq> x mod t " 
+        show "t = 0 \<or> (\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0)) = 0"
+          using assms
+        proof(simp)
+          show "(\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0)) = 0"
+          proof -
+            have "\<And>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0) = 0"
+            proof - 
+              have "\<And>v::nat. u + t * v \<noteq> x "
+                using u assms by force
+              then show "\<And>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0) = 0"
+                by simp
+            qed
+            then have "(\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0)) = (\<Sum>v. 0)"
+              by meson
+            also have "... = 0"
+              by simp
+            finally show ?thesis by simp
+          qed
+        qed
+      qed
+      then have "(\<Sum>u \<in> {0..t - 1}-{x mod t}. exp (-u/t) * (1 - exp (- 1/t)) / (1 - exp (- 1)) *
+         (\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0))) = (\<Sum>u \<in> {0..t - 1}-{x mod t}. 0)"
+        by (rewrite Finite_Cartesian_Product.sum_cong_aux[of "{0..t-1}-{x mod t}" "_" "\<lambda>v. 0"],simp_all)
+      also have "... = 0"
+        by simp
+      finally show ?thesis by simp
+    qed
+    have 4:"(\<Sum>u::nat\<in>{x mod t}. exp (real_of_int (- int u) / real t) * (1-exp (-(1::real)/t)) / (1 - exp (- 1)) * (\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0)))
+           = exp(- real_of_nat(x mod t)/t) * (1-exp (- (1::real)/t)) / (1 - exp (- 1)) * exp(-(1::real))^((x-x mod t) div t) * (1 - exp (- 1)) "
+    proof -
+      have p1:"(\<Sum>u::nat\<in>{x mod t}. exp (real_of_int (- int u) / real t) * (1-exp (-(1::real)/t)) / (1 - exp (- 1)) * (\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if u + t * v = x then 1 else 0)))
+          = exp (-real_of_nat (x mod t)/t) * (1-exp (-(1::real)/t)) / (1 - exp (- 1)) * (\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if x mod t + t * v = x then 1 else 0))"
+        by simp
+      have p2:"(\<Sum>v. exp (- 1) ^ v * (1 - exp (- 1)) * (if x mod t + t * v = x then 1 else 0)) = exp(-(1::real))^((x-x mod t) div t) * (1 - exp (- 1))"
+      proof - 
+        have "(\<Sum>v. exp (- 1::real) ^ v * (1 - exp (- 1)) * (if x mod t + t * v = x then 1 else 0)) = (\<Sum>v\<in>{(x-x mod t) div t}. exp (- 1) ^ v * (1 - exp (- 1)) * (if x mod t + t * v = x then 1 else 0))"
+        proof (rule suminf_finite,simp_all)
+        fix v
+        show"v \<noteq> (x-x mod t) div t \<Longrightarrow> x mod t + t * v \<noteq> x"
+          by (metis add.commute add_diff_cancel_right' assms le_antisym less_eq_nat.simps(1) nonzero_mult_div_cancel_left zero_neq_one)
+        qed
+        also have "... = exp (- 1) ^ ((x-x mod t) div t) * (1 - exp (- 1)) * (if x mod t + t * ((x-x mod t) div t) = x then 1 else 0)"
+          by simp
+        also have "... = exp (- 1) ^ ((x-x mod t) div t) * (1 - exp (- 1))"
+          by simp
+        finally show ?thesis by simp
+      qed
+      show ?thesis using p1 p2 by simp
+    qed
+    show ?thesis
+      using 2 3 4 
+      by simp
+  qed
+  also have "... = (1-exp(-1/t)) * exp(-x/t)"
+  proof - 
+    have "exp (- (x mod t)/t) * (1 - exp (- 1/t)) / (1 - exp (- 1)) * exp (- 1) ^ ((x - x mod t) div t) * (1 - exp (- 1))
+        = exp (- (x mod t)/t) * (1 - exp (- 1/t)) * exp (- 1) ^ ((x - x mod t) div t)"
+      by simp
+    also have "... = exp (- (x mod t)/t) * (1 - exp (- 1/t)) * exp (-((x - x mod t) div t))"
+      using assms apply(simp)
+      by (metis exp_of_nat_mult mult_minus1_right)
+    also have "... =  (1 - exp (- 1/t)) * exp(-x/t)"
+      using assms 
+    proof(simp)
+      show "exp (- ((x mod t)/t)) * exp (- real ((x - x mod t) div t)) = exp (- (x/t)) "
+      proof-
+        have "exp (- ((x mod t)/t)) * exp (- real ((x - x mod t) div t))  = exp (- ((x mod t)/t + (x - x mod t) div t)) "
+          by (simp add: mult_exp_exp)
+        also have "... =  exp (-(x/t))"
+        proof -
+          have p1:"(x mod t)+ (x - x mod t) = x"
+            by simp
+          then have p2:"(x mod t)/t + (x - x mod t)/t = x/t"
+            by (metis add_divide_distrib of_nat_add)
+          then have "(x mod t)/t + (x - x mod t) div t = x/t"
+          proof -
+            have "(x - x mod t)/t = (x - x mod t) div t"
+              by (simp add: real_of_nat_div_aux)
+            then show ?thesis 
+              using p2 by simp
+          qed
+          then show ?thesis 
+            by simp
+        qed
+        finally show ?thesis
+          by simp
+      qed
+    qed
+    finally have "exp (- (x mod t)/t) * (1 - exp (- 1/t)) / (1 - exp (- 1)) * exp (- 1) ^ ((x - x mod t) div t) * (1 - exp (- 1))
+                = (1 - exp (- 1/t)) * exp(-x/t)"
+      by simp
+    then show ?thesis
+      by simp
+  qed
+  finally have "ennreal (spmf (discrete_laplace_rat_unit t) x) = ennreal ((1 - exp (- 1 / real t))*exp(-x/t))"
+    by simp
+  then show ?thesis by simp
+qed
 
-
+lemma spmf_y_discrete_laplace_rat:
+  assumes "1\<le>t" and "1\<le>s"
+  shows "spmf (map_spmf (\<lambda>x. calculate_y x s) (discrete_laplace_rat_unit t)) y = (1-exp(-1/t)^s) * exp(-1/t) ^ (s*y)" 
+proof -
+  have "ennreal (spmf (map_spmf (\<lambda>x. calculate_y x s) (discrete_laplace_rat_unit t)) y) =(1-exp(-1/t)^s) * exp(-1/t) ^ (s*y)"
+    apply(rewrite ennreal_spmf_map_conv_nn_integral, rewrite nn_integral_measure_spmf)
+    apply(simp add: nn_integral_count_space_nat)
+    using assms apply(simp add:calculate_y_def)
+  proof -
+    show "(\<Sum>x. ennreal ((1 - exp (-(1/t))) * exp (- (x/t))) * indicator ((\<lambda>x. nat \<lfloor>x/s\<rfloor>) -` {y}) x)
+        = ennreal ((1 - exp (- (1 / real t)) ^ s) * exp (- (1 / real t)) ^ (s * y))"
+    proof -
+      have 1:"{x. nat \<lfloor>real x/s\<rfloor> \<in> {y}} = {x. nat \<lfloor>real x /s\<rfloor> = y}"
+        by simp
+      then have 2:"\<And>x. indicator {x. nat \<lfloor>real x / real s\<rfloor> \<in> {y}} x =  indicator {x. nat \<lfloor>real x/s\<rfloor> =y} x"
+        by simp
+      have 3:"\<And>x. (s * y \<le> x \<and> x< s * (y+1)) = (nat\<lfloor>real x/s\<rfloor> =y)"
+      proof 
+        fix x::nat
+        assume H:"s * y \<le> x \<and> x< s * (y+1)"
+        show "nat \<lfloor>real x/s\<rfloor> =y"
+          apply(rewrite floor_eq2[of "y"])
+          apply(simp_all)
+        proof -
+          have "(s * y)/ s\<le> x/s"
+            apply(rewrite divide_right_mono,simp_all)
+            using H of_nat_mono by fastforce
+          then show "y \<le> x/s"
+            using assms by simp
+          show "real x / real s < real y + 1 "
+          proof-
+            have "real x < s * (real y + 1)"
+            proof-
+              have "real y + 1 = y + 1"
+                by simp
+              then have "s * (real y + 1) = s * (y+1)"
+                using of_nat_mult by metis
+              then show ?thesis
+                using H 
+                by linarith
+            qed
+            then have "x/s < (s * (real y + 1))/s"
+              apply(rewrite divide_strict_right_mono,simp_all)
+              using assms by simp
+            then show ?thesis 
+              using assms by simp
+          qed
+        qed
+      next
+        fix x::nat
+        assume H:"nat \<lfloor>real x / real s\<rfloor> = y"
+        show "s * y \<le> x \<and> x < s * (y + 1)"
+        proof
+          have 1:"nat \<lfloor>real x / real s\<rfloor>  = x div s"
+            using floor_divide_of_nat_eq 
+            by (metis nat_int)
+          show "s*y\<le>x"
+            using 1 H assms 
+            by simp
+          show "x < s * (y + 1)"
+            using 1 H assms 
+            by (simp add: dividend_less_times_div)
+        qed
+      qed
+      have 4:"\<And>x. (x\<in>{s*y..<s*(y+1)}) = (indicator {x. nat \<lfloor>real x / real s\<rfloor> \<in> {y}} x = 1)"
+        using 2 3 by force
+      have 5:"\<And>x. (x\<notin>{s*y..<s*(y+1)}) = (indicator {x. nat \<lfloor>real x / real s\<rfloor> \<in> {y}} x = 0)"
+        using 2 3 by force
+      have 6:"\<And>x. x\<in>{s*y..<s*(y+1)} \<Longrightarrow> (1 - exp (- (1 / real t))) * exp (- (real x / real t)) * indicator {x. nat \<lfloor>real x / real s\<rfloor> \<in> {y}} x = (1 - exp (-(1/t))) * exp (- (x/t))"
+        using 4 by auto
+      have 7:"\<And>x. x\<notin>{s*y..<s*(y+1)} \<Longrightarrow> (1 - exp (- (1 / real t))) * exp (- (real x / real t)) * indicator {x. nat \<lfloor>real x / real s\<rfloor> \<in> {y}} x = 0"
+        using 5 by auto
+      have "(\<Sum>x. ennreal ((1 - exp (-(1/t))) * exp (- (x/t))) * indicator ((\<lambda>x. nat \<lfloor>x/s\<rfloor>) -` {y}) x)
+          = (\<Sum>x. ennreal ((1 - exp (-(1/t))) * exp (- (x/t))) * ennreal (indicator ((\<lambda>x. nat \<lfloor>x/s\<rfloor>) -` {y}) x))"
+        by(simp add: ennreal_indicator)
+      also have "... = (\<Sum>x. ennreal ((1 - exp (-(1/t))) * exp (- (x/t)) * indicator ((\<lambda>x. nat \<lfloor>x/s\<rfloor>) -` {y}) x))"
+        by(simp add: ennreal_mult')
+      also have "... = ennreal (\<Sum>x. (1 - exp (-(1/t))) * exp (- (x/t)) * indicator ((\<lambda>x. nat \<lfloor>x/s\<rfloor>) -` {y}) x)"
+      proof(rewrite suminf_ennreal,simp_all,rewrite ennreal_suminf_neq_top,simp_all)
+        have 1:"\<And>x. (\<lambda>x. (1 - exp (- (1 / real t))) * exp (- (real x / real t)) * indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) x)x
+                   \<le> (\<lambda>x. (1 - exp (- (1 / real t))) * exp (- (real x / real t))) x"
+          using assms by simp
+        have 2:"summable (\<lambda>x. (1 - exp (- (1 / real t))) * exp (- (real x / real t))) "
+          apply(rewrite summable_mult, simp_all)
+          using assms summable_exp_rat by simp
+        show "summable (\<lambda>x. (1 - exp (- (1 / real t))) * exp (- (real x / real t)) * indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) x)"
+        proof(rewrite summable_comparison_test[of "_" "(\<lambda>x. exp (- (real x / real t)))"],simp_all)
+          show "summable (\<lambda>x. exp (- (real x / real t)))"
+            using assms summable_exp_rat by simp
+          show "\<exists>N. \<forall>n\<ge>N. (1 - exp (- (1 / real t))) * indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) n \<le> 1 "
+          proof -
+            have "\<And>n::nat. (1 - exp (- (1 / real t))) * indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) n \<le> 1 "
+            proof -
+              fix n
+              have 1:"(1 - exp (- (1 / real t))) \<le> 1"
+                by simp
+              have 2:"indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) n \<le> 1"
+                by simp
+              show "(1 - exp (- (1 / real t))) * indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) n \<le> 1"
+                using 1 2
+                ereal_mult_mono[of "1" "indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) n" "(1 - exp (- (1 / real t)))" "1"]
+                by simp
+            qed
+            then show ?thesis by simp
+          qed
+        qed
+      qed
+      also have "... = ennreal (\<Sum>x\<in>{s*y..<s*(y+1)} . (1 - exp (-(1/t))) * exp (- (x/t)))"
+      proof -
+        have "(\<Sum>x. (1 - exp (-(1/t))) * exp (- (x/t)) * indicator ((\<lambda>x. nat \<lfloor>x/s\<rfloor>) -` {y}) x) 
+            = (\<Sum>x\<in>{s*y..<s*(y+1)}. (1 - exp (-(1/t))) * exp (- (x/t)) * indicator ((\<lambda>x. nat \<lfloor>x/s\<rfloor>) -` {y}) x)"
+        proof(rule suminf_finite,simp_all)
+          fix x::nat
+          assume H:"s * y \<le> x \<longrightarrow> \<not> x < s + s * y"
+          show "t = 0 \<or> indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) x = 0"
+            using assms
+          proof (simp)
+            show "indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) x = 0"
+              unfolding vimage_def using H 5 by auto
+          qed
+        qed
+        also have "... = (\<Sum>x = s * y..<s * (y + 1). (1 - exp (- (1 / real t))) * exp (- (real x / real t)))"
+          unfolding vimage_def using 6
+          by(rule Finite_Cartesian_Product.sum_cong_aux,auto)
+        finally have "(\<Sum>x. (1 - exp (- (1 / real t))) * exp (- (real x / real t)) * indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) x)
+                    = (\<Sum>x = s * y..<s * (y + 1). (1 - exp (- (1 / real t))) * exp (- (real x / real t))) "
+          by simp
+        then show ?thesis by simp
+      qed
+      also have "... = (1-exp(-1/t)^s) * exp(-1/t) ^ (s*y)"
+      proof -
+        have "(\<Sum>x = s * y..<s * (y + 1). (1 - exp (- (1 / real t))) * exp (- (real x / real t)))
+            = (1-exp(-1/t)^s) * exp(-1/t) ^ (s*y) "
+        proof -
+          have "(\<Sum>x = s * y..<s * (y + 1). (1 - exp (- (1 / real t))) * exp (- (real x / real t)))
+              = (1 - exp (- (1 / real t))) * (\<Sum>x = s * y..<s * (y + 1).  exp (- (real x / real t)))"
+            by(rewrite sum_distrib_left, simp)
+          also have "... = (1 - exp (- (1 / real t))) * (exp(-(s*y)/t)-exp(-(s*(y+1))/t))/(1-exp(-1/t))"
+          proof -
+            have " (\<Sum>x = s * y..<s * (y + 1).  exp (- (x/t))) = (\<Sum>x = s * y..s * (y + 1)-1.  exp (- (x/t)))"
+            proof -
+              have "{s*y..<s* (y+1)} = {s*y..s*(y+1)-1}"
+                using assms by auto
+              then show ?thesis 
+                by auto
+            qed
+            also have "... = (\<Sum>x = s * y..s * (y + 1) - 1. exp (- x/t))"
+              by simp
+            also have "... = (exp(-(s*y)/t)-exp(-(s*(y+1))/t))/(1-exp(-1/t))"
+              apply(rewrite exp_sum_general[of "t" "s*y" "s*(y+1)-1"])
+              using assms by(simp_all)
+            finally have "(\<Sum>x = s * y..<s * (y + 1). exp (- (real x / real t)))
+                        = (exp(-(s*y)/t)-exp(-(s*(y+1))/t))/(1-exp(-1/t))"
+              by simp
+            then show ?thesis by simp
+          qed
+          also have "... = (exp(-(s*y)/t)-exp(-(s*(y+1))/t))" 
+            by simp
+          also have "... = (1 - exp(-s/t)) *  exp(-(s*y)/t)"
+          proof -
+            have "exp(-(s*y)/t)-exp(-(s*(y+1))/t) = 1*exp(-(s*y)/t) - exp(-s/t)*exp(-(s*y)/t)"
+              apply(simp)
+              using exp_add[of "- (real s*y/t)" "-(s/t)"]
+              by argo
+            also have "... = exp(-(s*y)/t) * (1- exp(-s/t))"
+              by argo
+            finally show "exp(-(s*y)/t)-exp(-(s*(y+1))/t) = (1 - exp(-s/t)) *  exp(-(s*y)/t)"
+              by simp
+          qed
+          also have "... = (1-exp(-1/t)^s) * exp(-1/t) ^ (s*y)"
+          proof -
+            have "exp(-(s*y)/t) = exp ((s*y)*(-1/t))"
+              by simp
+            also have "... = exp(-1/t) ^ (s*y)"
+              using exp_of_nat_mult[of "s*y" "-1/t"]
+              by simp
+            finally have 1:"exp(-(s*y)/t) = exp(-1/t) ^ (s*y)"
+              by simp
+            have "1 - exp(-s/t) = 1-exp(s*(-1/t))"
+              by simp
+            also have "... =(1-exp(-1/t)^s)"
+              using exp_of_nat_mult[of "s" "-1/t"]
+              by simp
+            finally have 2:"1 - exp(-s/t) = (1-exp(-1/t)^s)"
+              by simp
+            show ?thesis 
+              using 1 2 by simp
+          qed
+          finally show ?thesis by simp
+        qed
+        then show ?thesis by simp
+      qed
+      finally show ?thesis by simp
+    qed
+  qed
+  then show ?thesis 
+    by (simp add: power_le_one)
+qed
 
 
 context
