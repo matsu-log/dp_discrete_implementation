@@ -305,7 +305,7 @@ partial_function (spmf) discrete_laplace_rat_unit_loop1 :: "nat \<Rightarrow> na
   d::bool \<leftarrow> bernoulli_exp_minus_rat (Fract u t);
   if d then return_spmf u else discrete_laplace_rat_unit_loop1 t 
 }"
-
+end
 context notes [[function_internals]] begin
 partial_function (spmf) discrete_laplace_rat_unit_loop2 :: "nat \<Rightarrow> nat spmf" where
 "discrete_laplace_rat_unit_loop2 v = do {
@@ -2366,5 +2366,4 @@ proof -
   then show ?thesis by simp
 qed
 
-end
 end
