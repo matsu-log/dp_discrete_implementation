@@ -3,6 +3,7 @@ theory Code_Generation
           "Bernoulli_exp_minus_rat"
           "Bernoulli_rat"
           "Discrete_Laplace_rat"
+          "Discrete_laplace_mechanism"
           "Probabilistic_While.Fast_Dice_Roll"
 begin
 context fixes n :: nat notes [[function_internals]] begin
@@ -330,5 +331,16 @@ proof-
   thus ?thesis
     unfolding rel_fun_def rel_spmf_of_ra_def by simp
 qed
+
+definition discrete_laplace_mechanism_ra :: "('a list \<Rightarrow> int) \<Rightarrow> nat \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> int random_alg" where
+"discrete_laplace_mechanism_ra f \<Delta> x epsilon1 epsilon2  = do { 
+                                                            noise \<leftarrow> discrete_laplace_rat_ra (epsilon2 * \<Delta>) epsilon1;
+                                                            return_ra (noise + f x)
+}"
+
+lemma discrete_laplace_mechanisms_ra_correct:
+"spmf_of_ra (discrete_laplace_mechanism_ra f \<Delta> x epsilon1 epsilon2) = discrete_laplace_mechanism f \<Delta> x epsilon1 epsilon2"
+  unfolding discrete_laplace_mechanism_def discrete_laplace_mechanism_ra_def
+  by(simp add: spmf_of_ra_simps discrete_laplace_rat_ra_correct)
 
 end
