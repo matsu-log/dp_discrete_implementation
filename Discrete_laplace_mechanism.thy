@@ -2,6 +2,7 @@ section \<open>Discrete Laplace Mechanism\<close>
 
 theory Discrete_laplace_mechanism
   imports Discrete_laplace_rat
+          IEEE_Floating_Point.Double
 begin 
 
 subsection \<open>Integer Query: SampCert Implementation\<close>
@@ -139,10 +140,320 @@ subsection \<open>granularity:multiples of 2^k\<close>
 (*
   query returns floating-point value (that is rounded to the nearst multiples of 2^k)
   noise from discrete laplace on (2^k * \<int>)
+  f: query 
+  \<Delta> is sensitivity of f 
+  x: dataset
+  epsilon = epsilon1/epsilon2 (1\<le>epsilon1,epsilon2)
+  k: noise granularity in terms of 2^k
 *)
 
+lift_definition valof :: "double \<Rightarrow> real" is IEEE.valof.
+
+definition x_div_2k :: "real \<Rightarrow> int \<Rightarrow> real" where
+"x_div_2k x k = (if 0\<le>k then x/(2^(nat k)) else x * 2^(nat (-k)))"
+
+definition findUpperBoundMultiple_2k :: "double \<Rightarrow> int \<Rightarrow> int" where
+"findUpperBoundMultiple_2k d k = (if 0\<le>k then ceiling (x_div_2k (valof d) k)
+                                  else ceiling (x_div_2k (valof d) k))"
+
+definition findNearstMultiple_2k :: "double \<Rightarrow> int \<Rightarrow> int" where
+"findNearstMultiple_2k d k = (let x = findUpperBoundMultiple_2k d k in 
+                             (if ((x - (x_div_2k (valof d) k)) \<le> (x_div_2k (valof d) k)- (x-1)) then x else x-1)
+)"
 
 
-      
+definition discrete_laplace_mechanism_Z2k_unit :: "('a list \<Rightarrow> double) \<Rightarrow> nat \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> int spmf" where
+"discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon2 k = do {
+  noise::int \<leftarrow> discrete_laplace_rat (epsilon2 * i) epsilon1;
+  return_spmf (noise  + (findNearstMultiple_2k (f x) k))
+}
+"
+
+definition power_2 :: "int \<Rightarrow> real" where
+"power_2 k = (if 0\<le>k then 2^(nat k) else 1/(2^(nat (-k))))"
+
+definition x_mul_2k :: "int \<Rightarrow> int \<Rightarrow> double" where
+"x_mul_2k x k = (if 0\<le>k then double_of_int (x * 2^(nat k)) else double_of_int (x * 2^(nat(-k))))"
+
+definition discrete_laplace_mechanism_Z2k :: "('a list \<Rightarrow> double) \<Rightarrow> nat \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> double spmf" where
+"discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k = do {
+  ans::int \<leftarrow> discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon2 k;
+  return_spmf (x_mul_2k ans k)
+}
+"
+
+lemma findUpperBoundMultiple_2k_ub:
+  shows "valof x \<le> power_2 k * findUpperBoundMultiple_2k x k"
+proof (cases "0\<le>k")
+  case True
+  then show ?thesis
+    unfolding findUpperBoundMultiple_2k_def x_div_2k_def power_2_def
+    apply(simp)
+  proof -
+    have "0 < (2::nat) ^ nat k"
+      by simp
+    then show "valof x \<le> 2 ^ nat k * real_of_int \<lceil>valof x / 2 ^ nat k\<rceil>"
+      using ceiling_divide_upper[of "2 ^ nat k" "valof x"]
+      by (simp add: mult.commute)
+  qed
+next
+  case False
+  then show ?thesis 
+    unfolding findUpperBoundMultiple_2k_def x_div_2k_def power_2_def
+    apply(simp)
+  proof -
+    have 1:"valof x * 2 ^ nat (- k)\<le> real_of_int \<lceil>valof x * 2 ^ nat (- k)\<rceil>"
+      by simp
+    have 2:"0 < (2::nat) ^ nat (- k)"
+      by simp
+    have 3:"valof x * 2 ^ nat (- k) / 2 ^ nat (- k)\<le> real_of_int \<lceil>valof x * 2 ^ nat (- k)\<rceil> / 2 ^ nat (- k)"     
+      using 1 2 divide_right_mono[of "valof x * 2 ^ nat (- k)" "real_of_int \<lceil>valof x * 2 ^ nat (- k)\<rceil>" "2 ^ nat (- k)"]
+      by simp
+    have 4:"valof x = valof x * 2 ^ nat (- k) / 2 ^ nat (- k)"
+      by simp
+    show "valof x \<le> real_of_int \<lceil>valof x * 2 ^ nat (- k)\<rceil> / 2 ^ nat (- k)"
+      using 3 4
+      by simp
+  qed
+qed
+
+lemma findUpperBoundMultiple_2k_ub2:
+  fixes z::int
+  assumes "valof x \<le> power_2 k * z"
+  shows "findUpperBoundMultiple_2k x k \<le> z"
+proof (cases "0\<le>k")
+  case True
+  then show ?thesis
+    unfolding findUpperBoundMultiple_2k_def
+    using True apply(simp)
+    unfolding x_div_2k_def
+    using True apply(simp)
+  proof -
+    have 1:"valof x \<le> 2 ^ nat k * z"
+      using assms True 
+      unfolding power_2_def
+      by simp
+    have "valof x / 2^ nat k \<le> z"
+    proof -
+      have "0 < (2::nat)^nat k" 
+        by simp
+      then show ?thesis
+        using 1 divide_right_mono[of"valof x" "2^nat k * z" "2^nat k"]
+        by simp
+    qed
+    then show"\<lceil>valof x / 2 ^ nat k\<rceil>  \<le> z"
+      by linarith
+  qed
+next
+  case False
+  then show ?thesis 
+    unfolding findUpperBoundMultiple_2k_def
+    using False apply(simp)
+    unfolding x_div_2k_def
+    using False apply(simp)
+  proof -
+    have 1:"valof x \<le> z / 2 ^ nat (- k)"
+      using assms 
+      unfolding power_2_def
+      using False by(simp)
+    have "valof x * 2^nat(-k) \<le> z"
+    proof -
+      have "0 < (2::nat)^nat (-k)"
+        by simp
+      then show ?thesis 
+        using 1 mult_right_mono[of"valof x" "z/2^nat(-k)" "2^nat(-k)"]
+        by simp
+    qed
+    then show "\<lceil>valof x * 2 ^ nat (- k)\<rceil> \<le> z"
+      by linarith
+  qed
+qed
+
+lemma findUpperBoundMultiple_2k_ub3:
+  fixes z::int
+  assumes "findUpperBoundMultiple_2k x k \<le> z"
+  shows "valof x \<le> power_2 k * z"
+proof -
+  have "valof x \<le> power_2 k * real_of_int (findUpperBoundMultiple_2k x k)"
+    using findUpperBoundMultiple_2k_ub[of "x" "k"]
+    by simp
+  also have "... \<le> power_2 k * z"
+  proof -
+    have "0 < power_2 k"
+      unfolding power_2_def by simp
+    then show ?thesis
+      using assms by simp
+  qed
+  finally show ?thesis by simp
+qed
+
+lemma div_2k_power_2k:
+  shows "x_div_2k (valof x) k * power_2 k = valof x"
+  unfolding x_div_2k_def power_2_def
+  by simp
+  
+
+lemma findNearstMultiple_2k:
+  fixes z::int
+  shows "\<bar>valof x - power_2 k * findNearstMultiple_2k x k\<bar> \<le> \<bar>valof x - power_2 k * z\<bar>"
+proof(cases "0\<le>k")
+  case True
+  then show ?thesis
+    unfolding findNearstMultiple_2k_def Let_def
+  proof(auto)
+    assume H:"2 * real_of_int (findUpperBoundMultiple_2k x k) \<le> 2 * x_div_2k (Discrete_laplace_mechanism.valof x) k + 1"
+      and k:"0\<le>k"
+    show "\<bar>valof x - power_2 k * real_of_int (findUpperBoundMultiple_2k x k)\<bar>
+       \<le> \<bar>valof x - power_2 k * z\<bar>"
+    proof(cases "findUpperBoundMultiple_2k x k \<le>z")
+      case True
+      then show ?thesis
+      proof -
+        have "valof x - power_2 k * real_of_int (findUpperBoundMultiple_2k x k) \<le> 0"
+          using findUpperBoundMultiple_2k_ub
+          by simp
+        then have "\<bar>valof x - power_2 k * real_of_int (findUpperBoundMultiple_2k x k)\<bar> 
+                 =  power_2 k * real_of_int (findUpperBoundMultiple_2k x k) - valof x"
+          by simp
+        also have "... \<le> power_2 k * z - valof x"
+        proof(rule diff_right_mono[of "power_2 k * real_of_int (findUpperBoundMultiple_2k x k)"])
+          have "0< power_2 k"
+            unfolding power_2_def by simp
+          then show "power_2 k * real_of_int (findUpperBoundMultiple_2k x k) \<le> power_2 k * z"
+            using True by simp
+        qed
+        also have "... = \<bar>valof x - power_2 k * z\<bar>"
+        proof -
+          have "0\<le> power_2 k * z - valof x"
+            using True findUpperBoundMultiple_2k_ub3
+            by simp
+          then show ?thesis by simp
+        qed
+        finally show ?thesis by simp
+      qed     
+    next
+      case False
+      then show ?thesis 
+      proof -
+        have "0 \<le> power_2 k * (findUpperBoundMultiple_2k x k) - valof x"
+          using findUpperBoundMultiple_2k_ub
+          by simp
+        then have 1:"\<bar>valof x - power_2 k * (findUpperBoundMultiple_2k x k)\<bar> = power_2 k * (findUpperBoundMultiple_2k x k) - valof x"
+          by simp
+        have "0 \<le> valof x - power_2 k * z"
+          using False findUpperBoundMultiple_2k_ub2
+          by force
+        then have 2:"\<bar>valof x - power_2 k * z\<bar> = valof x - power_2 k * z"
+          by simp
+        have 3:"\<bar>valof x - power_2 k * z\<bar> -\<bar>valof x - power_2 k * (findUpperBoundMultiple_2k x k)\<bar> 
+            = 2 * valof x - power_2 k * z - power_2 k * (findUpperBoundMultiple_2k x k)"
+          using 1 2 by simp
+        then have 4:"... = 2 * valof x - power_2 k * (z+ (findUpperBoundMultiple_2k x k))"
+        proof -
+          have "- power_2 k * z - power_2 k * (findUpperBoundMultiple_2k x k) = - (power_2 k * z + power_2 k * (findUpperBoundMultiple_2k x k))"
+            by simp
+          also have "... = - (power_2 k * (z+ (findUpperBoundMultiple_2k x k)))"
+            using distrib_left[of "power_2 k" "z" "(findUpperBoundMultiple_2k x k)"]
+            by simp
+          finally show ?thesis
+            by simp
+        qed
+        have 5:"2 * (findUpperBoundMultiple_2k x k) - 1 \<le> 2 * x_div_2k (valof x) k"
+          using H by simp
+        have 6:"(2 * (findUpperBoundMultiple_2k x k) - 1) * power_2 k \<le> 2 * valof x"
+        proof -
+          have "0< power_2 k"
+            unfolding power_2_def by simp
+          then show ?thesis
+            using 5 div_2k_power_2k[of "x" "k"] mult_right_mono[of "2 * (findUpperBoundMultiple_2k x k) - 1" "2 * x_div_2k (valof x) k" "power_2 k"]
+            by argo
+        qed
+        have 7:"power_2 k * (z+ (findUpperBoundMultiple_2k x k)) \<le> (2 * (findUpperBoundMultiple_2k x k) - 1) * power_2 k"
+        proof -
+          have "z \<le> findUpperBoundMultiple_2k x k - 1"
+            using False by simp
+          then have 1:"z+ (findUpperBoundMultiple_2k x k) \<le> 2 * (findUpperBoundMultiple_2k x k) - 1"
+            by simp
+          have "0 < power_2 k"
+            unfolding power_2_def by simp
+          then show ?thesis
+            using 1 by simp
+        qed
+        have "0 \<le> 2 * valof x - power_2 k * (z+ (findUpperBoundMultiple_2k x k))"
+          using 6 7 by simp
+        then show "\<bar>valof x - power_2 k * (findUpperBoundMultiple_2k x k)\<bar> \<le> \<bar>valof x - power_2 k * z\<bar>"
+          using 3 4 by simp
+      qed
+    qed
+  next
+    assume H:"\<not> 2 * real_of_int (findUpperBoundMultiple_2k x k) \<le> 2 * x_div_2k (valof x) k + 1"
+      and k: "0\<le>k" 
+    show "\<bar>valof x - power_2 k * (real_of_int (findUpperBoundMultiple_2k x k) - 1)\<bar>
+       \<le> \<bar>valof x - power_2 k * real_of_int z\<bar> "
+    proof (cases "findUpperBoundMultiple_2k x k \<le>z")
+      case True
+      then show ?thesis  
+      proof -
+        have 1:"\<bar>valof x - power_2 k * ((findUpperBoundMultiple_2k x k) - 1)\<bar> = valof x - power_2 k * ((findUpperBoundMultiple_2k x k) - 1)"
+        proof -
+          have "power_2 k * ((findUpperBoundMultiple_2k x k) - 1) \<le> valof x"
+          proof -
+            have "\<not> findUpperBoundMultiple_2k x k \<le> findUpperBoundMultiple_2k x k - 1"
+              by simp
+            then have "\<not> valof x \<le> power_2 k * ((findUpperBoundMultiple_2k x k) - 1)"
+              using findUpperBoundMultiple_2k_ub2
+              by blast
+            then show ?thesis by simp
+          qed 
+          then show ?thesis by simp
+        qed
+        have 2:"\<bar>valof x - power_2 k * z\<bar> = power_2 k * z - valof x"
+          using True findUpperBoundMultiple_2k_ub3
+          by simp
+        have 3:"\<bar>valof x - power_2 k * z\<bar> - \<bar>valof x - power_2 k * ((findUpperBoundMultiple_2k x k) - 1)\<bar> 
+            = power_2 k * z + power_2 k * ((findUpperBoundMultiple_2k x k) - 1) - 2* valof x"
+          using 1 2 by simp
+        have "0 \<le> power_2 k * z + power_2 k * ((findUpperBoundMultiple_2k x k) - 1) - 2* valof x"
+          sorry
+        then show ?thesis using 3 by auto
+      qed              
+    next
+      case False
+      then show ?thesis sorry
+    qed
+  qed
+next
+  case False
+  then show ?thesis sorry
+qed
+
+
+
+
+
+lemma spmf_discrete_laplace_mechanism_Z2k_unit:
+  assumes "1\<le>epsilon1" and "1\<le>epsilon2"
+and "1\<le>i"
+  shows "spmf (discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon2 k) z 
+       = (exp(epsilon1/(epsilon2*i))-1) * exp (-(epsilon1*\<bar>z-(findNearstMultiple_2k (f x) k)\<bar>/(epsilon2*i)))/(exp (epsilon1/(epsilon2*i))+1)"
+proof - 
+  have "spmf (discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon2 k) z  = spmf (discrete_laplace_rat (epsilon2 * i) epsilon1 \<bind> (\<lambda>noise. return_spmf (noise + findNearstMultiple_2k (f x) k))) z "
+    unfolding discrete_laplace_mechanism_Z2k_unit_def by simp
+  also have "... = spmf (map_spmf (\<lambda>noise. noise + findNearstMultiple_2k (f x) k) (discrete_laplace_rat (epsilon2 * i) epsilon1)) z"
+    by(simp add: map_spmf_conv_bind_spmf)
+  finally have 1:"spmf (discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon2 k) z = spmf (map_spmf (\<lambda>noise. noise + findNearstMultiple_2k (f x) k) (discrete_laplace_rat (epsilon2 * i) epsilon1)) z"
+    by simp
+  have "(\<lambda>noise. noise + findNearstMultiple_2k (f x) k) -` {z} = {z - findNearstMultiple_2k (f x) k}"
+    by auto
+  then have 2:"spmf (map_spmf (\<lambda>noise. noise + findNearstMultiple_2k (f x) k) (discrete_laplace_rat (epsilon2 * i) epsilon1)) z = spmf (discrete_laplace_rat (epsilon2 * i) epsilon1) (z-findNearstMultiple_2k (f x) k)"  
+    apply(simp add: spmf_map)
+    by(simp add: spmf_conv_measure_spmf)    
+  have 3:"... = (exp (epsilon1 /(epsilon2*i))-1) * exp (-(epsilon1*\<bar>z-findNearstMultiple_2k (f x) k\<bar>/(epsilon2*i)))/(exp (epsilon1/(epsilon2*i))+1)"
+    using assms spmf_discrete_laplace_rat    
+    by simp
+  show ?thesis
+    using 1 2 3 by simp
+qed
+
 
 end
