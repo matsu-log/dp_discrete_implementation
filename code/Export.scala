@@ -1,4 +1,4 @@
-package code
+
 object Lazy {
   final class Lazy[A] (f: Unit => A) {
     var evaluated = false;
@@ -1290,39 +1290,64 @@ import scala.util.Random
 
 object Main {
   val delta = Nat.Nata(BigInt(1))
-  val list = List[Int] (26,20,22,50,35) 
-  val epsilon1 = Nat.Nata(BigInt(100))
-  val epsilon2 = Nat.Nata(BigInt(1))
+  val epsilon1 = Nat.Nata(BigInt(1))
+  val epsilon2 = Nat.Nata(BigInt(100))
   def f(list: List[Int]):Int.int = {
       Int.int_of_integer(BigInt(10))    
   }
   def main(args: Array[String]) = {
-    val ra: Randomized_Algorithm.random_alg[Int.int] = Code_generation.discrete_laplace_mechanism_ra(f, delta, list, epsilon1 , epsilon2)
-    val ra2: Coin_Space.coin_stream => Option[(Int.int, Coin_Space.coin_stream)] = Randomized_Algorithm.Rep_random_alg[Int.int](ra)
+    val ra: Randomized_Algorithm.random_alg[Int.int] = Code_Generation.discrete_laplace_mechanism_ra(f, delta, list, epsilon1 , epsilon2)
     val cs = randomInfiniteCoinStream(10)
-    val result = ra2(cs)
-    result match {
-      case Some(i, cs2) => {
-        i match {
-          case int_of_integer(bi) => println (bi)
-        }
+    val result = test_ra(ra,cs,10)
+    display_int_list(result)
+  }
+  def display_int_list(list: List[Int.int]): Unit = {
+    list match {
+      case Nil => println("end")
+      case x::xs =>x match {
+        case Int.int_of_integer(bi) => {
+          println(bi)
+          display_int_list(xs)
+        } 
       }
-      case None => println("None")
     }
   }
   
+  def test_ra[A](ra: Randomized_Algorithm.random_alg[A],cs: Coin_Space.coin_stream, n: scala.Int): List[A] = {
+    val ra2 = Randomized_Algorithm.Rep_random_alg[A](ra)
+    if (n<= 0) {
+      Nil
+    }
+    else {
+      ra2(cs) match {
+        case Some(tuple) => tuple match{
+          case (a,cs2) => {
+            a :: test_ra(ra, cs2, n-1)
+          }
+        }
+        case None => Nil
+      }
+    }
+  }
+
   // ランダムな無限コイン列を生成する関数
   def randomInfiniteCoinStream(seed: Long): Coin_Space.coin_stream = {
     val random = new Random(seed)
 
     // 無限にコインを生成
-    def generateCoinStream: Coin_Space.coin_stream = {
-      val coinValue = random.nextBoolean()
-      val nextStream = Lazy.delay(generateCoinStream) // 遅延評価を使用
-      Coin_Lazy(coinValue, nextStream)
+    def generateCoinStream: Coin_Space.coin_stream_lazy = {
+      // 1つのコインを生成
+      val coinValue: Boolean = random.nextBoolean()
+
+      // 次のコインのストリームを遅延評価で生成
+      val nextStream: Lazy.Lazy[Coin_Space.coin_stream_lazy] = Lazy.delay(Unit => generateCoinStream)
+
+      // 現在のコインと次のストリームを組み合わせる
+      Coin_Space.Coin_Lazy(coinValue, Coin_Space.Lazy_coin_stream(nextStream))
     }
 
-    Lazy_coin_stream(Lazy.delay(generateCoinStream)) // 初期コイン列を返す
+  // 初期コイン列を返す
+  Coin_Space.Lazy_coin_stream(Lazy.delay(Unit => generateCoinStream))
   }
 
 

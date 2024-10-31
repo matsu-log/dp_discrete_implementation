@@ -343,6 +343,6 @@ lemma discrete_laplace_mechanisms_ra_correct:
   unfolding discrete_laplace_mechanism_def discrete_laplace_mechanism_ra_def
   by(simp add: spmf_of_ra_simps discrete_laplace_rat_ra_correct)
 
-export_code discrete_laplace_mechanism_ra in Scala
+export_code discrete_laplace_mechanism_ra in OCaml
 
 end
