@@ -147,6 +147,8 @@ subsection \<open>granularity:multiples of 2^k\<close>
   k: noise granularity in terms of 2^k
 *)
 
+subsubsection \<open>definition\<close>
+
 lift_definition valof :: "double \<Rightarrow> real" is IEEE.valof.
 
 definition x_div_2k :: "real \<Rightarrow> int \<Rightarrow> real" where
@@ -184,6 +186,11 @@ definition discrete_laplace_mechanism_Z2k :: "('a list \<Rightarrow> double) \<R
   return_spmf (ans * power_2 k)
 }
 "
+
+definition postprocess_round_to_double :: "real \<Rightarrow> int \<Rightarrow> double" where
+"postprocess_round_to_double x k = 0"
+
+subsubsection \<open>Properties of Component Functions\<close>
 
 lemma findUpperBoundMultiple_2k_ub:
   shows "valof x \<le> power_2 k * findUpperBoundMultiple_2k x k"
@@ -430,11 +437,24 @@ next
   then show ?thesis sorry
 qed
 
+lemma power_2_pos:
+  assumes "0\<le>k"
+  shows "power_2 k = 2^(nat k)"
+  unfolding power_2_def by(rule if_P,simp add: assms)
+
+lemma power_2_neg:
+  assumes "k<0"
+  shows "power_2 k = 1/2^(nat (-k))"
+  unfolding power_2_def 
+  apply(rule if_not_P)
+  using assms by(simp)
+
 lemma power_2_gt_zero:
 "0<power_2 k"
   unfolding power_2_def
   by simp
 
+subsubsection \<open>pure-dp of discrete_laplace_mechanism_Z2k\<close>
 
 lemma spmf_discrete_laplace_mechanism_Z2k_unit:
   assumes "1\<le>epsilon1" and "1\<le>epsilon2"
