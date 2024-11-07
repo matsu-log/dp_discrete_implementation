@@ -2,8 +2,8 @@ section \<open>Discrete Laplace Mechanism\<close>
 
 theory Discrete_laplace_mechanism
   imports Discrete_laplace_rat
+          Differential_Privacy
           IEEE_Floating_Point.Double
-          Differenatial_Privacy
 begin 
 
 subsection \<open>Integer Query: SampCert Implementation\<close>
@@ -28,14 +28,14 @@ definition discrete_laplace_mechanism :: "('a list \<Rightarrow> int) \<Rightarr
 lemma spmf_discrete_laplace_mechanism:
   assumes "1\<le>epsilon1" and "1\<le>epsilon2"
 and "1\<le> \<Delta>"
-shows "spmf (iscrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z = (exp (epsilon1 /(epsilon2*\<Delta>))-1) * exp (-(epsilon1*\<bar>z-(f x)\<bar>/(epsilon2*\<Delta>)))/(exp (epsilon1/(epsilon2*\<Delta>))+1)"
+shows "spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z = (exp (epsilon1 /(epsilon2*\<Delta>))-1) * exp (-(epsilon1*\<bar>z-(f x)\<bar>/(epsilon2*\<Delta>)))/(exp (epsilon1/(epsilon2*\<Delta>))+1)"
 proof -
-  have "spmf (iscrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z 
+  have "spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z 
         = spmf (discrete_laplace_rat (epsilon2 * \<Delta>) epsilon1 \<bind> (\<lambda>noise. return_spmf (noise + f x))) z"
     unfolding discrete_laplace_mechanism_def by simp
   also have "... = spmf (map_spmf (\<lambda>noise. noise + f x) (discrete_laplace_rat (epsilon2 * \<Delta>) epsilon1)) z"
     by(simp add: map_spmf_conv_bind_spmf)
-  finally have 1:"spmf (iscrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z = spmf (map_spmf (\<lambda>noise. noise + f x) (discrete_laplace_rat (epsilon2 * \<Delta>) epsilon1)) z"
+  finally have 1:"spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z = spmf (map_spmf (\<lambda>noise. noise + f x) (discrete_laplace_rat (epsilon2 * \<Delta>) epsilon1)) z"
     by simp
   have "(\<lambda>noise. noise + f x) -` {z} = {z - f x}"
     by auto
@@ -53,16 +53,16 @@ lemma pure_dp_discrete_laplace_mechanism:
   assumes "\<bar>f x - f y\<bar> \<le> \<Delta>"
 and "1\<le>epsilon1" and "1\<le>epsilon2"
 and "1\<le> \<Delta>"
-shows "\<And>z. spmf (iscrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z \<le> exp (epsilon1/epsilon2) * spmf (discrete_laplace_mechanism f \<Delta> y epsilon1 epsilon2) z"
+shows "\<And>z. spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z \<le> exp (epsilon1/epsilon2) * spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z"
 proof -
   fix z::int
-  have 1:"spmf (iscrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z = (exp (epsilon1 /(epsilon2*\<Delta>))-1) * exp (-(epsilon1*\<bar>z-(f x)\<bar>/(epsilon2*\<Delta>)))/(exp (epsilon1/(epsilon2*\<Delta>))+1)"
+  have 1:"spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z = (exp (epsilon1 /(epsilon2*\<Delta>))-1) * exp (-(epsilon1*\<bar>z-(f x)\<bar>/(epsilon2*\<Delta>)))/(exp (epsilon1/(epsilon2*\<Delta>))+1)"
     using assms spmf_discrete_laplace_mechanism[of "epsilon1" "epsilon2" "\<Delta>" "f" "x" "z"]
     by(simp)
-  have 2:"spmf (discrete_laplace_mechanism f \<Delta> y epsilon1 epsilon2) z = (exp (epsilon1 /(epsilon2*\<Delta>))-1) * exp (-(epsilon1*\<bar>z-(f y)\<bar>/(epsilon2*\<Delta>)))/(exp (epsilon1/(epsilon2*\<Delta>))+1)"
+  have 2:"spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z = (exp (epsilon1 /(epsilon2*\<Delta>))-1) * exp (-(epsilon1*\<bar>z-(f y)\<bar>/(epsilon2*\<Delta>)))/(exp (epsilon1/(epsilon2*\<Delta>))+1)"
     using assms spmf_discrete_laplace_mechanism[of "epsilon1" "epsilon2" "\<Delta>" "f" "y" "z"]
     by simp
-  have 3:"spmf (iscrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z/spmf (discrete_laplace_mechanism f \<Delta> y epsilon1 epsilon2) z = exp (-(epsilon1*\<bar>z-(f x)\<bar>/(epsilon2*\<Delta>)))/exp (-(epsilon1*\<bar>z-(f y)\<bar>/(epsilon2*\<Delta>)))"
+  have 3:"spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z/spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z = exp (-(epsilon1*\<bar>z-(f x)\<bar>/(epsilon2*\<Delta>)))/exp (-(epsilon1*\<bar>z-(f y)\<bar>/(epsilon2*\<Delta>)))"
     apply(rewrite 1)
     apply(rewrite 2)
     apply(auto)
@@ -108,22 +108,22 @@ proof -
   qed
   also have "... = exp(epsilon1/epsilon2)"
     using assms by simp
-  finally have p:"spmf (iscrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z / spmf (discrete_laplace_mechanism f \<Delta> y epsilon1 epsilon2) z \<le> exp (epsilon1 /epsilon2)"
+  finally have p:"spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z / spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z \<le> exp (epsilon1 /epsilon2)"
     by simp
-  show "spmf (iscrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z \<le> exp (real epsilon1 / real epsilon2) * spmf (discrete_laplace_mechanism f \<Delta> y epsilon1 epsilon2) z"
+  show "spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z \<le> exp (real epsilon1 / real epsilon2) * spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z"
   proof -
-    have "spmf (iscrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z = spmf (iscrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z * (spmf (discrete_laplace_mechanism f \<Delta> y epsilon1 epsilon2) z/ spmf (discrete_laplace_mechanism f \<Delta> y epsilon1 epsilon2) z)"
+    have "spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z = spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z * (spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z/ spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z)"
     proof -
-      have "spmf (discrete_laplace_mechanism f \<Delta> y epsilon1 epsilon2) z / spmf (discrete_laplace_mechanism f \<Delta> y epsilon1 epsilon2) z = 1"
-      using divide_self[of "spmf (discrete_laplace_mechanism f \<Delta> y epsilon1 epsilon2) z"] 
+      have "spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z / spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z = 1"
+      using divide_self[of "spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z"] 
       apply(simp)
       using 3
       by auto
       then show ?thesis by auto
     qed
-    also have "... = spmf (iscrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z / spmf (discrete_laplace_mechanism f \<Delta> y epsilon1 epsilon2) z * spmf (discrete_laplace_mechanism f \<Delta> y epsilon1 epsilon2) z"
+    also have "... = spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z / spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z * spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z"
       by simp      
-    also have "... \<le> exp (epsilon1/epsilon2) * spmf (discrete_laplace_mechanism f \<Delta> y epsilon1 epsilon2) z"
+    also have "... \<le> exp (epsilon1/epsilon2) * spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z"
       apply(rewrite mult_right_mono)
       using p 
       by(simp_all)
@@ -132,9 +132,21 @@ proof -
   qed
 qed
 
+definition adjacency_integer_function:: "('a list \<Rightarrow> int) \<Rightarrow> nat \<Rightarrow> 'a list rel" where
+"adjacency_integer_function f \<Delta> = {(x,y) |x y::'a list. \<bar>f x - f y\<bar>\<le> \<Delta> }"
+
 lemma pure_dp_discrete_laplace_mechanism2:
-  assumes "0\<le>epsilon"
-  shows "Pure_DP (discrete_laplace_mechanism)"
+  assumes "1\<le>epsilon1" and "1\<le>epsilon2"
+  shows "Pure_DP (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2) (adjacency_integer_function f \<Delta>) (epsilon1/epsilon2)"
+  unfolding Pure_DP_def
+proof(rule, clarify)
+  fix x y::"'a list"
+  assume "(x,y)\<in> adjacency_integer_function f \<Delta>"
+  show "Pure_DP_inequality (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) (epsilon1/epsilon2)"
+    unfolding Pure_DP_inequality_def
+    sorry
+qed
+
       
 subsection \<open>granularity:multiples of 2^k\<close>
 (*
