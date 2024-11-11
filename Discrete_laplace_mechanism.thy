@@ -50,7 +50,8 @@ proof -
 qed
 
 lemma pure_dp_discrete_laplace_mechanism:
-  assumes "\<bar>f x - f y\<bar> \<le> \<Delta>"
+  assumes "is_sensitivity f \<Delta>"
+and "Neighbour x y"
 and "1\<le>epsilon1" and "1\<le>epsilon2"
 and "1\<le> \<Delta>"
 shows "\<And>z. spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z \<le> exp (epsilon1/epsilon2) * spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z"
@@ -99,7 +100,7 @@ proof -
   also have "... \<le> exp ((epsilon1*\<Delta>)/(epsilon2*\<Delta>))"
   proof 
     have 1:"epsilon1 * \<bar>f x - f y\<bar> \<le> epsilon1 * \<Delta>"
-      using assms by simp
+      using assms sensitivity by simp
     have 2:"0 \<le> epsilon2*\<Delta>"
       using assms by simp
     show "epsilon1 * \<bar>f x - f y\<bar>/(epsilon2*\<Delta>) \<le> epsilon1 * \<Delta>/(epsilon2*\<Delta>)"
@@ -132,20 +133,12 @@ proof -
   qed
 qed
 
-definition adjacency_integer_function:: "('a list \<Rightarrow> int) \<Rightarrow> nat \<Rightarrow> 'a list rel" where
-"adjacency_integer_function f \<Delta> = {(x,y) |x y::'a list. \<bar>f x - f y\<bar>\<le> \<Delta> }"
+thm pure_dp_discrete_laplace_mechanism
 
 lemma pure_dp_discrete_laplace_mechanism2:
-  assumes "1\<le>epsilon1" and "1\<le>epsilon2"
-  shows "Pure_DP (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2) (adjacency_integer_function f \<Delta>) (epsilon1/epsilon2)"
-  unfolding Pure_DP_def
-proof(rule, clarify)
-  fix x y::"'a list"
-  assume "(x,y)\<in> adjacency_integer_function f \<Delta>"
-  show "Pure_DP_inequality (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) (epsilon1/epsilon2)"
-    unfolding Pure_DP_inequality_def
-    sorry
-qed
+  assumes "is_sensitivity f \<Delta>"
+  shows "Pure_DP (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2) \<epsilon>"
+  sorry
 
       
 subsection \<open>granularity:multiples of 2^k\<close>
