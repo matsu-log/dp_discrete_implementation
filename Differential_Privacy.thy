@@ -47,7 +47,111 @@ shows "\<bar>q l1 - q l2\<bar>\<le> \<Delta>"
   by simp
 
 
+definition int_family :: "nat \<Rightarrow> int set" where
+"int_family n = (if even n then {n div 2} else {-((n+1) div 2)})"
 
+lemma disjoint_family_int_family:
+"disjoint_family int_family"
+  unfolding disjoint_family_on_def UNIV_def
+proof(clarify)
+  fix m n::nat
+  assume mn:"m \<noteq> n"
+  show "int_family m \<inter> int_family n = {}"
+    unfolding int_family_def 
+    using mn
+  proof(auto)
+    have "even m \<Longrightarrow> even n \<Longrightarrow>int n div 2 \<noteq> int m div 2"
+      using mn by fastforce
+    then show "even m \<Longrightarrow> even n \<Longrightarrow> int n div 2 = int m div 2 \<Longrightarrow> False"
+      by simp
+    have "odd m \<Longrightarrow> odd n \<Longrightarrow> int n div 2 \<noteq> int m div 2"
+      using mn 
+      by (metis bit_eq_rec even_of_nat nat_int_comparison(1))
+    then show " odd m \<Longrightarrow> odd n \<Longrightarrow> int n div 2 = int m div 2 \<Longrightarrow> False"
+      by simp
+  qed
+qed
+
+lemma int_family_union:
+"\<Union> (range int_family) = UNIV"
+proof
+  show "\<Union> (range int_family) \<subseteq> UNIV"
+    by simp
+  show "UNIV \<subseteq> \<Union> (range int_family)"
+  proof
+    fix x::int
+    assume "x \<in> UNIV"
+    show "x \<in> \<Union> (range int_family)"
+    proof(cases "x<0")
+      case True
+      show ?thesis
+      proof 
+        show "nat(-2*x-1) \<in> UNIV"
+          by simp
+        show "x \<in> int_family (nat(-2*x-1))"
+          unfolding int_family_def
+        proof-
+          have 1:"\<not> even (nat (-2*x-1))"
+          proof -
+            have 1:"nat (-2*x-1) = 2*nat(-x) -1"
+              using True by simp
+            have 2:"\<not> even (2*nat(-x) -1)"
+              using True by simp
+            show ?thesis
+              using 1 2 by simp
+          qed
+          have 2:"x \<in>  {- ((int (nat (- 2 * x - 1)) + 1) div 2)}"
+          proof
+            show "x = - ((int (nat (- 2 * x - 1)) + 1) div 2)"
+              using True by simp
+          qed
+          show "x \<in> (if even (nat (- 2 * x - 1)) then {int (nat (- 2 * x - 1)) div 2} else {- ((int (nat (- 2 * x - 1)) + 1) div 2)}) "
+            using 1 2 by simp
+        qed
+      qed
+    next
+      case False
+      show ?thesis
+      proof
+        show "2*(nat x)\<in> UNIV"
+          by simp
+        show "x \<in> int_family (2*(nat x))"
+          unfolding int_family_def
+          using False 
+          by simp
+      qed
+    qed
+  qed
+qed
+
+lemma suminf_emeasure_spmf_int_family:
+"(\<Sum>i::nat. emeasure (measure_spmf p) (int_family i)) = emeasure (measure_spmf p) (\<Union> (range int_family))"
+  apply(rule suminf_emeasure,simp)
+  using disjoint_family_int_family by simp
+  
+
+lemma 
+  fixes p::"'a spmf"
+  shows "countable {x. spmf p x\<noteq>0}"
+  using spmf_conv_measure_spmf[of "p"] measure_spmf.countable_support[of "p"]
+  by simp
+
+definition int_family_set:: "int set \<Rightarrow> nat \<Rightarrow>int set" where 
+"int_family_set A n = (if int_family n \<subseteq> A then int_family n else {})"
+
+lemma disjoint_family_int_family_set:
+"disjoint_family (int_family_set A)"
+  unfolding int_family_set_def
+  using disjoint_family_int_family
+  unfolding disjoint_family_on_def
+  by simp
+
+
+lemma int_family_set_union:
+"\<Union> (range (int_family_set A)) = A"
+  sorry
+  
+declare[[show_types]]
 lemma pure_dp:
   fixes M::"('a,'b) mechanism"
   assumes "\<And>z l1 l2. Neighbour l1 l2 \<Longrightarrow> spmf (M l1)z \<le> exp (\<epsilon>) * spmf (M l2)z"
@@ -61,14 +165,11 @@ proof (rule+)
   proof
     fix A::"'b set"
     show "Sigma_Algebra.measure (measure_spmf (M h1)) A \<le> exp \<epsilon> * Sigma_Algebra.measure (measure_spmf (M h2)) A"
-    
-      term"countably_additive"
-      term "pmf"
-      find_theorems "countable"
-      term "countable"
-      term "prob_space"
-      term "sigma_finite_measure"
-      term "almost_everywhere"
+    proof -
+      thm measure_def
+      thm countable_def
+      find_theorems "disjoint_family"
+
 
 lemma dp_postprocess_theorem:
   assumes "Pure_DP M \<epsilon>"
