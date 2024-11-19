@@ -29,6 +29,10 @@ definition is_sensitivity :: "('a, int) query \<Rightarrow> nat \<Rightarrow> bo
 definition Pure_DP_inequality :: "'a spmf \<Rightarrow> 'a spmf \<Rightarrow> real \<Rightarrow> bool" where
 "Pure_DP_inequality M N \<epsilon> = (\<forall>A::'a set. measure (measure_spmf M) A \<le> exp( \<epsilon>) * measure (measure_spmf N) A)"
 
+find_theorems "measure (measure_spmf _) _ \<le> measure (measure_spmf _ ) _"
+
+thm measure_spmf.finite_measure_mono
+
 definition Pure_DP :: "('a,'b) mechanism \<Rightarrow> real \<Rightarrow> bool" where
 "Pure_DP M \<epsilon> = (\<forall>l1 l2. Neighbour l1 l2 \<longrightarrow> Pure_DP_inequality (M l1) (M l2) \<epsilon>)"
 
@@ -129,12 +133,14 @@ lemma suminf_emeasure_spmf_int_family:
   apply(rule suminf_emeasure,simp)
   using disjoint_family_int_family by simp
   
-
+thm suminf_emeasure
 lemma 
   fixes p::"'a spmf"
   shows "countable {x. spmf p x\<noteq>0}"
   using spmf_conv_measure_spmf[of "p"] measure_spmf.countable_support[of "p"]
   by simp
+
+
 
 definition int_family_set:: "int set \<Rightarrow> nat \<Rightarrow>int set" where 
 "int_family_set A n = (if int_family n \<subseteq> A then int_family n else {})"
@@ -150,10 +156,79 @@ lemma disjoint_family_int_family_set:
 lemma int_family_set_union:
 "\<Union> (range (int_family_set A)) = A"
   sorry
+
+lemma suminf_emeasure_spmf_int_family_set:
+"(\<Sum>i::nat. emeasure (measure_spmf p) (int_family_set A i)) = emeasure (measure_spmf p) A"
+proof -
+  have "(\<Sum>i::nat. emeasure (measure_spmf p) (int_family_set A i)) = emeasure (measure_spmf p) (\<Union> (range (int_family_set A)))"
+  apply(rule suminf_emeasure,simp)
+    using disjoint_family_int_family_set by simp
+  also have "... = emeasure (measure_spmf p) A"
+    using int_family_set_union by simp
+  finally show ?thesis by simp
+qed
+
+lemma test1:
+  fixes A::"int set"
+  assumes "\<And>z. spmf p z \<le> exp(\<epsilon>) * spmf q z"
+  shows "emeasure (measure_spmf p) A \<le> exp(\<epsilon>) * emeasure (measure_spmf q) A"
+proof -
+  have 1:"emeasure (measure_spmf p) A = (\<Sum>i::nat. emeasure (measure_spmf p) (int_family_set A i))"
+    using suminf_emeasure_spmf_int_family_set
+    by simp
+  have 2:"emeasure (measure_spmf q) A = (\<Sum>i::nat. emeasure (measure_spmf q) (int_family_set A i))"
+    using suminf_emeasure_spmf_int_family_set
+    by simp
+  have 3:"(\<Sum>i::nat. emeasure (measure_spmf p) (int_family_set A i)) \<le>  (\<Sum>i::nat. exp(\<epsilon>) *  emeasure (measure_spmf q) (int_family_set A i))"
+    apply(rewrite suminf_le,auto)
+    unfolding int_family_set_def 
+  proof -
+    fix n::nat
+    show "emeasure (measure_spmf p) (if int_family n \<subseteq> A then int_family n else {}) \<le>  exp(\<epsilon>) * emeasure (measure_spmf q) (if int_family n \<subseteq> A then int_family n else {})"
+    proof(cases "int_family n \<subseteq> A")
+      case True
+      then show ?thesis
+        apply(simp)
+        unfolding int_family_def
+        apply(auto)
+      proof -
+        show "emeasure (measure_spmf p) {int n div 2} \<le>  exp(\<epsilon>) * emeasure (measure_spmf q) {int n div 2}"
+          apply(rewrite emeasure_spmf_single, rewrite emeasure_spmf_single)
+          using assms exp_ge_zero[of "\<epsilon>"] ennreal_mult'[of "exp(\<epsilon>)" "spmf q (int n div 2)"] ennreal_leI
+          by metis          
+        show "emeasure (measure_spmf p) {- (int n div 2) - 1} \<le> exp(\<epsilon>) * emeasure (measure_spmf q) {- (int n div 2) - 1}"
+          apply(rewrite emeasure_spmf_single, rewrite emeasure_spmf_single)
+          using assms exp_ge_zero[of "\<epsilon>"] ennreal_mult'[of "exp(\<epsilon>)" "spmf q (-(int n div 2)-1)"] ennreal_leI
+          by metis   
+      qed
+    next
+      case False
+      then show ?thesis by simp
+    qed
+  qed
+  show ?thesis
+    using 1 2 3 by auto
+qed
+
+lemma test2: 
+  fixes p q:: "int spmf"
+  assumes "\<And>z. spmf p z \<le> exp (\<epsilon>) * spmf q z"
+  shows "measure (measure_spmf p) A \<le> exp (\<epsilon>) * measure (measure_spmf q) A"
+proof - 
+  have 1:"emeasure (measure_spmf p) A  \<le>  exp (\<epsilon>) * emeasure (measure_spmf q) A"
+    using test1 assms by blast
+  have 2:"emeasure (measure_spmf q) A < \<top>"
+    using measure_spmf.emeasure_finite[of "q" "A"] less_top 
+    by blast
+  then show ?thesis 
+    unfolding measure_def
+    using 1 2
+    by (simp add: enn2real_leI ennreal_mult')
+qed
   
 declare[[show_types]]
 lemma pure_dp:
-  fixes M::"('a,'b) mechanism"
+  fixes M::"('a, int) mechanism"
   assumes "\<And>z l1 l2. Neighbour l1 l2 \<Longrightarrow> spmf (M l1)z \<le> exp (\<epsilon>) * spmf (M l2)z"
 shows "Pure_DP M \<epsilon>"
   unfolding Pure_DP_def
@@ -163,12 +238,13 @@ proof (rule+)
   show "Pure_DP_inequality (M h1) (M h2) \<epsilon>"
     unfolding Pure_DP_inequality_def
   proof
-    fix A::"'b set"
+    fix A::"int set"
     show "Sigma_Algebra.measure (measure_spmf (M h1)) A \<le> exp \<epsilon> * Sigma_Algebra.measure (measure_spmf (M h2)) A"
-    proof -
-      thm measure_def
-      thm countable_def
-      find_theorems "disjoint_family"
+      using test2[of "M h1" "\<epsilon>" "M h2"] assms[of "h1" "h2"] neighbour
+      by blast
+  qed
+qed
+     
 
 
 lemma dp_postprocess_theorem:
