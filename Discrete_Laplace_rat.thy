@@ -1,3 +1,5 @@
+section \<open>Discrete Laplace distribution take t/s as parameter\<close>
+
 theory Discrete_Laplace_rat
   imports "Bernoulli_exp_minus_rat"
           "Probabilistic_While.Fast_Dice_Roll"
@@ -5,6 +7,7 @@ theory Discrete_Laplace_rat
           "Probabilistic_While.While_SPMF"
 begin
 
+subsection \<open>auxiliary lemmas\<close>
 
 lemma map_spmf_bind_spmf_lambda:
 "map_spmf f \<circ> (\<lambda>y. bind_spmf (p y) (g y) ) = (\<lambda>y. (p y) \<bind> map_spmf f \<circ> (g y))"
@@ -298,6 +301,8 @@ proof -
     using x by(simp_all)
 qed
 
+subsection \<open>Define discrete_laplace_rat\<close>
+
 context notes [[function_internals]] begin
 partial_function (spmf) discrete_laplace_rat_unit_loop1 :: "nat \<Rightarrow> nat spmf" where 
 "discrete_laplace_rat_unit_loop1 t = do {
@@ -314,7 +319,6 @@ partial_function (spmf) discrete_laplace_rat_unit_loop2 :: "nat \<Rightarrow> na
               else  discrete_laplace_rat_unit_loop2 (v+1)
 }"
 end
-
 
 definition discrete_laplace_rat_unit :: "nat \<Rightarrow> nat spmf" where
 "discrete_laplace_rat_unit t = do {
@@ -340,7 +344,7 @@ partial_function (spmf) discrete_laplace_rat :: "nat \<Rightarrow> nat \<Rightar
 "
 end
 
-thm discrete_laplace_rat_unit_loop1.fixp_induct
+subsection \<open>Properties of discrete_laplace_rat\<close>
 
 lemma discrete_laplace_rat_unit_loop1_fixp_induct [case_names adm bottom step]:
   assumes "spmf.admissible P" 
@@ -355,8 +359,6 @@ and "P (\<lambda>discrete_laplace_rat_unit_loop2. return_pmf None)"
 and "(\<And>discrete_laplace_rat_unit_loop2'. P discrete_laplace_rat_unit_loop2' \<Longrightarrow> P (\<lambda>va. bernoulli_exp_minus_rat 1 \<bind> (\<lambda>a. if a = False then return_spmf va else discrete_laplace_rat_unit_loop2' (va + 1))))"
 shows "P discrete_laplace_rat_unit_loop2"
   using assms by (rule discrete_laplace_rat_unit_loop2.fixp_induct)
-
-thm discrete_laplace_rat.fixp_induct
 
 lemma discrete_laplace_rat_fixp_induct [case_names adm bottom step]:
   assumes "spmf.admissible (\<lambda>discrete_laplace_rat. P (curry discrete_laplace_rat))"
@@ -553,7 +555,6 @@ proof -
   then show ?thesis 
     using discrete_laplace_rat_unit_loop1_conv_while assms by auto
 qed
-
 end
 
 lemma spmf_discrete_laplace_rat_unit_loop1[simp]:
@@ -797,9 +798,6 @@ proof -
     using assms by simp
 qed
 
-
-
-
 context
   fixes body :: "bool \<times> nat \<Rightarrow> (bool \<times> nat) spmf"
 defines [simp]: "body \<equiv> (\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (True,k'+1) else (False,k'))) (bernoulli_exp_minus_rat 1))"
@@ -881,7 +879,6 @@ lemma lossless_discrete_laplace_rat_unit_loop2_zero[simp]:
 proof(simp, auto, simp add:lossless_bernoulli_exp_minus_rat)
   show "lossless_spmf (discrete_laplace_rat_unit_loop2 (Suc 0)) " using lossless_discrete_laplace_rat_unit_loop2 by simp
 qed
-
 end
 
 lemma spmf_discrete_laplace_rat_unit_loop2_zero_fixp_induct_case_adm:
@@ -990,8 +987,6 @@ lemma lossless_discrete_laplace_rat_unit[simp]:
   apply(rewrite discrete_laplace_rat_unit_def)
   by(simp)
 
-thm discrete_laplace_rat.simps
-(*declare [[show_types]]*)
 lemma spmf_discrete_laplace_rat_unit[simp]:
   assumes "1\<le>t"
   shows "spmf (discrete_laplace_rat_unit t) x = (1-exp(-1/t)) * exp(-x/t)"
@@ -1245,206 +1240,6 @@ proof -
   then show ?thesis by simp
 qed
 
-lemma spmf_y_discrete_laplace_rat:
-  assumes "1\<le>t" and "1\<le>s"
-  shows "spmf (map_spmf (\<lambda>x. calculate_y x s) (discrete_laplace_rat_unit t)) y = (1-exp(-1/t)^s) * exp(-1/t) ^ (s*y)" 
-proof -
-  have "ennreal (spmf (map_spmf (\<lambda>x. calculate_y x s) (discrete_laplace_rat_unit t)) y) =(1-exp(-1/t)^s) * exp(-1/t) ^ (s*y)"
-    apply(rewrite ennreal_spmf_map_conv_nn_integral, rewrite nn_integral_measure_spmf)
-    apply(simp add: nn_integral_count_space_nat)
-    using assms apply(simp add:calculate_y_def)
-  proof -
-    show "(\<Sum>x. ennreal ((1 - exp (-(1/t))) * exp (- (x/t))) * indicator ((\<lambda>x. nat \<lfloor>x/s\<rfloor>) -` {y}) x)
-        = ennreal ((1 - exp (- (1 / real t)) ^ s) * exp (- (1 / real t)) ^ (s * y))"
-    proof -
-      have 1:"{x. nat \<lfloor>real x/s\<rfloor> \<in> {y}} = {x. nat \<lfloor>real x /s\<rfloor> = y}"
-        by simp
-      then have 2:"\<And>x. indicator {x. nat \<lfloor>real x / real s\<rfloor> \<in> {y}} x =  indicator {x. nat \<lfloor>real x/s\<rfloor> =y} x"
-        by simp
-      have 3:"\<And>x. (s * y \<le> x \<and> x< s * (y+1)) = (nat\<lfloor>real x/s\<rfloor> =y)"
-      proof 
-        fix x::nat
-        assume H:"s * y \<le> x \<and> x< s * (y+1)"
-        show "nat \<lfloor>real x/s\<rfloor> =y"
-          apply(rewrite floor_eq2[of "y"])
-          apply(simp_all)
-        proof -
-          have "(s * y)/ s\<le> x/s"
-            apply(rewrite divide_right_mono,simp_all)
-            using H of_nat_mono by fastforce
-          then show "y \<le> x/s"
-            using assms by simp
-          show "real x / real s < real y + 1 "
-          proof-
-            have "real x < s * (real y + 1)"
-            proof-
-              have "real y + 1 = y + 1"
-                by simp
-              then have "s * (real y + 1) = s * (y+1)"
-                using of_nat_mult by metis
-              then show ?thesis
-                using H 
-                by linarith
-            qed
-            then have "x/s < (s * (real y + 1))/s"
-              apply(rewrite divide_strict_right_mono,simp_all)
-              using assms by simp
-            then show ?thesis 
-              using assms by simp
-          qed
-        qed
-      next
-        fix x::nat
-        assume H:"nat \<lfloor>real x / real s\<rfloor> = y"
-        show "s * y \<le> x \<and> x < s * (y + 1)"
-        proof
-          have 1:"nat \<lfloor>real x / real s\<rfloor>  = x div s"
-            using floor_divide_of_nat_eq 
-            by (metis nat_int)
-          show "s*y\<le>x"
-            using 1 H assms 
-            by simp
-          show "x < s * (y + 1)"
-            using 1 H assms 
-            by (simp add: dividend_less_times_div)
-        qed
-      qed
-      have 4:"\<And>x. (x\<in>{s*y..<s*(y+1)}) = (indicator {x. nat \<lfloor>real x / real s\<rfloor> \<in> {y}} x = 1)"
-        using 2 3 by force
-      have 5:"\<And>x. (x\<notin>{s*y..<s*(y+1)}) = (indicator {x. nat \<lfloor>real x / real s\<rfloor> \<in> {y}} x = 0)"
-        using 2 3 by force
-      have 6:"\<And>x. x\<in>{s*y..<s*(y+1)} \<Longrightarrow> (1 - exp (- (1 / real t))) * exp (- (real x / real t)) * indicator {x. nat \<lfloor>real x / real s\<rfloor> \<in> {y}} x = (1 - exp (-(1/t))) * exp (- (x/t))"
-        using 4 by auto
-      have 7:"\<And>x. x\<notin>{s*y..<s*(y+1)} \<Longrightarrow> (1 - exp (- (1 / real t))) * exp (- (real x / real t)) * indicator {x. nat \<lfloor>real x / real s\<rfloor> \<in> {y}} x = 0"
-        using 5 by auto
-      have "(\<Sum>x. ennreal ((1 - exp (-(1/t))) * exp (- (x/t))) * indicator ((\<lambda>x. nat \<lfloor>x/s\<rfloor>) -` {y}) x)
-          = (\<Sum>x. ennreal ((1 - exp (-(1/t))) * exp (- (x/t))) * ennreal (indicator ((\<lambda>x. nat \<lfloor>x/s\<rfloor>) -` {y}) x))"
-        by(simp add: ennreal_indicator)
-      also have "... = (\<Sum>x. ennreal ((1 - exp (-(1/t))) * exp (- (x/t)) * indicator ((\<lambda>x. nat \<lfloor>x/s\<rfloor>) -` {y}) x))"
-        by(simp add: ennreal_mult')
-      also have "... = ennreal (\<Sum>x. (1 - exp (-(1/t))) * exp (- (x/t)) * indicator ((\<lambda>x. nat \<lfloor>x/s\<rfloor>) -` {y}) x)"
-      proof(rewrite suminf_ennreal,simp_all,rewrite ennreal_suminf_neq_top,simp_all)
-        have 1:"\<And>x. (\<lambda>x. (1 - exp (- (1 / real t))) * exp (- (real x / real t)) * indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) x)x
-                   \<le> (\<lambda>x. (1 - exp (- (1 / real t))) * exp (- (real x / real t))) x"
-          using assms by simp
-        have 2:"summable (\<lambda>x. (1 - exp (- (1 / real t))) * exp (- (real x / real t))) "
-          apply(rewrite summable_mult, simp_all)
-          using assms summable_exp_rat by simp
-        show "summable (\<lambda>x. (1 - exp (- (1 / real t))) * exp (- (real x / real t)) * indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) x)"
-        proof(rewrite summable_comparison_test[of "_" "(\<lambda>x. exp (- (real x / real t)))"],simp_all)
-          show "summable (\<lambda>x. exp (- (real x / real t)))"
-            using assms summable_exp_rat by simp
-          show "\<exists>N. \<forall>n\<ge>N. (1 - exp (- (1 / real t))) * indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) n \<le> 1 "
-          proof -
-            have "\<And>n::nat. (1 - exp (- (1 / real t))) * indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) n \<le> 1 "
-            proof -
-              fix n
-              have 1:"(1 - exp (- (1 / real t))) \<le> 1"
-                by simp
-              have 2:"indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) n \<le> 1"
-                by simp
-              show "(1 - exp (- (1 / real t))) * indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) n \<le> 1"
-                using 1 2
-                ereal_mult_mono[of "1" "indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) n" "(1 - exp (- (1 / real t)))" "1"]
-                by simp
-            qed
-            then show ?thesis by simp
-          qed
-        qed
-      qed
-      also have "... = ennreal (\<Sum>x\<in>{s*y..<s*(y+1)} . (1 - exp (-(1/t))) * exp (- (x/t)))"
-      proof -
-        have "(\<Sum>x. (1 - exp (-(1/t))) * exp (- (x/t)) * indicator ((\<lambda>x. nat \<lfloor>x/s\<rfloor>) -` {y}) x) 
-            = (\<Sum>x\<in>{s*y..<s*(y+1)}. (1 - exp (-(1/t))) * exp (- (x/t)) * indicator ((\<lambda>x. nat \<lfloor>x/s\<rfloor>) -` {y}) x)"
-        proof(rule suminf_finite,simp_all)
-          fix x::nat
-          assume H:"s * y \<le> x \<longrightarrow> \<not> x < s + s * y"
-          show "t = 0 \<or> indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) x = 0"
-            using assms
-          proof (simp)
-            show "indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) x = 0"
-              unfolding vimage_def using H 5 by auto
-          qed
-        qed
-        also have "... = (\<Sum>x = s * y..<s * (y + 1). (1 - exp (- (1 / real t))) * exp (- (real x / real t)))"
-          unfolding vimage_def using 6
-          by(rule Finite_Cartesian_Product.sum_cong_aux,auto)
-        finally have "(\<Sum>x. (1 - exp (- (1 / real t))) * exp (- (real x / real t)) * indicat_real ((\<lambda>x. nat \<lfloor>real x / real s\<rfloor>) -` {y}) x)
-                    = (\<Sum>x = s * y..<s * (y + 1). (1 - exp (- (1 / real t))) * exp (- (real x / real t))) "
-          by simp
-        then show ?thesis by simp
-      qed
-      also have "... = (1-exp(-1/t)^s) * exp(-1/t) ^ (s*y)"
-      proof -
-        have "(\<Sum>x = s * y..<s * (y + 1). (1 - exp (- (1 / real t))) * exp (- (real x / real t)))
-            = (1-exp(-1/t)^s) * exp(-1/t) ^ (s*y) "
-        proof -
-          have "(\<Sum>x = s * y..<s * (y + 1). (1 - exp (- (1 / real t))) * exp (- (real x / real t)))
-              = (1 - exp (- (1 / real t))) * (\<Sum>x = s * y..<s * (y + 1).  exp (- (real x / real t)))"
-            by(rewrite sum_distrib_left, simp)
-          also have "... = (1 - exp (- (1 / real t))) * (exp(-(s*y)/t)-exp(-(s*(y+1))/t))/(1-exp(-1/t))"
-          proof -
-            have " (\<Sum>x = s * y..<s * (y + 1).  exp (- (x/t))) = (\<Sum>x = s * y..s * (y + 1)-1.  exp (- (x/t)))"
-            proof -
-              have "{s*y..<s* (y+1)} = {s*y..s*(y+1)-1}"
-                using assms by auto
-              then show ?thesis 
-                by auto
-            qed
-            also have "... = (\<Sum>x = s * y..s * (y + 1) - 1. exp (- x/t))"
-              by simp
-            also have "... = (exp(-(s*y)/t)-exp(-(s*(y+1))/t))/(1-exp(-1/t))"
-              apply(rewrite exp_sum_general[of "t" "s*y" "s*(y+1)-1"])
-              using assms by(simp_all)
-            finally have "(\<Sum>x = s * y..<s * (y + 1). exp (- (real x / real t)))
-                        = (exp(-(s*y)/t)-exp(-(s*(y+1))/t))/(1-exp(-1/t))"
-              by simp
-            then show ?thesis by simp
-          qed
-          also have "... = (exp(-(s*y)/t)-exp(-(s*(y+1))/t))" 
-            by simp
-          also have "... = (1 - exp(-s/t)) *  exp(-(s*y)/t)"
-          proof -
-            have "exp(-(s*y)/t)-exp(-(s*(y+1))/t) = 1*exp(-(s*y)/t) - exp(-s/t)*exp(-(s*y)/t)"
-              apply(simp)
-              using exp_add[of "- (real s*y/t)" "-(s/t)"]
-              by argo
-            also have "... = exp(-(s*y)/t) * (1- exp(-s/t))"
-              by argo
-            finally show "exp(-(s*y)/t)-exp(-(s*(y+1))/t) = (1 - exp(-s/t)) *  exp(-(s*y)/t)"
-              by simp
-          qed
-          also have "... = (1-exp(-1/t)^s) * exp(-1/t) ^ (s*y)"
-          proof -
-            have "exp(-(s*y)/t) = exp ((s*y)*(-1/t))"
-              by simp
-            also have "... = exp(-1/t) ^ (s*y)"
-              using exp_of_nat_mult[of "s*y" "-1/t"]
-              by simp
-            finally have 1:"exp(-(s*y)/t) = exp(-1/t) ^ (s*y)"
-              by simp
-            have "1 - exp(-s/t) = 1-exp(s*(-1/t))"
-              by simp
-            also have "... =(1-exp(-1/t)^s)"
-              using exp_of_nat_mult[of "s" "-1/t"]
-              by simp
-            finally have 2:"1 - exp(-s/t) = (1-exp(-1/t)^s)"
-              by simp
-            show ?thesis 
-              using 1 2 by simp
-          qed
-          finally show ?thesis by simp
-        qed
-        then show ?thesis by simp
-      qed
-      finally show ?thesis by simp
-    qed
-  qed
-  then show ?thesis 
-    by (simp add: power_le_one)
-qed
-
-
 context
   fixes body :: "bool \<times> nat \<times> nat \<times> int \<Rightarrow> (bool \<times> nat \<times> nat \<times> int) spmf"
   defines [simp]: "body \<equiv> (\<lambda>(b, t, s, z). 
@@ -1469,7 +1264,6 @@ interpretation loop_spmf "fst" body
          else return_spmf (False, t, s, y)
 })"
   by(fact body_def)
-
 
 lemma discrete_laplace_rat_cov_while:
 "discrete_laplace_rat t s = map_spmf (\<lambda>a. snd (snd (snd a))) (while (True, t, s, 0))" (is "?lhs = ?rhs")

@@ -20,10 +20,10 @@ subsection \<open>Integer Query: SampCert Implementation\<close>
 *)
 
 definition discrete_laplace_mechanism :: "('a list \<Rightarrow> int) \<Rightarrow> nat  \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a list \<Rightarrow> int spmf" where
-"discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x = do { 
-                                                            noise \<leftarrow> discrete_laplace_rat (epsilon2 * \<Delta>) epsilon1;
-                                                            return_spmf (noise + f x)
-}"
+"discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x = 
+  do { noise \<leftarrow> discrete_laplace_rat (epsilon2 * \<Delta>) epsilon1;
+       return_spmf (noise + f x)
+    }"
 
 lemma spmf_discrete_laplace_mechanism:
   assumes "1\<le>epsilon1" and "1\<le>epsilon2"
@@ -49,9 +49,9 @@ proof -
     using 1 2 3 by simp
 qed
 
-lemma pure_dp_discrete_laplace_mechanism:
+lemma pointwise_pure_dp_inequality_discrete_laplace_mechanism:
   assumes "is_sensitivity f \<Delta>"
-and "Neighbour x y"
+and "neighbour x y"
 and "1\<le>epsilon1" and "1\<le>epsilon2"
 and "1\<le> \<Delta>"
 shows "\<And>z. spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z \<le> exp (epsilon1/epsilon2) * spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z"
@@ -133,28 +133,16 @@ proof -
   qed
 qed
 
-thm pure_dp_discrete_laplace_mechanism
-
-lemma pure_dp_discrete_laplace_mechanism2:
+lemma pure_dp_discrete_laplace_mechanism:
   assumes "is_sensitivity f \<Delta>"
 and "1 \<le> epsilon1"
 and "1 \<le> epsilon2"
 and "1 \<le> \<Delta>"
-  shows "Pure_DP (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2) (epsilon1/epsilon2)"
-  unfolding Pure_DP_def Pure_DP_inequality_def
-proof (clarify)
-  fix l1 l2::"'a list" and A::"int set"
-  assume neighbour:"Neighbour l1 l2"
-  show "Sigma_Algebra.measure (measure_spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 l1)) A
-       \<le> exp (epsilon1/epsilon2) *
-          Sigma_Algebra.measure (measure_spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 l2)) A"
-  using pure_dp_discrete_laplace_mechanism[of "f" "\<Delta>" "l1" "l2" "epsilon1" "epsilon2"]
-        pure_dp[of "(\<lambda>l. discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 l)" "epsilon1/epsilon2"] 
-        assms
-  using neighbour test2 by presburger
-qed
-
-
+shows "pure_dp (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2) (epsilon1/epsilon2)"
+  using pointwise_pure_dp_inequality_discrete_laplace_mechanism[of "f" "\<Delta>" "_" "_" "epsilon1" "epsilon2"]
+        pointwise_spmf_bound_imp_pure_dp[of "(\<lambda>l. discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 l)" "epsilon1/epsilon2"] 
+        assms 
+  by simp
       
 subsection \<open>granularity:multiples of 2^k\<close>
 (*
@@ -188,7 +176,6 @@ definition findNearstMultiple_2k :: "double \<Rightarrow> int \<Rightarrow> int"
                              (if ((x - (x_div_2k (valof d) k)) \<le> (x_div_2k (valof d) k)- (x-1)) then x else x-1)
 )"
 
-
 definition discrete_laplace_mechanism_Z2k_unit :: "('a list \<Rightarrow> double) \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> 'a list \<Rightarrow> int spmf" where
 "discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x = do {
   noise::int \<leftarrow> discrete_laplace_rat (epsilon2 * i) epsilon1;
@@ -210,7 +197,6 @@ definition discrete_laplace_mechanism_Z2k :: "('a list \<Rightarrow> double) \<R
   postprocess (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k) (\<lambda>ans. ans * power_2 k) x
 }
 "
-
 
 definition discrete_laplace_mechanism_Z2k' :: "('a list \<Rightarrow> double) \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> 'a list \<Rightarrow> real spmf" where
 "discrete_laplace_mechanism_Z2k' f i epsilon1 epsilon2 k x = do {

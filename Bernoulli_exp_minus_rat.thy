@@ -1,3 +1,4 @@
+section \<open>Bernoulli distribution that take exp(-p) as parameter, where p is a rational number\<close>
 theory Bernoulli_exp_minus_rat
   imports "Probabilistic_While.While_SPMF"
           "HOL-Probability.Probability"
@@ -5,6 +6,7 @@ theory Bernoulli_exp_minus_rat
           "Bernoulli_exp_minus_real"
 begin
 
+subsection \<open>Definite bernoulli_exp_minus_rat\<close>
 context notes [[function_internals]] begin
 partial_function (spmf) bernoulli_exp_minus_rat_from_0_to_1_loop :: "rat  \<Rightarrow> nat  \<Rightarrow> nat spmf" where
  "bernoulli_exp_minus_rat_from_0_to_1_loop p k = 
@@ -44,6 +46,8 @@ definition bernoulli_exp_minus_rat :: "rat  \<Rightarrow> bool spmf" where
       }
   )
 "
+
+subsection \<open>Properties of bernoulli_exp_minus_rat\<close>
 
 lemma bernoulli_exp_minus_rat_from_0_to_1_loop_fixp_induct [case_names adm bottom step]:
   assumes "spmf.admissible (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop. P (curry bernoulli_exp_minus_rat_from_0_to_1_loop))"

@@ -57,7 +57,6 @@ proof -
     by (simp add: assms(3) fact_mono frac_le)
 qed
 
-(* these two lemma  for lemma spmf_bernoulli_exp_minus_real_from_0_to_1*)
 lemma summable_2i_2i_plus_1:
   fixes p:: real
   assumes "0\<le>p" and "p\<le>1"
