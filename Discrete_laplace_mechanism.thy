@@ -186,12 +186,6 @@ definition discrete_laplace_mechanism_Z2k_unit :: "('a list \<Rightarrow> double
 definition power_2 :: "int \<Rightarrow> real" where
 "power_2 k = (if 0\<le>k then 2^(nat k) else 1/(2^(nat (-k))))"
 
-definition power_2_double :: "int \<Rightarrow> double" where 
-"power_2_double k = (if 0\<le>k then double_of_int (2^(nat k)) else 1 / double_of_int(2^nat(-k)))"
-
-definition x_mul_2k :: "int \<Rightarrow> int \<Rightarrow> double" where
-"x_mul_2k x k = (if 0\<le>k then double_of_int (x * 2^(nat k)) else double_of_int (x) /double_of_int (2^(nat(-k))))"
-
 definition discrete_laplace_mechanism_Z2k :: "('a list \<Rightarrow> double) \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> 'a list \<Rightarrow> real spmf" where
 "discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x = do {
   postprocess (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k) (\<lambda>ans. ans * power_2 k) x
@@ -207,17 +201,25 @@ definition discrete_laplace_mechanism_Z2k' :: "('a list \<Rightarrow> double) \<
 
 lift_definition double_of_real::"real \<Rightarrow> double" is "\<lambda>x. round RNE x" .
 
-definition postprocess_round_to_double :: "real \<Rightarrow> double" where
-"postprocess_round_to_double x = double_of_real x"
+definition round_to_double :: "real \<Rightarrow> double" where
+"round_to_double x = double_of_real x"
 
-definition discrete_laplace_mechanism_Z2k_to_double :: "('a list \<Rightarrow> double) \<Rightarrow> nat \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> double spmf" where
-"discrete_laplace_mechanism_Z2k_to_double f i x epsilon1 epsilon2 k = do {
-  ans::int \<leftarrow> discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon2 k;
-  return_spmf (postprocess_round_to_double (ans * power_2 k))
+definition discrete_laplace_mechanism_Z2k_to_double :: "('a list \<Rightarrow> double) \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> 'a list \<Rightarrow> double spmf" where
+"discrete_laplace_mechanism_Z2k_to_double f i epsilon1 epsilon2 k x = do {
+  postprocess (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k) round_to_double x
+}
+"
+
+definition discrete_laplace_mechanism_Z2k_to_double' :: "('a list \<Rightarrow> double) \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> 'a list \<Rightarrow> double spmf" where
+"discrete_laplace_mechanism_Z2k_to_double' f i epsilon1 epsilon2 k x = do {
+  ans::int \<leftarrow> discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x;
+  return_spmf (round_to_double (ans * power_2 k))
 }
 "
 
 subsubsection \<open>Properties of Component Functions\<close>
+
+text \<open>power_2\<close>
 
 lemma power_2_pos:
   assumes "0\<le>k"
@@ -235,6 +237,8 @@ lemma power_2_gt_zero:
 "0<power_2 k"
   unfolding power_2_def
   by simp
+
+text \<open>findUpperBoundMultipl2_2k\<close>
 
 lemma findUpperBoundMultiple_2k_ub:
   shows "valof x \<le> power_2 k * findUpperBoundMultiple_2k x k"
@@ -341,11 +345,14 @@ proof -
   finally show ?thesis by simp
 qed
 
+text \<open>x_div_2k\<close>
+
 lemma div_2k_power_2k:
   shows "x_div_2k (valof x) k * power_2 k = valof x"
   unfolding x_div_2k_def power_2_def
   by simp
 
+text \<open>findNearstMultiple_2k\<close>
 
 lemma findNearstMultiple_2k:
   fixes z::int
@@ -534,7 +541,7 @@ subsubsection \<open>pure-dp of discrete_laplace_mechanism_Z2k\<close>
 lemma lossless_discrete_laplace_mechanism_Z2k_unit:
   assumes "1\<le>epsilon1" and "1\<le>epsilon2"
 and "1\<le>i"
-shows "lossless_spmf (discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon2 k)"
+shows "lossless_spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x)"
   unfolding discrete_laplace_mechanism_Z2k_unit_def
   using lossless_discrete_laplace_rat assms
   by simp
@@ -542,26 +549,29 @@ shows "lossless_spmf (discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon
 lemma lossless_discrete_laplace_mechanism_Z2k:
   assumes "1\<le>epsilon1" and "1\<le>epsilon2"
 and "1\<le>i"
-shows "lossless_spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k)"
-  unfolding discrete_laplace_mechanism_Z2k_def
+shows "lossless_spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x)"
+  unfolding discrete_laplace_mechanism_Z2k_def postprocess_def
   using lossless_discrete_laplace_mechanism_Z2k_unit assms
   by fastforce
 
 lemma spmf_discrete_laplace_mechanism_Z2k_unit:
   assumes "1\<le>epsilon1" and "1\<le>epsilon2"
 and "1\<le>i"
-  shows "spmf (discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon2 k) z 
+  shows "spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x) z 
        = (exp(epsilon1/(epsilon2*i))-1) * exp (-(epsilon1*\<bar>z-(findNearstMultiple_2k (f x) k)\<bar>/(epsilon2*i)))/(exp (epsilon1/(epsilon2*i))+1)"
 proof - 
-  have "spmf (discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon2 k) z  = spmf (discrete_laplace_rat (epsilon2 * i) epsilon1 \<bind> (\<lambda>noise. return_spmf (noise + findNearstMultiple_2k (f x) k))) z "
+  have "spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x) z  
+      = spmf (discrete_laplace_rat (epsilon2 * i) epsilon1 \<bind> (\<lambda>noise. return_spmf (noise + findNearstMultiple_2k (f x) k))) z "
     unfolding discrete_laplace_mechanism_Z2k_unit_def by simp
   also have "... = spmf (map_spmf (\<lambda>noise. noise + findNearstMultiple_2k (f x) k) (discrete_laplace_rat (epsilon2 * i) epsilon1)) z"
     by(simp add: map_spmf_conv_bind_spmf)
-  finally have 1:"spmf (discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon2 k) z = spmf (map_spmf (\<lambda>noise. noise + findNearstMultiple_2k (f x) k) (discrete_laplace_rat (epsilon2 * i) epsilon1)) z"
+  finally have 1:"spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x) z 
+                = spmf (map_spmf (\<lambda>noise. noise + findNearstMultiple_2k (f x) k) (discrete_laplace_rat (epsilon2 * i) epsilon1)) z"
     by simp
   have "(\<lambda>noise. noise + findNearstMultiple_2k (f x) k) -` {z} = {z - findNearstMultiple_2k (f x) k}"
     by auto
-  then have 2:"spmf (map_spmf (\<lambda>noise. noise + findNearstMultiple_2k (f x) k) (discrete_laplace_rat (epsilon2 * i) epsilon1)) z = spmf (discrete_laplace_rat (epsilon2 * i) epsilon1) (z-findNearstMultiple_2k (f x) k)"  
+  then have 2:"spmf (map_spmf (\<lambda>noise. noise + findNearstMultiple_2k (f x) k) (discrete_laplace_rat (epsilon2 * i) epsilon1)) z 
+             = spmf (discrete_laplace_rat (epsilon2 * i) epsilon1) (z-findNearstMultiple_2k (f x) k)" 
     apply(simp add: spmf_map)
     by(simp add: spmf_conv_measure_spmf)    
   have 3:"... = (exp (epsilon1 /(epsilon2*i))-1) * exp (-(epsilon1*\<bar>z-findNearstMultiple_2k (f x) k\<bar>/(epsilon2*i)))/(exp (epsilon1/(epsilon2*i))+1)"
@@ -570,6 +580,8 @@ proof -
   show ?thesis
     using 1 2 3 by simp
 qed
+
+lemma 
 
 lemma spmf_discrete_laplace_mechanism_Z2k_in_Z2k:
   fixes z::real and n::int
