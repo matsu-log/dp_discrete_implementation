@@ -2,6 +2,7 @@ section \<open>Differential Privacy\<close>
 
 theory Differential_Privacy
   imports "HOL-Probability.Probability"
+          "IEEE_Floating_Point.Double"
 begin
 
 subsection \<open>Auxiliary Lemmas for pointwise_spmf_bound_imp_pure_dp\<close>
@@ -103,12 +104,6 @@ lemma suminf_emeasure_spmf_int_family:
 "(\<Sum>i::nat. emeasure (measure_spmf p) (int_family i)) = emeasure (measure_spmf p) (\<Union> (range int_family))"
   apply(rule suminf_emeasure,simp)
   using disjoint_family_int_family by simp
-  
-lemma 
-  fixes p::"'a spmf"
-  shows "countable {x. spmf p x\<noteq>0}"
-  using spmf_conv_measure_spmf[of "p"] measure_spmf.countable_support[of "p"]
-  by simp
 
 definition int_family_set:: "int set \<Rightarrow> nat \<Rightarrow>int set" where 
 "int_family_set A n = (if int_family n \<subseteq> A then int_family n else {})"

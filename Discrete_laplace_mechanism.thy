@@ -154,7 +154,7 @@ subsection \<open>granularity:multiples of 2^k\<close>
   query returns floating-point value (that is rounded to the nearst multiples of 2^k)
   noise from discrete laplace on (2^k * \<int>)
   f: query 
-  \<Delta> is sensitivity of f 
+  i: 2^k*i is sensitivity of f 
   x: dataset
   epsilon = epsilon1/epsilon2 (1\<le>epsilon1,epsilon2)
   k: noise granularity in terms of 2^k
@@ -216,6 +216,20 @@ definition discrete_laplace_mechanism_Z2k_to_double' :: "('a list \<Rightarrow> 
   return_spmf (round_to_double (ans * power_2 k))
 }
 "
+
+subsubsection \<open>sensitivity for Z2k\<close>
+
+definition is_sensitivity_Z2k :: "('a, double) query \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> bool" where
+"is_sensitivity_Z2k q i k 
+= (\<forall>l1 l2. neighbour l1 l2 \<longrightarrow> \<bar>findNearstMultiple_2k (q l1) k - findNearstMultiple_2k (q l2) k\<bar> \<le> i)"
+
+lemma sensitivity_Z2k:
+  assumes "is_sensitivity_Z2k q i k"
+and "neighbour l1 l2"
+shows "\<bar>findNearstMultiple_2k (q l1) k - findNearstMultiple_2k (q l2) k\<bar> \<le> i"
+  using assms
+  unfolding is_sensitivity_Z2k_def
+  by simp
 
 subsubsection \<open>Properties of Component Functions\<close>
 
@@ -359,7 +373,7 @@ lemma findNearstMultiple_2k:
   shows "\<bar>valof x - power_2 k * findNearstMultiple_2k x k\<bar> \<le> \<bar>valof x - power_2 k * z\<bar>"
   unfolding findNearstMultiple_2k_def Let_def
 proof(auto)
-  assume H:"2 * real_of_int (findUpperBoundMultiple_2k x k) \<le> 2 * x_div_2k (Discrete_laplace_mechanism.valof x) k + 1"
+  assume H:"2 * real_of_int (findUpperBoundMultiple_2k x k) \<le> 2 * x_div_2k (valof x) k + 1"
   show "\<bar>valof x - power_2 k * real_of_int (findUpperBoundMultiple_2k x k)\<bar>
        \<le> \<bar>valof x - power_2 k * z\<bar>"
   proof(cases "findUpperBoundMultiple_2k x k \<le>z")
@@ -581,7 +595,110 @@ proof -
     using 1 2 3 by simp
 qed
 
-lemma 
+lemma pointwise_pure_dp_inequality_discrete_laplace_mechanism_Z2k_unit:
+  assumes "is_sensitivity_Z2k f i k"
+and "neighbour x y"
+and "1\<le>epsilon1"
+and "1\<le>epsilon2"
+and "1\<le>i"
+shows "\<And>z. spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x) z \<le> exp(epsilon1/epsilon2) * spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k y) z "
+proof -
+  fix z::int
+  have 1:"spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x) z = (exp(epsilon1/(epsilon2*i))-1) * exp (-(epsilon1*\<bar>z-(findNearstMultiple_2k (f x) k)\<bar>/(epsilon2*i)))/(exp (epsilon1/(epsilon2*i))+1)"
+    using spmf_discrete_laplace_mechanism_Z2k_unit[of "epsilon1" "epsilon2" "i" "f" "k" "x"] assms
+    by simp
+  have 2:"spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k y) z = (exp(epsilon1/(epsilon2*i))-1) * exp (-(epsilon1*\<bar>z-(findNearstMultiple_2k (f y) k)\<bar>/(epsilon2*i)))/(exp (epsilon1/(epsilon2*i))+1)"
+    using spmf_discrete_laplace_mechanism_Z2k_unit[of "epsilon1" "epsilon2" "i" "f" "k" "y"] assms
+    by simp
+  have 3:"spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x) z/spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k y) z
+        = exp (-(epsilon1*\<bar>z-(findNearstMultiple_2k (f x) k)\<bar>/(epsilon2*i)))/exp (-(epsilon1*\<bar>z-(findNearstMultiple_2k (f y) k)\<bar>/(epsilon2*i)))"
+    using assms
+  proof(rewrite 1, rewrite 2,auto)
+    have "exp (real epsilon1 / (real epsilon2 * real i)) + 1 > 1"
+      using exp_gt_zero[of "epsilon1/(epsilon2 * i)"]
+      by simp
+    then show "exp (real epsilon1 / (real epsilon2 * real i)) + 1 = 0 \<Longrightarrow> False"
+      by simp
+  qed
+  also have "... = exp(-(epsilon1*\<bar>z-(findNearstMultiple_2k (f x) k)\<bar>/(epsilon2*i))-(-(epsilon1*\<bar>z-(findNearstMultiple_2k (f y) k)\<bar>/(epsilon2*i))))"
+    using exp_diff[of"-(epsilon1*\<bar>z-(findNearstMultiple_2k (f x) k)\<bar>/(epsilon2*i))" "-(epsilon1*\<bar>z-(findNearstMultiple_2k (f y) k)\<bar>/(epsilon2*i))"]
+    by argo
+  also have "... = exp ((epsilon1*\<bar>z-(findNearstMultiple_2k (f y) k)\<bar>-epsilon1*\<bar>z-(findNearstMultiple_2k (f x) k)\<bar>)/(epsilon2*i))"
+    using diff_divide_distrib[of "-epsilon1*\<bar>z-(findNearstMultiple_2k (f x) k)\<bar>" "-epsilon1*\<bar>z-(findNearstMultiple_2k (f y) k)\<bar>" "(epsilon2*i)"]
+    by simp
+  also have "... = exp ((epsilon1*(\<bar>z-(findNearstMultiple_2k (f y) k)\<bar>-\<bar>z-(findNearstMultiple_2k (f x) k)\<bar>))/(epsilon2*i))"
+    using int_distrib(4) by presburger
+  also have "... \<le> exp((epsilon1*\<bar>(findNearstMultiple_2k (f x) k) - (findNearstMultiple_2k (f y) k)\<bar>)/(epsilon2*i))"
+  proof 
+    have "\<bar>z-(findNearstMultiple_2k (f y) k)\<bar>-\<bar>z-(findNearstMultiple_2k (f x) k)\<bar> \<le> \<bar>(findNearstMultiple_2k (f x) k) - (findNearstMultiple_2k (f y) k)\<bar>"
+      by simp
+    then have 1:"epsilon1 * (\<bar>z-(findNearstMultiple_2k (f y) k)\<bar>-\<bar>z-(findNearstMultiple_2k (f x) k)\<bar>) \<le> epsilon1 * \<bar>(findNearstMultiple_2k (f x) k) - (findNearstMultiple_2k (f y) k)\<bar>"
+      using assms by simp
+    have 2:"0\<le> epsilon2 * i"
+      using assms by simp
+    show "(epsilon1 * (\<bar>z - findNearstMultiple_2k (f y) k\<bar> - \<bar>z - findNearstMultiple_2k (f x) k\<bar>))/(epsilon2 * i)
+       \<le> (epsilon1 * \<bar>findNearstMultiple_2k (f x) k - findNearstMultiple_2k (f y) k\<bar>)/(epsilon2 * i)"
+      using 1 2 divide_right_mono[of "epsilon1*(\<bar>z-(findNearstMultiple_2k (f y) k)\<bar>-\<bar>z-(findNearstMultiple_2k (f x) k)\<bar>)" "epsilon1*\<bar>(findNearstMultiple_2k (f x) k) - (findNearstMultiple_2k (f y) k)\<bar>" "(epsilon2*i)"]
+      by linarith
+  qed
+  also have "... \<le> exp((epsilon1*i)/(epsilon2*i))"
+  proof
+    have 1:"epsilon1 * \<bar>findNearstMultiple_2k (f x) k - findNearstMultiple_2k (f y) k\<bar> \<le> epsilon1 * i"
+      using assms sensitivity_Z2k[of "f" "i" "k" "x" "y"] by simp
+    have 2:"0 \<le> epsilon2 * i"
+      using assms by simp
+    show "epsilon1 * \<bar>findNearstMultiple_2k (f x) k - findNearstMultiple_2k (f y) k\<bar>/(epsilon2 * i) \<le> (epsilon1 * i)/(epsilon2 * i)"
+      using 1 2 divide_right_mono[of "epsilon1 * \<bar>findNearstMultiple_2k (f x) k - findNearstMultiple_2k (f y) k\<bar>" "epsilon1 * i" "epsilon2*i"]
+      by linarith
+  qed
+  also have "... = exp(epsilon1/epsilon2)"
+    using assms by simp
+  finally have p:"spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x) z / spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k y) z \<le> exp (epsilon1/epsilon2)"
+    by simp
+  show "spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x) z \<le> exp (epsilon1/epsilon2) * spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k y) z"
+  proof -
+    have "spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x) z  = spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x) z * spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k y) z/spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k y) z"
+    proof -
+      have "spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k y) z/spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k y) z = 1"
+        using divide_self[of "spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k y) z "] 3
+        by(auto)
+      then show ?thesis by auto
+    qed
+    also have "... = spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x) z/spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k y) z * spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k y) z"
+      by simp
+    also have "... \<le> exp (epsilon1/epsilon2) * spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k y) z "
+      apply(rewrite mult_right_mono)
+      using p by simp_all
+    finally show ?thesis by simp
+  qed
+qed
+
+lemma pure_dp_discrete_laplace_mechanism_Z2k_unit:
+  assumes "is_sensitivity_Z2k f i k"
+and "1\<le>epsilon1" and "1\<le>epsilon2"
+and "1\<le>i"
+shows "pure_dp (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k) (epsilon1/epsilon2)"
+  using pointwise_spmf_bound_imp_pure_dp 
+        pointwise_pure_dp_inequality_discrete_laplace_mechanism_Z2k_unit assms
+  by blast
+
+lemma pure_dp_discrete_laplace_mechanism_Z2k:
+  assumes "is_sensitivity_Z2k f i k"
+and "1\<le>epsilon1" and "1\<le>epsilon2"
+and "1\<le>i"
+shows "pure_dp (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k) (epsilon1/epsilon2)"
+  unfolding discrete_laplace_mechanism_Z2k_def 
+  using pure_dp_discrete_laplace_mechanism_Z2k_unit dp_postprocess_theorem assms
+  by blast
+
+lemma pure_dp_discrete_laplace_mechanism_Z2k_to_double:
+  assumes "is_sensitivity_Z2k f i k"
+and "1\<le>epsilon1" and "1\<le>epsilon2"
+and "1\<le>i"
+shows "pure_dp (discrete_laplace_mechanism_Z2k_to_double f i epsilon1 epsilon2 k) (epsilon1/epsilon2)"
+  unfolding discrete_laplace_mechanism_Z2k_to_double_def 
+  using pure_dp_discrete_laplace_mechanism_Z2k dp_postprocess_theorem assms
+  by blast
 
 lemma spmf_discrete_laplace_mechanism_Z2k_in_Z2k:
   fixes z::real and n::int
@@ -645,9 +762,6 @@ proof -
   show ?thesis
     using 1 2 by simp
 qed
-
-thm weight_spmf_def
-thm plus_emeasure
 
 lemma plus_measure_spmf:
   assumes "A \<union> B = C" and "A \<inter> B = empty"
@@ -901,125 +1015,5 @@ proof -
   show ?thesis
     sorry
 qed
-
-
-
-
-
-
-
-lemma pure_dp_discrete_laplace_mechanism_Z2k:
-  fixes f::"'a list \<Rightarrow> double"
-and i::nat
-and x:: "'a list"
-and epsilon1 epsilon2::nat
-and k:: int
-  assumes sensitivity:"\<bar>findNearstMultiple_2k (f x) k - findNearstMultiple_2k (f y) k\<bar>\<le> i"
-and scale1:"1\<le> epsilon1" and scale2:"1\<le> epsilon2"
-and i:"1\<le>i" and delta: "\<Delta> = power_2 k * i"
-shows "\<And>z. spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) z \<le> exp (epsilon1/epsilon2) * spmf (discrete_laplace_mechanism_Z2k f i y epsilon1 epsilon2 k) z"
-proof -
-  fix z:: real
-  show "spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) z \<le> exp (epsilon1/epsilon2) * spmf (discrete_laplace_mechanism_Z2k f i y epsilon1 epsilon2 k) z"
-  proof(cases "z\<in>{d. \<exists>n::int. d = power_2 k * n}")
-    case True
-    then show ?thesis
-    proof -
-      have z:"z = power_2 k * real_of_int (THE n. z=power_2 k * n)"
-        using True power_2_gt_zero[of "k"]
-        by(auto)
-      have 1:"spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) z = (exp (epsilon1 / (epsilon2 * i)) - 1) * exp (- ((epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f x) k\<bar>) / (epsilon2 * \<Delta>)))/(exp (epsilon1 / (epsilon2 * i)) + 1)"
-        apply(rewrite spmf_discrete_laplace_mechanism_Z2k_in_Z2k[of"epsilon1" "epsilon2" "i" "\<Delta>" "k" "z" "(THE n. z=power_2 k * n)"])
-        using assms z by(simp_all)
-      have 2:"spmf (discrete_laplace_mechanism_Z2k f i y epsilon1 epsilon2 k) z = (exp (epsilon1 / (epsilon2 * i)) - 1) * exp (- ((epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f y) k\<bar>) / (epsilon2 * \<Delta>)))/(exp (epsilon1 / (epsilon2 * i)) + 1)"
-        apply(rewrite spmf_discrete_laplace_mechanism_Z2k_in_Z2k[of"epsilon1" "epsilon2" "i" "\<Delta>" "k" "z" "(THE n. z=power_2 k * n)"])
-        using assms z by(simp_all)
-      have 3:"spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) z/ spmf (discrete_laplace_mechanism_Z2k f i y epsilon1 epsilon2 k) z 
-            = exp (- ((epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f x) k\<bar>) / (epsilon2 * \<Delta>)))/exp (- ((epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f y) k\<bar>) / (epsilon2 * \<Delta>)))"
-        apply(rewrite 1)
-        apply(rewrite 2)
-        apply(auto)
-        using assms apply(simp_all)
-      proof -
-        have "exp (real epsilon1 / (real epsilon2 * real i)) + 1 > 0"
-          using exp_gt_zero add_pos_pos zero_less_one
-          by blast
-        then show "exp (real epsilon1 / (real epsilon2 * real i)) + 1 = 0 \<Longrightarrow> False"
-          by simp
-      qed
-      also have "... =  exp (- ((epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f x) k\<bar>) / (epsilon2 * \<Delta>))- (- ((epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f y) k\<bar>) / (epsilon2 * \<Delta>))))"
-        using exp_diff[of"- ((epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f x) k\<bar>) / (epsilon2 * \<Delta>))" "- ((epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f y) k\<bar>) / (epsilon2 * \<Delta>))"]
-        by simp
-      also have "... = exp ((epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f y) k\<bar>- epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f x) k\<bar>) / (epsilon2 * \<Delta>))"
-        using diff_divide_distrib[of "- (epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f x) k\<bar>)" "-(epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f y) k\<bar>)" "(epsilon2*\<Delta>)"]
-        by simp
-      also have "... = exp(epsilon1 * (\<bar>z - power_2 k * findNearstMultiple_2k (f y) k\<bar> - \<bar>z - power_2 k * findNearstMultiple_2k (f x) k\<bar>)/(epsilon2*\<Delta>))"
-        by argo
-      also have "... \<le> exp((epsilon1 * \<bar>power_2 k * findNearstMultiple_2k (f x) k - power_2 k * findNearstMultiple_2k (f y) k\<bar>)/(epsilon2*\<Delta>))"
-      proof 
-        have "\<bar>z - power_2 k * findNearstMultiple_2k (f y) k\<bar> - \<bar>z - power_2 k * findNearstMultiple_2k (f x) k\<bar> \<le> \<bar>power_2 k * findNearstMultiple_2k (f x) k - power_2 k * findNearstMultiple_2k (f y) k\<bar>"
-          by simp
-        then have 1:"epsilon1 * (\<bar>z - power_2 k * findNearstMultiple_2k (f y) k\<bar> - \<bar>z - power_2 k * findNearstMultiple_2k (f x) k\<bar>) \<le> epsilon1 * \<bar>power_2 k * findNearstMultiple_2k (f x) k - power_2 k * findNearstMultiple_2k (f y) k\<bar>"
-          using scale1 by simp
-        have 2:"0\<le> epsilon2 * \<Delta>"
-          using scale2 delta sensitivity power_2_gt_zero[of"k"] by simp
-        show "real epsilon1 * (\<bar>z - power_2 k * real_of_int (findNearstMultiple_2k (f y) k)\<bar> - \<bar>z - power_2 k * real_of_int (findNearstMultiple_2k (f x) k)\<bar>) / (real epsilon2 * \<Delta>)
-    \<le> real epsilon1 * \<bar>power_2 k * real_of_int (findNearstMultiple_2k (f x) k) - power_2 k * real_of_int (findNearstMultiple_2k (f y) k)\<bar> / (real epsilon2 * \<Delta>)"
-          using 1 2 divide_right_mono[of "epsilon1 * (\<bar>z - power_2 k * findNearstMultiple_2k (f y) k\<bar> - \<bar>z - power_2 k * findNearstMultiple_2k (f x) k\<bar>)" "epsilon1 * \<bar>power_2 k * findNearstMultiple_2k (f x) k - power_2 k * findNearstMultiple_2k (f y) k\<bar>" "(epsilon2*\<Delta>)"]
-          by linarith
-      qed
-      also have "... \<le> exp((epsilon1*\<Delta>)/(epsilon2*\<Delta>))"
-      proof 
-        have 1:"epsilon1 * \<bar>power_2 k * findNearstMultiple_2k (f x) k - power_2 k * findNearstMultiple_2k (f y) k\<bar> \<le> epsilon1*\<Delta>"
-        proof -
-          have "\<bar>power_2 k * findNearstMultiple_2k (f x) k - power_2 k * findNearstMultiple_2k (f y) k\<bar> = \<bar>power_2 k * (findNearstMultiple_2k (f x) k- findNearstMultiple_2k (f y) k)\<bar>"
-            using right_diff_distrib[of "power_2 k" "(findNearstMultiple_2k (f x) k)" "(findNearstMultiple_2k (f y) k)"]
-            by simp
-          also have "... = power_2 k * \<bar>findNearstMultiple_2k (f x) k- findNearstMultiple_2k (f y) k\<bar>"
-            using abs_mult_pos'[of "power_2 k" "findNearstMultiple_2k (f x) k- findNearstMultiple_2k (f y) k"] power_2_gt_zero[of "k"]
-            by simp
-          also have "... \<le> \<Delta>"
-            using sensitivity delta power_2_gt_zero[of"k"]
-            by(simp)
-          finally have "\<bar>power_2 k * real_of_int (findNearstMultiple_2k (f x) k) - power_2 k * real_of_int (findNearstMultiple_2k (f y) k)\<bar> \<le> \<Delta> " by simp
-          then show ?thesis 
-            using scale1 by simp
-        qed
-        have 2:"0 \<le> epsilon2*\<Delta>"
-          using assms power_2_gt_zero[of"k"] by simp     
-        show "real epsilon1 * \<bar>power_2 k * real_of_int (findNearstMultiple_2k (f x) k) - power_2 k * real_of_int (findNearstMultiple_2k (f y) k)\<bar> / (real epsilon2 * \<Delta>)
-    \<le> real epsilon1 * \<Delta> / (real epsilon2 * \<Delta>)"
-          using 1 2 divide_right_mono by blast
-      qed
-      also have "... = exp(epsilon1/epsilon2)"
-        using assms power_2_gt_zero[of"k"] by simp 
-      finally have p:"spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) z/ spmf (discrete_laplace_mechanism_Z2k f i y epsilon1 epsilon2 k) z \<le> exp (epsilon1/epsilon2)"
-        by simp
-      show ?thesis
-      proof -
-        have "spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) z = spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) z * spmf (discrete_laplace_mechanism_Z2k f i y epsilon1 epsilon2 k) z/ spmf (discrete_laplace_mechanism_Z2k f i y epsilon1 epsilon2 k) z"
-        proof -
-          have "spmf (discrete_laplace_mechanism_Z2k f i y epsilon1 epsilon2 k) z/spmf (discrete_laplace_mechanism_Z2k f i y epsilon1 epsilon2 k) z = 1"
-            using divide_self[of"spmf (discrete_laplace_mechanism_Z2k f i y epsilon1 epsilon2 k) z"]
-            apply(simp)
-            using 3 by auto
-          then show ?thesis by auto
-        qed
-        also have "... = spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) z/spmf (discrete_laplace_mechanism_Z2k f i y epsilon1 epsilon2 k) z * spmf (discrete_laplace_mechanism_Z2k f i y epsilon1 epsilon2 k) z"
-          by simp
-        also have "... \<le> exp (epsilon1/epsilon2) * spmf (discrete_laplace_mechanism_Z2k f i y epsilon1 epsilon2 k) z"
-          apply(rewrite mult_right_mono)
-          using p by (simp_all)
-        finally show ?thesis by simp
-      qed
-    qed
-  next
-    case False
-    then show ?thesis 
-    apply(rewrite spmf_discrete_laplace_mechanism_Z2k_out_Z2k)
-      using assms False by(simp_all)
-  qed
-qed
-
 
 end
