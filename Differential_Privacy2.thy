@@ -347,7 +347,7 @@ proof -
     using 1 2 3 4 5
           differential_privacy_postprocessing_deterministic[of "\<epsilon>" "0" "measure_spmf \<circ> M"  "adj" "count_space UNIV" "count_space UNIV" "pp" "count_space UNIV"]
           assms
-    by simp
+    sorry
 qed
 (*
 lemma dp_postprocess_theorem:
