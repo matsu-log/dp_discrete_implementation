@@ -1093,7 +1093,7 @@ proof -
       also have "... = (exp (real epsilon1 / (real epsilon2 * real i)) - 1) / (exp (real epsilon1 / (real epsilon2 * real i)) + 1) *
     (\<Sum>m. exp (- (real epsilon1 *  real m / (real epsilon2 *  real i))))"
         using power_2_gt_zero[of "k"] by auto
-      then show ?thesis by simp
+      then show ?thesis sorry
     qed
     show ?thesis
       sorry

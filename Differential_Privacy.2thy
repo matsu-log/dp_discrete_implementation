@@ -1,6 +1,6 @@
 section \<open>Differential Privacy\<close>
 
-theory Differential_Privacy
+theory Differential_Privacy2
   imports "HOL-Probability.Probability"
           "IEEE_Floating_Point.Double"
           "formalization.Differential_Privacy_Standard"

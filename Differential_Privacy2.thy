@@ -101,6 +101,9 @@ proof
   qed
 qed
 
+thm suminf_emeasure
+find_theorems "disjoint_family "
+
 lemma suminf_emeasure_spmf_int_family:
 "(\<Sum>i::nat. emeasure (measure_spmf p) (int_family i)) = emeasure (measure_spmf p) (\<Union> (range int_family))"
   apply(rule suminf_emeasure,simp)
@@ -221,6 +224,83 @@ proof -
     by (simp add: enn2real_leI ennreal_mult')
 qed
 
+definition nat_family:: "nat set \<Rightarrow> nat \<Rightarrow> nat set" where
+"nat_family A n = (if n\<in>A then {n} else {})"
+
+lemma disjoint_family_nat_family:
+"disjoint_family (nat_family A)"
+  unfolding nat_family_def
+  unfolding disjoint_family_on_def
+  by simp
+
+lemma nat_family_union:
+"\<Union> (range (nat_family A)) = A"
+proof
+  show "\<Union> (range (nat_family A)) \<subseteq> A"
+    unfolding nat_family_def
+    by auto
+  show "A \<subseteq> \<Union> (range (nat_family A))"
+    unfolding nat_family_def
+    by auto
+qed
+
+lemma suminf_emeasure_spmf_nat_family:
+"(\<Sum>i::nat. emeasure (measure_spmf p) (nat_family A i)) = emeasure (measure_spmf p) A"
+proof -
+  have "(\<Sum>i::nat. emeasure (measure_spmf p) (nat_family A i)) = emeasure (measure_spmf p) (\<Union> (range (nat_family A)))"
+  apply(rule suminf_emeasure,simp)
+    using disjoint_family_nat_family by simp
+  also have "... = emeasure (measure_spmf p) A"
+    using nat_family_union by simp
+  finally show ?thesis by simp
+qed
+
+lemma emeasure_spmf_bound_nat:
+  fixes A::"nat set"
+  assumes "\<And>z. spmf p z \<le> c * spmf q z"
+and "0<c"
+  shows "emeasure (measure_spmf p) A \<le> c * emeasure (measure_spmf q) A"
+proof -
+  have 1:"emeasure (measure_spmf p) A = (\<Sum>i::nat. emeasure (measure_spmf p) (nat_family A i))"
+    using suminf_emeasure_spmf_nat_family
+    by simp
+  have 2:"emeasure (measure_spmf q) A = (\<Sum>i::nat. emeasure (measure_spmf q) (nat_family A i))"
+    using suminf_emeasure_spmf_nat_family
+    by simp
+  have 3:"(\<Sum>i::nat. emeasure (measure_spmf p) (nat_family A i)) \<le>  (\<Sum>i::nat. c *  emeasure (measure_spmf q) (nat_family A i))"
+    apply(rewrite suminf_le,auto)
+    unfolding nat_family_def 
+  proof -
+    fix n::nat
+    show "emeasure (measure_spmf p) (if n \<in> A then {n} else {}) \<le> ennreal c * emeasure (measure_spmf q) (if n \<in> A then {n} else {})"
+      apply(simp)
+      apply(rewrite emeasure_spmf_single, rewrite emeasure_spmf_single)
+      apply(auto)
+      using assms(1)[of "n"] assms(2) ennreal_mult'[of "c" "spmf q n"] ennreal_leI
+      by fastforce
+  qed
+  show ?thesis
+    using 1 2 3 by auto
+qed
+
+lemma measure_spmf_bound_nat: 
+  fixes p q:: "nat spmf"
+  assumes "\<And>z. spmf p z \<le> c * spmf q z"
+and "0<c"
+  shows "measure (measure_spmf p) A \<le> c * measure (measure_spmf q) A"
+proof - 
+  have 1:"emeasure (measure_spmf p) A  \<le>  c * emeasure (measure_spmf q) A"
+    using emeasure_spmf_bound_nat assms by simp
+  have 2:"emeasure (measure_spmf q) A < \<top>"
+    using measure_spmf.emeasure_finite[of "q" "A"] less_top 
+    by blast
+  then show ?thesis 
+    unfolding measure_def
+    using 1 2 assms
+    by (simp add: enn2real_leI ennreal_mult')
+qed
+
+
 subsection \<open>Define pure_dp\<close>
 
 paragraph \<open>type_synonym for query, mechanism.\<close>
@@ -304,67 +384,39 @@ proof(rule pure_dp_inequality_imp_pure_dp,clarify)
       by simp
   qed
 qed
-                                             
-thm differential_privacy_postprocessing_deterministic[of "\<epsilon>" "0" "measure_spmf \<circ> M"  "adj" _ _ "f"]
 
-lemma dp_postprocess_theorem:
-  assumes "pure_dp M \<epsilon>"
-  shows "pure_dp (postprocess M pp) \<epsilon>"
-  unfolding pure_dp_def postprocess_def
-proof -
-  have 1:"differential_privacy (measure_spmf \<circ> M) adj \<epsilon> 0"
-    using assms 
-    unfolding pure_dp_def by simp
-  have 2:"measure_spmf \<circ> M \<in> count_space UNIV \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
-  proof -
-    have 1:"\<And>x. x \<in> space (count_space UNIV) \<Longrightarrow> prob_space ((measure_spmf \<circ> M) x)"
-      unfolding o_def measure_spmf_def
-    proof -
-      fix x
-      have 1:"prob_space (restrict_space (measure_pmf (M x)) (range Some))"
-        sorry
-        find_theorems "prob_space (restrict_space _ _)"
-      show "prob_space (distr (restrict_space (measure_pmf (M x)) (range Some)) (count_space UNIV) the)"
-        using prob_space.prob_space_distr[of "(restrict_space (measure_pmf (M x)) (range Some))" "the" "count_space UNIV"]
-        sorry
-    qed
-    have 2:"measure_spmf \<circ> M \<in> count_space UNIV \<rightarrow>\<^sub>M subprob_algebra (count_space UNIV)"
-      unfolding o_def using measurable_measure_spmf
-      by simp
-    show ?thesis
-      using measurable_prob_algebraI[of "count_space UNIV" "measure_spmf \<circ> M" "count_space UNIV"]
-            1 2
+lemma pointwise_spmf_bound_imp_pure_dp_nat:
+  fixes M::"('a, nat) mechanism"
+  assumes "\<And>z l1 l2. (l1, l2)\<in>adj \<Longrightarrow> spmf (M l1)z \<le> exp (\<epsilon>) * spmf (M l2)z"
+shows "pure_dp M \<epsilon>"
+proof(rule pure_dp_inequality_imp_pure_dp,clarify)
+  fix h1 h2:: "'a list"
+  assume adj:"(h1, h2)\<in> adj"
+  show "pure_dp_inequality (M h1) (M h2) \<epsilon>"
+    unfolding pure_dp_inequality_def DP_inequality_def
+  proof
+    fix A::"nat set"
+    show "Sigma_Algebra.measure (measure_spmf (M h1)) A \<le> exp \<epsilon> * Sigma_Algebra.measure (measure_spmf (M h2)) A+0"
+      using measure_spmf_bound_nat[of "M h1" "exp(\<epsilon>)" "M h2"] assms[of "h1" "h2"] exp_gt_zero adj
       by simp
   qed
-  have 3:"pp \<in> count_space UNIV \<rightarrow>\<^sub>M count_space UNIV"
-    sorry
-  have 4:"adj \<subseteq> space (count_space UNIV) \<times> space (count_space UNIV)"
-    sorry
-  have 5:"(\<lambda>x. (measure_spmf \<circ> M) x \<bind> (\<lambda>y. return (count_space UNIV) (pp y))) = measure_spmf \<circ> (\<lambda>l. M l \<bind> (\<lambda>A. return_spmf (pp A)))"
-    unfolding o_def
-    sorry
-  show "differential_privacy (measure_spmf \<circ> (\<lambda>l. M l \<bind> (\<lambda>A. return_spmf (pp A)))) adj \<epsilon> 0 "
-    using 1 2 3 4 5
-          differential_privacy_postprocessing_deterministic[of "\<epsilon>" "0" "measure_spmf \<circ> M"  "adj" "count_space UNIV" "count_space UNIV" "pp" "count_space UNIV"]
-          assms
-    sorry
 qed
-(*
+                                             
 lemma dp_postprocess_theorem:
   assumes "pure_dp M \<epsilon>"
   shows "pure_dp (postprocess M pp) \<epsilon>"
   unfolding pure_dp_def
   apply(rewrite differential_privacy_adj_sym, simp add: adj_sym) 
-  unfolding DP_inequality_def
 proof (rule+,auto)
-  find_theorems "DP_inequality"
   fix l1 l2:: "'a list" 
   assume adj:"(l1, l2) \<in> adj"
   have p:"DP_inequality (measure_spmf (M l1)) (measure_spmf (M l2)) \<epsilon> 0"
     using assms pure_dp_def[of "M" "\<epsilon>"] adj
-    by blast
-  show "DP_inequality (postprocess M pp l1) (postprocess M pp l2) \<epsilon> 0"
-    unfolding pure_dp_inequality_def postprocess_def 
+    unfolding o_def differential_privacy_def
+    by auto
+       
+  show "DP_inequality (measure_spmf (postprocess M pp l1)) (measure_spmf (postprocess M pp l2)) \<epsilon> 0"
+    unfolding DP_inequality_def postprocess_def 
   proof
     fix A
     have l1:"Sigma_Algebra.measure (measure_spmf (M l1 \<bind> (\<lambda>A. return_spmf (pp A)))) A 
@@ -376,15 +428,14 @@ proof (rule+,auto)
     have "measure (measure_spmf (map_spmf pp (M l1))) A \<le> exp \<epsilon> * measure (measure_spmf (map_spmf pp (M l2))) A"
       apply(rewrite measure_map_spmf)
       apply(rewrite measure_map_spmf)
-      using p unfolding pure_dp_inequality_def
+      using p unfolding DP_inequality_def
       by auto
-    then show "Sigma_Algebra.measure (measure_spmf (M l1 \<bind> (\<lambda>A. return_spmf (pp A)))) A
-         \<le> exp \<epsilon> * Sigma_Algebra.measure (measure_spmf (M l2 \<bind> (\<lambda>A. return_spmf (pp A)))) A"
+    then show "Sigma_Algebra.measure (measure_spmf (M l1 \<bind> (\<lambda>A. return_spmf (pp A)))) A 
+              \<le> exp \<epsilon> * Sigma_Algebra.measure (measure_spmf (M l2 \<bind> (\<lambda>A. return_spmf (pp A)))) A + 0"
       using l1 l2 by simp
   qed
 qed
  
-
-*)
+thm differential_privacy_postprocessing_deterministic[of "\<epsilon>" "0" "measure_spmf \<circ> M"  "adj" _ _ "f"]
 
 end
