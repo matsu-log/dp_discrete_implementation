@@ -2,7 +2,7 @@ section \<open>Discrete Laplace Mechanism\<close>
 
 theory Discrete_laplace_mechanism
   imports Discrete_laplace_rat
-          Differential_Privacy
+          Differential_Privacy2
           IEEE_Floating_Point.Double
 begin 
 
@@ -25,6 +25,14 @@ definition discrete_laplace_mechanism :: "('a list \<Rightarrow> int) \<Rightarr
        return_spmf (noise + f x)
     }"
 
+lemma lossless_discrete_laplace_mechanism:
+  assumes "1\<le>epsilon1" and "1\<le>epsilon2"
+and "1\<le> \<Delta>"
+shows "lossless_spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x)"
+  unfolding discrete_laplace_mechanism_def
+  using lossless_discrete_laplace_rat[of "epsilon2 * \<Delta>" "epsilon1"] assms
+  by simp
+  
 lemma spmf_discrete_laplace_mechanism:
   assumes "1\<le>epsilon1" and "1\<le>epsilon2"
 and "1\<le> \<Delta>"
@@ -51,7 +59,7 @@ qed
 
 lemma pointwise_pure_dp_inequality_discrete_laplace_mechanism:
   assumes "is_sensitivity f \<Delta>"
-and "neighbour x y"
+and "(x, y)\<in> adj"
 and "1\<le>epsilon1" and "1\<le>epsilon2"
 and "1\<le> \<Delta>"
 shows "\<And>z. spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z \<le> exp (epsilon1/epsilon2) * spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z"
@@ -221,15 +229,15 @@ subsubsection \<open>sensitivity for Z2k\<close>
 
 definition is_sensitivity_Z2k :: "('a, double) query \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> bool" where
 "is_sensitivity_Z2k q i k 
-= (\<forall>l1 l2. neighbour l1 l2 \<longrightarrow> \<bar>findNearstMultiple_2k (q l1) k - findNearstMultiple_2k (q l2) k\<bar> \<le> i)"
+= (\<forall>(l1, l2)\<in>adj. \<bar>findNearstMultiple_2k (q l1) k - findNearstMultiple_2k (q l2) k\<bar> \<le> i)"
 
 lemma sensitivity_Z2k:
   assumes "is_sensitivity_Z2k q i k"
-and "neighbour l1 l2"
+and "(l1, l2)\<in>adj"
 shows "\<bar>findNearstMultiple_2k (q l1) k - findNearstMultiple_2k (q l2) k\<bar> \<le> i"
   using assms
   unfolding is_sensitivity_Z2k_def
-  by simp
+  by auto
 
 subsubsection \<open>Properties of Component Functions\<close>
 
@@ -597,7 +605,7 @@ qed
 
 lemma pointwise_pure_dp_inequality_discrete_laplace_mechanism_Z2k_unit:
   assumes "is_sensitivity_Z2k f i k"
-and "neighbour x y"
+and "(x, y)\<in>adj"
 and "1\<le>epsilon1"
 and "1\<le>epsilon2"
 and "1\<le>i"
@@ -705,14 +713,14 @@ lemma spmf_discrete_laplace_mechanism_Z2k_in_Z2k:
   assumes scale1:"1\<le>epsilon1" and scale2:"1\<le>epsilon2"
 and seinsitivity:"1\<le>i" and delta:"\<Delta> = power_2 k * i"
 and z:"z = power_2 k * n"
-shows "spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) z 
+shows "spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) z 
       = (exp (epsilon1 / (epsilon2 * i)) - 1) * exp (- ((epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f x) k\<bar>) / (epsilon2 * \<Delta>)))/(exp (epsilon1 / (epsilon2 * i)) + 1)"
 proof -
-  have "spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) z = spmf (discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon2 k \<bind> (\<lambda>x. return_spmf (real_of_int x * power_2 k))) z"
-    unfolding discrete_laplace_mechanism_Z2k_def by simp
-  also have "... = spmf (map_spmf (\<lambda>x. real_of_int x * power_2 k) (discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon2 k )) z"
+  have "spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) z = spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x \<bind> (\<lambda>x. return_spmf (real_of_int x * power_2 k))) z"
+    unfolding discrete_laplace_mechanism_Z2k_def postprocess_def by simp
+  also have "... = spmf (map_spmf (\<lambda>x. real_of_int x * power_2 k) (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x)) z"
     by(simp add: map_spmf_conv_bind_spmf)
-  finally have 1:"spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) z = spmf (map_spmf (\<lambda>x. real_of_int x * power_2 k) (discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon2 k)) z"
+  finally have 1:"spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) z = spmf (map_spmf (\<lambda>x. real_of_int x * power_2 k) (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x)) z"
     by simp
   term "(\<lambda>x. real_of_int x * power_2 k) -` {z}"
   have "(\<lambda>x. real_of_int x * power_2 k) -` {z} = {n}"
@@ -720,7 +728,7 @@ proof -
     apply(rewrite z)
     unfolding power_2_def 
     by simp
-  then have "spmf (map_spmf (\<lambda>x. real_of_int x * power_2 k) (discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon2 k)) z = spmf (discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon2 k) n"
+  then have "spmf (map_spmf (\<lambda>x. real_of_int x * power_2 k) (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x)) z = spmf (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x) n"
     apply(rewrite spmf_map)
     by(simp add: spmf_conv_measure_spmf)
   also have "... = (exp (epsilon1 / (epsilon2 * i)) - 1) * exp (- ((epsilon1 * \<bar>n - findNearstMultiple_2k (f x) k\<bar>) / (epsilon2 * i)))/(exp (epsilon1 / (epsilon2 * i)) + 1)"
@@ -755,7 +763,7 @@ proof -
     then show ?thesis
       by auto
   qed
-  finally have 2:"spmf (map_spmf (\<lambda>x. real_of_int x * power_2 k) (discrete_laplace_mechanism_Z2k_unit f i x epsilon1 epsilon2 k)) z =
+  finally have 2:"spmf (map_spmf (\<lambda>x. real_of_int x * power_2 k) (discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x)) z =
   (exp (epsilon1 /(epsilon2 * i)) - 1) * exp (- (epsilon1 * \<bar>z - power_2 k * real_of_int (findNearstMultiple_2k (f x) k)\<bar> / (epsilon2 * \<Delta>))) /
   (exp (epsilon1 /(epsilon2 * i)) + 1)"
     by simp
@@ -938,23 +946,23 @@ lemma spmf_discrete_laplace_mechanism_Z2k_out_Z2k:
   assumes scale:"1\<le>epsilon1" and "1\<le>epsilon2" 
 and seinsitivity:"1\<le>i"
 and z:"z\<notin>{d. \<exists>n::int. d = power_2 k * n}"
-shows "spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) z = 0"
+shows "spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) z = 0"
 proof -
-  have lossless:"weight_spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) = 1"
+  have lossless:"weight_spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) = 1"
     using lossless_discrete_laplace_mechanism_Z2k assms lossless_spmf_def
     by blast
-  have 1:"weight_spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) 
-    = Sigma_Algebra.measure (measure_spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) ) UNIV"
+  have 1:"weight_spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) 
+    = Sigma_Algebra.measure (measure_spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) ) UNIV"
     using weight_spmf_def by blast
   have set1:"{d. \<exists>n::int. d = power_2 k * n} \<union> {d.\<forall> n::int. d \<noteq> power_2 k * n} = UNIV"
     by auto
   have set2:"{d. \<exists>n::int. d = power_2 k * n} \<inter> {d.\<forall> n::int. d \<noteq> power_2 k * n} = {}"
     by auto
-  have 2:"Sigma_Algebra.measure (measure_spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) ) UNIV 
-      = Sigma_Algebra.measure (measure_spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) ) {d. \<exists>n::int. d = power_2 k * n}
-       + Sigma_Algebra.measure (measure_spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) ) {d.\<forall> n::int. d \<noteq> power_2 k * n}"
+  have 2:"Sigma_Algebra.measure (measure_spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) ) UNIV 
+      = Sigma_Algebra.measure (measure_spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) ) {d. \<exists>n::int. d = power_2 k * n}
+       + Sigma_Algebra.measure (measure_spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) ) {d.\<forall> n::int. d \<noteq> power_2 k * n}"
     using set1 set2 plus_measure_spmf by blast
-  have 3:"Sigma_Algebra.measure (measure_spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) ) {d. \<exists>n::int. d = power_2 k * n} = 1"
+  have 3:"Sigma_Algebra.measure (measure_spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) ) {d. \<exists>n::int. d = power_2 k * n} = 1"
   proof -
     have set1:"{power_2 k * n | n::int. True} = {power_2 k * n | n::int. findNearstMultiple_2k (f x) k\<le>n}  \<union> {power_2 k * n | n::int. findNearstMultiple_2k (f x) k>n} "
       by fastforce
@@ -962,58 +970,137 @@ proof -
       apply(rule)
       using power_2_gt_zero[of k]
       by(auto)
-    have "measure (measure_spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) ) {d. \<exists>n::int. d = power_2 k * n} 
-        = measure (measure_spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) ) {power_2 k * n | n::int. findNearstMultiple_2k (f x) k\<le>n} 
-        + measure (measure_spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) ) {power_2 k * n | n::int. findNearstMultiple_2k (f x) k>n}"
+    have "measure (measure_spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) ) {d. \<exists>n::int. d = power_2 k * n} 
+        = measure (measure_spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) ) {power_2 k * n | n::int. findNearstMultiple_2k (f x) k\<le>n} 
+        + measure (measure_spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) ) {power_2 k * n | n::int. findNearstMultiple_2k (f x) k>n}"
       using set1 set2 plus_measure_spmf by fastforce
-    have "ennreal (Sigma_Algebra.measure (measure_spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) ) {power_2 k * n | n::int. findNearstMultiple_2k (f x) k\<le>n})
-        = emeasure (measure_spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) ) {power_2 k * n | n::int. findNearstMultiple_2k (f x) k\<le>n}"
+    have "ennreal (Sigma_Algebra.measure (measure_spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) ) {power_2 k * n | n::int. findNearstMultiple_2k (f x) k\<le>n})
+        = emeasure (measure_spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) ) {power_2 k * n | n::int. findNearstMultiple_2k (f x) k\<le>n}"
       by (simp add: measure_spmf.emeasure_eq_measure)
-    also have "... = (\<Sum>\<^sup>+ z\<in>{power_2 k * n | n::int. findNearstMultiple_2k (f x) k\<le>n}. ennreal (spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) z))"
+    also have "... = (\<Sum>\<^sup>+ z\<in>{power_2 k * n | n::int. findNearstMultiple_2k (f x) k\<le>n}. ennreal (spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) z))"
       using nn_integral_spmf by metis
     also have "... = (\<Sum>\<^sup>+ z\<in>{power_2 k * n | n::int. findNearstMultiple_2k (f x) k\<le>n}. 
                       ennreal ((exp (epsilon1 / (epsilon2 * i)) - 1) * exp (- ((epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f x) k\<bar>) / (epsilon2 * (power_2 k * i))))/(exp (epsilon1 / (epsilon2 * i)) + 1)))"
     proof -
-      have "\<And>z. z\<in>{d. \<exists>n::int. d = power_2 k * n \<and> findNearstMultiple_2k (f x) k\<le>n} \<Longrightarrow> ennreal (spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) z)
+      have "\<And>z. z\<in>{d. \<exists>n::int. d = power_2 k * n \<and> findNearstMultiple_2k (f x) k\<le>n} \<Longrightarrow> ennreal (spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) z)
                                                      = ennreal ((exp (epsilon1 / (epsilon2 * i)) - 1) * exp (- ((epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f x) k\<bar>) / (epsilon2 * (power_2 k * i))))/(exp (epsilon1 / (epsilon2 * i)) + 1))"
         sorry
       then show ?thesis
-        using nn_integral_cong[of _ "\<lambda>z. ennreal (spmf (discrete_laplace_mechanism_Z2k f i x epsilon1 epsilon2 k) z)" "\<lambda>z. ennreal ((exp (epsilon1 / (epsilon2 * i)) - 1) * exp (- ((epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f x) k\<bar>) / (epsilon2 * (power_2 k * i))))/(exp (epsilon1 / (epsilon2 * i)) + 1))"]
+        using nn_integral_cong[of _ "\<lambda>z. ennreal (spmf (discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x) z)" "\<lambda>z. ennreal ((exp (epsilon1 / (epsilon2 * i)) - 1) * exp (- ((epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f x) k\<bar>) / (epsilon2 * (power_2 k * i))))/(exp (epsilon1 / (epsilon2 * i)) + 1))"]
         by fastforce
     qed
-    also have "... =  (\<Sum>\<^sup>+ n\<in>{n::int. findNearstMultiple_2k (f x) k\<le>n}. 
-                      ennreal ((exp (epsilon1 / (epsilon2 * i)) - 1) * exp (- ((epsilon1 * \<bar>power_2 k * n - power_2 k * findNearstMultiple_2k (f x) k\<bar>) / (epsilon2 * (power_2 k * i))))/(exp (epsilon1 / (epsilon2 * i)) + 1)))"
-      sorry
-    also have "... =  (\<Sum>\<^sup>+ z\<in>{z::int. 0\<le>z}. 
-                      ennreal ((exp (epsilon1 / (epsilon2 * i)) - 1) * exp (- ((epsilon1 * \<bar>power_2 k * z\<bar>) / (epsilon2 * (power_2 k * i))))/(exp (epsilon1 / (epsilon2 * i)) + 1)))"
-      sorry
-    also have "... = (\<Sum>\<^sup>+ z\<in>{z::nat. True}. 
-                      ennreal ((exp (epsilon1 / (epsilon2 * i)) - 1) * exp (- ((epsilon1 * \<bar>power_2 k * z\<bar>) / (epsilon2 * (power_2 k * i))))/(exp (epsilon1 / (epsilon2 * i)) + 1)))"
-      sorry
-    also have "... = (\<Sum>\<^sup>+ z::nat\<in>UNIV. 
-                      ennreal ((exp (epsilon1 / (epsilon2 * i)) - 1) * exp (- ((epsilon1 * \<bar>power_2 k * z\<bar>) / (epsilon2 * (power_2 k * i))))/(exp (epsilon1 / (epsilon2 * i)) + 1)))"
+    also have "... =  (\<Sum>\<^sup>+ n\<in>{n. findNearstMultiple_2k (f x) k \<le> n}.
+   ennreal ((exp (epsilon1/(epsilon2 * i)) - 1) * exp (- (epsilon1 * \<bar>power_2 k * n - power_2 k * (findNearstMultiple_2k (f x) k)\<bar> / (epsilon2 * (power_2 k * real i))))/(exp (epsilon1 / (epsilon2 * i)) + 1)))"
     proof -
-      have "{z::nat. True} = UNIV"
-        by simp
+      have "bij_betw (\<lambda>x. power_2 k * real_of_int x) {n. findNearstMultiple_2k (f x) k \<le> n} {power_2 k * real_of_int n |n. findNearstMultiple_2k (f x) k \<le> n}"
+        sorry
       then show ?thesis
+        using nn_integral_bij_count_space[of "\<lambda>n. power_2 k * n" "{n::int. findNearstMultiple_2k (f x) k\<le>n}" "{power_2 k * n | n::int. findNearstMultiple_2k (f x) k\<le>n}"
+                                      "\<lambda>z. ennreal ((exp (epsilon1 / (epsilon2 * i)) - 1) * exp (- ((epsilon1 * \<bar>z - power_2 k * findNearstMultiple_2k (f x) k\<bar>) / (epsilon2 * (power_2 k * i))))/(exp (epsilon1 / (epsilon2 * i)) + 1))"]
         by simp
     qed
-    also have "... = (\<Sum>z. ennreal
-           ((exp (real epsilon1 / (real epsilon2 * real i)) - 1) * exp (- (real epsilon1 * \<bar>power_2 k * real z\<bar> / (real epsilon2 * (power_2 k * real i)))) /
-            (exp (real epsilon1 / (real epsilon2 * real i)) + 1)))"
-      by(rewrite nn_integral_count_space_nat, simp)
-    also have "... = ennreal ((\<Sum>z. (exp (real epsilon1 / (real epsilon2 * real i)) - 1) * exp (- (real epsilon1 * \<bar>power_2 k * real z\<bar> / (real epsilon2 * (power_2 k * real i)))) /
-            (exp (real epsilon1 / (real epsilon2 * real i)) + 1)))"
-      sorry
-    also have "... = ennreal ((exp (real epsilon1 / (real epsilon2 * real i)) - 1)/(exp (real epsilon1 / (real epsilon2 * real i)) + 1) 
-                            * (\<Sum>z.  exp (- (real epsilon1 * \<bar>power_2 k * real z\<bar> / (real epsilon2 * (power_2 k * real i))))) )"
-      using suminf_divide suminf_mult
-      sorry
+    also have "... =  (\<Sum>\<^sup>+ n\<in>{n. findNearstMultiple_2k (f x) k \<le> n}.
+   ennreal ((exp (epsilon1/(epsilon2 * i)) - 1) * exp (- (epsilon1 * \<bar>power_2 k * (n - (findNearstMultiple_2k (f x) k))\<bar> / (epsilon2 * (power_2 k * real i))))/(exp (epsilon1 / (epsilon2 * i)) + 1)))"
+    proof -
+      have "\<And>n. power_2 k * n - power_2 k * (findNearstMultiple_2k (f x) k) = power_2 k * (n - (findNearstMultiple_2k (f x) k))"
+        by argo
+      then show ?thesis
+        by auto
+    qed
+    also have "... =  (\<Sum>\<^sup>+ m\<in>{m::int. 0 \<le> m}.
+   ennreal ((exp (epsilon1/(epsilon2 * i)) - 1) * exp (- (epsilon1 * \<bar>power_2 k * m\<bar> / (epsilon2 * (power_2 k * real i))))/(exp (epsilon1 / (epsilon2 * i)) + 1)))"
+    proof -
+      have 1:"bij_betw (\<lambda>m. m + (findNearstMultiple_2k (f x) k)) {m. 0\<le>m} {n. findNearstMultiple_2k (f x) k \<le> n}"
+        sorry
+      then have "(\<Sum>\<^sup>+ n\<in>{n. findNearstMultiple_2k (f x) k \<le> n}.
+       ennreal ((exp (real epsilon1 / real (epsilon2 * i)) - 1) * exp (- (real epsilon1 * \<bar>power_2 k * real_of_int (n - findNearstMultiple_2k (f x) k)\<bar> / (real epsilon2 * (power_2 k * real i))))/(exp (real epsilon1 / real (epsilon2 * i)) + 1)))
+               = (\<Sum>\<^sup>+ m\<in>{m::int. 0 \<le> m}.
+       ennreal ((exp (real epsilon1 / real (epsilon2 * i)) - 1) * exp (- (real epsilon1 * \<bar>power_2 k * (m + findNearstMultiple_2k (f x) k - findNearstMultiple_2k (f x) k)\<bar> / (real epsilon2 * (power_2 k * real i))))/(exp (real epsilon1 / real (epsilon2 * i)) + 1)))"
+        using nn_integral_bij_count_space [of "(\<lambda>m. m + (findNearstMultiple_2k (f x) k))" "{m. 0\<le>m}" "{n. findNearstMultiple_2k (f x) k \<le> n}" 
+                                              "\<lambda>n. ennreal ((exp (epsilon1/(epsilon2 * i)) - 1) * exp (- (epsilon1 * \<bar>power_2 k * (n - (findNearstMultiple_2k (f x) k))\<bar> / (epsilon2 * (power_2 k * real i))))/(exp (epsilon1 / (epsilon2 * i)) + 1))"]
+        by argo
+      also have "... =  (\<Sum>\<^sup>+ m\<in>{m::int. 0 \<le> m}.
+   ennreal ((exp (epsilon1/(epsilon2 * i)) - 1) * exp (- (epsilon1 * \<bar>power_2 k * m\<bar> / (epsilon2 * (power_2 k * real i))))/(exp (epsilon1 / (epsilon2 * i)) + 1)))"
+        by simp
+      finally show ?thesis
+        by simp
+    qed
+    also have "... = (\<Sum>\<^sup>+ m\<in>{m::nat. True}.
+   ennreal ((exp (epsilon1/(epsilon2 * i)) - 1) * exp (- (epsilon1 * \<bar>power_2 k * m\<bar> / (epsilon2 * (power_2 k * real i))))/(exp (epsilon1 / (epsilon2 * i)) + 1)))"
+    proof -
+      have 1:"bij_betw (\<lambda>m. int m) {m::nat. True} {m::int. 0\<le>m}"
+        sorry
+      then show ?thesis
+        using nn_integral_bij_count_space[of "\<lambda>m. m" "{m::nat. True}" "{m::int. 0\<le>m}" 
+                                             "\<lambda>m. ennreal ((exp (epsilon1/(epsilon2 * i)) - 1) * exp (- (epsilon1 * \<bar>power_2 k * m\<bar> / (epsilon2 * (power_2 k * real i))))/(exp (epsilon1 / (epsilon2 * i)) + 1))"]
+        by simp
+    qed
+    also have "... = (\<Sum>m. ennreal((exp (real epsilon1 / (real epsilon2 * real i)) - 1) * exp (- (real epsilon1 * \<bar>power_2 k * real m\<bar> / (real epsilon2 * (power_2 k * real i))))/(exp (real epsilon1 / (real epsilon2 * real i)) + 1)))"
+      by(simp add: nn_integral_count_space_nat)
+    also have "... = (\<Sum>m. ennreal((exp (real epsilon1 / (real epsilon2 * real i)) - 1) * exp (- (real epsilon1 * power_2 k * real m / (real epsilon2 * (power_2 k * real i))))/(exp (real epsilon1 / (real epsilon2 * real i)) + 1)))"
+    proof -
+      have "\<And>m::nat. ennreal((exp (real epsilon1 / (real epsilon2 * real i)) - 1) * exp (- (real epsilon1 * \<bar>power_2 k * real m\<bar> / (real epsilon2 * (power_2 k * real i))))/(exp (real epsilon1 / (real epsilon2 * real i)) + 1))
+                    = ennreal((exp (real epsilon1 / (real epsilon2 * real i)) - 1) * exp (- (real epsilon1 * power_2 k * real m / (real epsilon2 * (power_2 k * real i))))/(exp (real epsilon1 / (real epsilon2 * real i)) + 1))"
+        using power_2_gt_zero[of"k"] by simp
+      then show ?thesis by metis
+    qed
+    also have "... = ennreal ((\<Sum>m. (exp (real epsilon1 / (real epsilon2 * real i)) - 1) * exp (- (real epsilon1 * power_2 k * real m / (real epsilon2 * (power_2 k * real i))))/(exp (real epsilon1 / (real epsilon2 * real i)) + 1)))"
+    proof(rewrite suminf_ennreal2,simp_all)
+      have 1:"\<And>x::nat. exp (- (real x / (real epsilon2 * real i / real epsilon1))) =  exp (- (real epsilon1 * real x / (real epsilon2 * real i)))"
+        using assms by simp
+      have 2:"summable (\<lambda>m. exp (- (real m / (real epsilon2 * real i / real epsilon1))))"
+        using summable_exp_minu_rat[of "(real epsilon2 * i)/epsilon1"] assms
+        by auto
+      have "summable (\<lambda>m. exp (- (if power_2 k = 0 then 0 else real epsilon1 * real m / (real epsilon2 * real i))))"
+        using power_2_gt_zero[of"k"] 
+        apply(auto)
+        using 1 2
+        by presburger
+      then show "exp (real epsilon1 / (real epsilon2 * real i)) + 1 = 0 \<or>
+    epsilon1 = 0 \<or> epsilon2 = 0 \<or> i = 0 \<or> summable (\<lambda>m. exp (- (if power_2 k = 0 then 0 else real epsilon1 * real m / (real epsilon2 * real i))))"
+        by blast
+    qed
+    also have "... = ennreal((exp (real epsilon1 / (real epsilon2 * real i)) - 1)/ (exp (real epsilon1 / (real epsilon2 * real i)) + 1)
+                     * (\<Sum>m.  exp (- (real epsilon1 * power_2 k * real m / (real epsilon2 * (power_2 k * real i))))))"
+    proof -
+      have "(\<Sum>m. (exp (real epsilon1 / (real epsilon2 * real i)) - 1) * (exp (- (real epsilon1 * power_2 k * real m / (real epsilon2 * (power_2 k * real i))))/(exp (real epsilon1 / (real epsilon2 * real i)) + 1))) 
+          = (exp (real epsilon1 / (real epsilon2 * real i)) - 1)/ (exp (real epsilon1 / (real epsilon2 * real i)) + 1)
+                     * (\<Sum>m.  exp (- (real epsilon1 * power_2 k * real m / (real epsilon2 * (power_2 k * real i)))))"
+      proof(rewrite suminf_mult)
+        have 1:"summable (\<lambda>m. exp (- (if power_2 k = 0 then 0 else real epsilon1 * real m / (real epsilon2 * real i))))"
+          sorry
+        then show "summable (\<lambda>m. exp (- (real epsilon1 * power_2 k * real m / (real epsilon2 * (power_2 k * real i)))) / (exp (real epsilon1 / (real epsilon2 * real i)) + 1))"
+          by simp
+        have 2:" (\<Sum>m. exp (- (real epsilon1 * power_2 k * real m / (real epsilon2 * (power_2 k * real i)))) / (exp (real epsilon1 / (real epsilon2 * real i)) + 1)) 
+             = 1/ (exp (real epsilon1 / (real epsilon2 * real i)) + 1) *
+               (\<Sum>m. exp (- (real epsilon1 * power_2 k * real m / (real epsilon2 * (power_2 k * real i)))))"
+        proof-
+          have "(\<Sum>m. exp (- (real epsilon1 * power_2 k * real m / (real epsilon2 * (power_2 k * real i)))) / (exp (real epsilon1 / (real epsilon2 * real i)) + 1)) 
+              = (\<Sum>m. (1/ (exp (real epsilon1 / (real epsilon2 * real i)) + 1)) * exp (- (real epsilon1 * power_2 k * real m / (real epsilon2 * (power_2 k * real i)))))"
+            by auto
+          also have "... = 1/ (exp (real epsilon1 / (real epsilon2 * real i)) + 1) *
+               (\<Sum>m. exp (- (real epsilon1 * power_2 k * real m / (real epsilon2 * (power_2 k * real i)))))"
+            apply(rewrite suminf_mult)
+            using 1 by auto
+          finally show ?thesis by simp
+        qed
+        then show "(exp (real epsilon1 / (real epsilon2 * real i)) - 1) *
+    (\<Sum>m. exp (- (real epsilon1 * power_2 k * real m / (real epsilon2 * (power_2 k * real i)))) / (exp (real epsilon1 / (real epsilon2 * real i)) + 1)) =
+    (exp (real epsilon1 / (real epsilon2 * real i)) - 1) / (exp (real epsilon1 / (real epsilon2 * real i)) + 1) *
+    (\<Sum>m. exp (- (real epsilon1 * power_2 k * real m / (real epsilon2 * (power_2 k * real i)))))"
+          by simp
+      qed
+      also have "... = (exp (real epsilon1 / (real epsilon2 * real i)) - 1) / (exp (real epsilon1 / (real epsilon2 * real i)) + 1) *
+    (\<Sum>m. exp (- (real epsilon1 *  real m / (real epsilon2 *  real i))))"
+        using power_2_gt_zero[of "k"] by auto
+      then show ?thesis by simp
+    qed
     show ?thesis
       sorry
   qed
   show ?thesis
     sorry
 qed
+
 
 end
