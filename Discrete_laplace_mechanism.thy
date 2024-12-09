@@ -218,10 +218,15 @@ definition discrete_laplace_mechanism_Z2k_to_double :: "('a list \<Rightarrow> d
 }
 "
 
-definition discrete_laplace_mechanism_Z2k_to_double' :: "('a list \<Rightarrow> double) \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> 'a list \<Rightarrow> double spmf" where
-"discrete_laplace_mechanism_Z2k_to_double' f i epsilon1 epsilon2 k x = do {
+definition mul_2k_to_double :: "int \<Rightarrow> int \<Rightarrow> double" where
+"mul_2k_to_double man expo = 
+  (let d = double_of_man_exp (integer_of_int man) (integer_of_int expo)
+   in (if d=None then 0 else the d))"
+
+definition discrete_laplace_mechanism_Z2k_to_double2 :: "('a list \<Rightarrow> double) \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> 'a list \<Rightarrow> double spmf" where
+"discrete_laplace_mechanism_Z2k_to_double2 f i epsilon1 epsilon2 k x = do {
   ans::int \<leftarrow> discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x;
-  return_spmf (round_to_double (ans * power_2 k))
+  return_spmf (mul_2k_to_double ans k)
 }
 "
 

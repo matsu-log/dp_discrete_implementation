@@ -438,4 +438,72 @@ qed
  
 thm differential_privacy_postprocessing_deterministic[of "\<epsilon>" "0" "measure_spmf \<circ> M"  "adj" _ _ "f"]
 
+lemma lossless_spmf_imp_measurable_as_measure:
+  assumes "\<And>x. lossless_spmf (M x)"
+  shows "measure_spmf \<circ> M \<in> (count_space UNIV) \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
+proof(rewrite measurable_count_space_eq1)
+  show "measure_spmf \<circ> M \<in> UNIV \<rightarrow> space (prob_algebra (count_space UNIV))" 
+  proof(auto)
+    fix x
+    have "emeasure (measure_spmf (M x)) (space (measure_spmf (M x))) = 1"
+      using assms space_measure_spmf[of "M x"]
+      unfolding lossless_spmf_def weight_spmf_def
+      by (simp add: measure_spmf.emeasure_eq_measure)
+    then have "prob_space (measure_spmf (M x))"
+      by rule
+    then show "measure_spmf (M x) \<in> space (prob_algebra (count_space UNIV))"
+      apply(rewrite space_prob_algebra)
+      by(auto)
+  qed
+qed
+
+declare[[show_types]]
+
+lemma pure_dp_comp:
+  assumes M:"pure_dp M \<epsilon>"
+and N:"\<And>y. pure_dp (\<lambda> x. N (x,y)) \<epsilon>'"
+and lossless_M:"\<And>x. lossless_spmf (M x)"
+and lossless_N:"\<And>x y. lossless_spmf (N (x,y))"
+and "0\<le>\<epsilon>" and "0\<le>\<epsilon>'"
+shows "pure_dp (\<lambda>x. bind_spmf  (M x) (\<lambda>y. N (x, y))) (\<epsilon>+\<epsilon>')"
+  using M N
+  unfolding pure_dp_def 
+proof -
+  thm differential_privacy_composition_adaptive[of "\<epsilon>" "0" "\<epsilon>'" "0" "measure_spmf \<circ> M" _ _ "adj"
+                                                   "measure_spmf \<circ> N" _]
+  have 1:" \<And>y. (\<lambda>x. (measure_spmf \<circ> N) (x, y)) = (measure_spmf \<circ> (\<lambda>x. N (x, y)))"
+    unfolding o_def
+    by simp                                                                            
+  have 2:"(\<lambda>x. (measure_spmf \<circ> M) x \<bind> (\<lambda>y. (measure_spmf \<circ> N) (x, y))) = (measure_spmf \<circ> (\<lambda>x. M x \<bind> (\<lambda>y. N (x, y))))"
+    using measure_spmf_bind
+    unfolding o_def
+    by metis
+  have 3:"measure_spmf \<circ> M \<in> (count_space UNIV) \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
+    using lossless_M lossless_spmf_imp_measurable_as_measure
+    by auto
+  have 4:"measure_spmf \<circ> N \<in> (count_space UNIV) \<Otimes>\<^sub>M (count_space UNIV) \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
+    unfolding measurable_def
+    apply(rule,auto)
+  proof -
+    fix a :: "'a list" and b :: "'b" 
+    assume "(a, b) \<in> space (count_space UNIV \<Otimes>\<^sub>M count_space UNIV)"
+    show "measure_spmf (N (a, b)) \<in> space (prob_algebra (count_space UNIV))"
+      apply(rewrite space_prob_algebra,auto)
+      apply(rule)
+      using assms space_measure_spmf[of "N (a, b)"]
+      unfolding lossless_spmf_def weight_spmf_def
+      by (simp add: measure_spmf.emeasure_eq_measure)
+  next
+    fix y::"'c measure set"
+    assume y:"y \<in> sets (prob_algebra (count_space UNIV))"
+    show "(measure_spmf \<circ> N) -` y \<inter> space (count_space UNIV \<Otimes>\<^sub>M count_space UNIV) \<in> sets (count_space UNIV \<Otimes>\<^sub>M count_space UNIV)"
+      unfolding vimage_def o_def
+      apply(rule)
+       apply(auto)
+      using y
+      unfolding pair_measure_def
+      apply(auto)
+      
+     
+
 end

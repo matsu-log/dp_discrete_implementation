@@ -385,7 +385,13 @@ lemma discrete_laplace_mechanism_Z2k_to_double_ra_correct:
   unfolding discrete_laplace_mechanism_Z2k_to_double_def discrete_laplace_mechanism_Z2k_to_double_ra_def postprocess_ra_def postprocess_def
   by(simp add: spmf_of_ra_simps discrete_laplace_mechanism_Z2k_ra_correct)
 
-export_code discrete_laplace_mechanism_Z2k_ra in OCaml
+definition discrete_laplace_mechanism_Z2k_to_double2_ra :: "('a list \<Rightarrow> double) \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> 'a list \<Rightarrow> double random_alg" where
+"discrete_laplace_mechanism_Z2k_to_double2_ra f i epsilon1 epsilon2 k x = do {
+  postprocess_ra (discrete_laplace_mechanism_Z2k_unit_ra f i epsilon1 epsilon2 k) (\<lambda>ans. mul_2k_to_double ans k) x
+}
+"
+
+export_code discrete_laplace_mechanism_Z2k_to_double2_ra in SML
 
 
 

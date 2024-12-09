@@ -115,6 +115,49 @@ lemma lossless_report_noisy_max:
   using lossless_discrete_laplace_noise_add_list assms
   by simp
 
+term "prod"
+value "prod (\<lambda>x::nat. x) {1,2,3}"
+term "sum"
+
+lemma spmf_discrete_laplace_noise_add_list:
+  assumes "1\<le>epsilon1" and "1\<le>epsilon2"
+shows "\<And>list. length cs = length list \<Longrightarrow> spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) list = ((exp(epsilon1/epsilon2)-1)/(exp(epsilon1/epsilon2)+1))^(length cs) 
+                                                                            * prod (\<lambda>c. exp(-(epsilon1 * \<bar>z-c(x)\<bar>)/epsilon2)) (set cs)"
+proof(induct cs)
+  case Nil
+  then show ?case
+  proof -
+    have 1:"spmf (discrete_laplace_noise_add_list [] epsilon1 epsilon2 x) list = 1"
+      unfolding discrete_laplace_noise_add_list.simps
+      using Nil by simp
+    have 2:"((exp (real epsilon1 / real epsilon2) - 1) / (exp (real epsilon1 / real epsilon2) + 1)) ^ length [] *
+    (\<Prod>c\<in>set (map (\<lambda>h x. real_of_int (h x)) []). exp (- (real epsilon1 * \<bar>z - c x\<bar>) / real epsilon2)) = 1"
+      by simp
+    show ?thesis
+      using 1 2 by simp
+  qed
+next
+  case (Cons a cs)
+  then show ?case
+  proof -
+    have "ennreal (spmf (discrete_laplace_noise_add_list (a # cs) epsilon1 epsilon2 x) list) 
+        = ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (drop 1 list)) *
+          ennreal (spmf (discrete_laplace_mechanism a (Suc 0) epsilon1 epsilon2 x) (nth list 0))"
+      unfolding discrete_laplace_noise_add_list.simps
+      apply(simp add: ennreal_spmf_bind nn_integral_measure_spmf)
+    proof-
+      have "\<And>xa. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa) *
+       (\<Sum>\<^sup>+ xb. ennreal (spmf (discrete_laplace_mechanism a (Suc 0) epsilon1 epsilon2 x) xb) * ennreal (indicat_real {Some list} (Some (xb # xa)))) =
+    ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (drop (Suc 0) list)) * ennreal (spmf (discrete_laplace_mechanism a (Suc 0) epsilon1 epsilon2 x) (list ! 0))"
+      proof -
+        fix xa xb
+        have "(xa = drop 1 list \<and> xb = nth list 0) = (list = (xb#xa))"
+          by (metis Cons_nth_drop_Suc One_nat_def drop0 drop_Suc_Cons length_greater_0_conv list.simps(3) local.Cons(2) nth_Cons_0)
+        then have ""
+    
+qed
+
+
 lemma pointwise_pure_dp_inequality_report_noisy_max:
   assumes "is_count_queries cs"
 and "(x,y)\<in>adj"
