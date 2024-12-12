@@ -438,10 +438,10 @@ next
         = (\<Sum>\<^sup>+ xa\<in>{list. length list = length cs \<and> z = snd (argmax_int_list list)}. exp(epsilon1/epsilon2) * ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) xa))"
       by(rewrite nn_integral_cmult,auto)
     have "(\<Sum>\<^sup>+ xa\<in>{list. length list = length cs \<and> z = snd (argmax_int_list list)}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa))
-        = (\<Sum>\<^sup>+ xa\<in>{(a, b, c). a = take z (a @ b # c) \<and> length (a @ b # c) = length cs \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c)\<and> z= snd (argmax_int_list (a@b#c))}.
-            ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (case xa of (a, b, c) \<Rightarrow> a @ b # c)))"
-      apply(rewrite nn_integral_bij_count_space[of "\<lambda>(a,b,c). (a@b#c)"                                       
-                                         "{(a, b, c). a = take z (a@b#c) \<and> length(a@b#c)  = length cs \<and> b = nth (a@b#c) z \<and> c = drop (Suc z) (a@b#c) \<and> z= snd (argmax_int_list (a@b#c))}"
+        = (\<Sum>\<^sup>+ xa\<in>{((a, c), b). a = take z (a @ b # c) \<and> length (a @ b # c) = length cs \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c) \<and> z = snd (argmax_int_list (a @ b # c))}.
+            ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (case xa of (x, xa) \<Rightarrow> (case x of (a, c) \<Rightarrow> \<lambda>b. a @ b # c) xa)))"
+      apply(rewrite nn_integral_bij_count_space[of "\<lambda>((a,c),b). (a@b#c)"                                       
+                                         "{((a,c),b). a = take z (a@b#c) \<and> length(a@b#c)  = length cs \<and> b = nth (a@b#c) z \<and> c = drop (Suc z) (a@b#c) \<and> z= snd (argmax_int_list (a@b#c))}"
                                          "{list. length list = length cs \<and> z = snd (argmax_int_list list)}" 
                                          "\<lambda>list. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) list)"])
         unfolding bij_betw_def image_def inj_on_def
@@ -453,11 +453,11 @@ next
           and  "b2 = nth (a2@b2#c2) (snd (argmax_int_list (a1 @ b1 # c1)))"
           and  "c1 = drop (Suc (snd (argmax_int_list (a1 @ b1 # c1)))) (a1@b1#c1)"
           and  "c2 = drop (Suc (snd (argmax_int_list (a1 @ b1 # c1)))) (a2@b2#c2)"
-        then show "a1 @ b1 # c1 = a2 @ b2 # c2 \<Longrightarrow> a1 = a2 \<and> (b1, c1) = (b2, c2)"
+        then show "a1 @ b1 # c1 = a2 @ b2 # c2 \<Longrightarrow> (a1, c1) = (a2, c2) \<and> b1 = b2"
           by metis
       next
-        show "{y. \<exists>x\<in>{(a, b, c). a = take z (a @ b # c) \<and> length (a @ b # c) = length cs \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c) \<and> z = snd (argmax_int_list (a @ b # c))}.
-           y = (case x of (a, b, c) \<Rightarrow> a @ b # c)} = {list. length list = length cs \<and> z = snd (argmax_int_list list)}"
+        show "{y. \<exists>x\<in>{((a, c), b). a = take z (a @ b # c) \<and> length (a @ b # c) = length cs \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c) \<and> z = snd (argmax_int_list (a @ b # c))}.
+           y = (case x of (x, xa) \<Rightarrow> (case x of (a, c) \<Rightarrow> \<lambda>b. a @ b # c) xa)} = {list. length list = length cs \<and> z = snd (argmax_int_list list)}"
         proof(rule,clarify,rule)
           fix list
           assume list:"list \<in> {list. length list = length cs \<and> z = snd (argmax_int_list list)}"
@@ -474,7 +474,14 @@ next
               using list by auto
           qed
         qed
-        find_theorems "(\<Sum>\<^sup>+ xa. (\<Sum>\<^sup>+ xa. _ ))"
+        show "(\<Sum>\<^sup>+ xa\<in>{list. length list = length cs \<and> z = snd (argmax_int_list list)}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa)) =
+              (\<Sum>\<^sup>+ xa\<in>{list. length list = length cs \<and> z = snd (argmax_int_list list)}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa))"
+          by auto
+      qed
+      also have "... = ..."
+        find_theorems "(_,_,_)"
+        find_theorems "(\<Sum>\<^sup>+ _\<in>_.(\<Sum>\<^sup>+_. _))"
+        
 qed
 
 lemma pure_dp_report_noisy_max:
