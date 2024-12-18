@@ -2,7 +2,6 @@ section \<open>Differential Privacy\<close>
 
 theory Differential_Privacy2
   imports "HOL-Probability.Probability"
-          "IEEE_Floating_Point.Double"
           "formalization.Differential_Privacy_Standard"
 begin
 
@@ -435,8 +434,6 @@ proof (rule+,auto)
       using l1 l2 by simp
   qed
 qed
- 
-thm differential_privacy_postprocessing_deterministic[of "\<epsilon>" "0" "measure_spmf \<circ> M"  "adj" _ _ "f"]
 
 lemma lossless_spmf_imp_measurable_as_measure:
   assumes "\<And>x. lossless_spmf (M x)"
@@ -460,75 +457,24 @@ qed
 lemma prod_measurable:
   fixes N::"'a list \<times>'b \<Rightarrow> 'c spmf"
   assumes "\<And>x y. lossless_spmf (N (x,y))"
+and "countable (UNIV:: ('a list) set)"
+and "countable (UNIV::'b set)"
   shows "measure_spmf \<circ> N \<in> count_space UNIV \<Otimes>\<^sub>M count_space UNIV \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
   unfolding o_def
-proof -
-  have "\<And>x. (\<lambda>y. measure_spmf (N (x,y))) \<in> count_space UNIV\<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
-    sorry
-  then have 1:"\<And>x. (\<lambda>pair. (\<lambda>y. measure_spmf (N (x,y))) (snd (pair))) \<in> count_space UNIV \<Otimes>\<^sub>M count_space UNIV \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
-    using measurable_snd''
-    by blast
-  have 2:"\<And>y. (\<lambda>pair. measure_spmf (N (fst pair, y))) \<in> count_space UNIV \<Otimes>\<^sub>M count_space UNIV \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
-    sorry
-  show "(\<lambda>x. measure_spmf (N x)) \<in> count_space UNIV \<Otimes>\<^sub>M count_space UNIV \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
-    using 1 2
-    unfolding measurable_def 
-    apply(rewrite space_pair_measure,rewrite space_pair_measure, rewrite sets_pair_measure)
-    unfolding vimage_def
-  proof(simp)
-    have "\<And>x. (\<lambda>pair. measure_spmf (N (x, snd pair))) \<in> space (count_space UNIV) \<times> space (count_space UNIV) \<rightarrow> space (prob_algebra (count_space UNIV)) \<and>
-         (\<forall>y\<in>sets (prob_algebra (count_space UNIV)). {xa. measure_spmf (N (x, snd xa)) \<in> y} \<inter> space (count_space UNIV) \<times> space (count_space UNIV) \<in> sigma_sets (space (count_space UNIV) \<times> space (count_space UNIV)) {a \<times> b |a b. a \<in> sets (count_space UNIV) \<and> b \<in> sets (count_space UNIV)})"
-      sorry
-    then have 1:"\<And>x. (\<forall>y\<in>sets (prob_algebra (count_space UNIV)). {xa. measure_spmf (N (x, snd xa)) \<in> y} \<in> sigma_sets UNIV {uu. \<exists>a b. uu = a \<times> b})"
-      by auto
-    have "\<And>y. (\<lambda>pair. measure_spmf (N (fst pair, y))) \<in> space (count_space UNIV) \<times> space (count_space UNIV) \<rightarrow> space (prob_algebra (count_space UNIV)) \<and>
-         (\<forall>ya\<in>sets (prob_algebra (count_space UNIV)). {x. measure_spmf (N (fst x, y)) \<in> ya} \<inter> space (count_space UNIV) \<times> space (count_space UNIV) \<in> sigma_sets (space (count_space UNIV) \<times> space (count_space UNIV)) {a \<times> b |a b. a \<in> sets (count_space UNIV) \<and> b \<in> sets (count_space UNIV)})"
-      sorry
-    then have 2:"\<And>y. (\<forall>ya\<in>sets (prob_algebra (count_space UNIV)). {x. measure_spmf (N (fst x, y)) \<in> ya} \<in> sigma_sets UNIV {uu. \<exists>a b. uu = a \<times> b})"
-      by auto
-    show "(\<lambda>x. measure_spmf (N x)) \<in> UNIV \<rightarrow> space (prob_algebra (count_space UNIV)) \<and> (\<forall>y\<in>sets (prob_algebra (count_space UNIV)). {x. measure_spmf (N x) \<in> y} \<in> sigma_sets UNIV {uu. \<exists>a b. uu = a \<times> b})"
-      apply(auto)
-    proof-
-      show "\<And>a b. measure_spmf (N (a, b)) \<in> space (prob_algebra (count_space UNIV))"
-        sorry
-      show "\<And>y. y \<in> sets (prob_algebra (count_space UNIV)) \<Longrightarrow> {x. measure_spmf (N x) \<in> y} \<in> sigma_sets UNIV {uu. \<exists>a b. uu = a \<times> b}"
-      proof -
-        fix y :: "'c measure set"
-        assume y:"y \<in> sets (prob_algebra (count_space UNIV))"
-        show "{x. measure_spmf (N x) \<in> y} \<in> sigma_sets UNIV {uu. \<exists>a b. uu = a \<times> b}"
-        proof-
-          have "\<And>x. {c. measure_spmf (N (x, snd c)) \<in> y} \<in> sigma_sets UNIV {uu. \<exists>a b. uu = a \<times> b}"
-            using 1 y by auto
-          then have 11:"\<And>x. {(c,d). measure_spmf (N (x, d)) \<in> y} \<in> sigma_sets UNIV {uu. \<exists>a b. uu = a \<times> b}"
-            sorry
-          have 22:"\<And>ya. {(c,d). measure_spmf (N (c, ya)) \<in> y} \<in> sigma_sets UNIV {uu. \<exists>a b. uu = a \<times> b}"
-            sorry
-          find_theorems "sigma_sets"
-          have "\<Union>(Collect (\<lambda>set. set = {(c,d). measure_spmf (N(c, d))\<in> y}))"
-          have "\<Union>(Collect (\<lambda>set. set = {(c,d). \<exists>x.  measure_spmf (N(x, d))\<in> y})) = {(c,d). measure_spmf (N (c,d)) \<in> y}"
-            apply(rule,simp_all,auto)
-
-            term "Collect (\<lambda>set. set = {(c,d). \<exists>x.  measure_spmf (N(x, d))\<in> y})"
-            term "Collect (\<lambda>i::int. True)"
-           
-            
-            
-        qed
-      qed
-    qed
-  qed
-qed
-      
-
-  find_theorems "_ \<Longrightarrow> _ \<in>(pair_measure _ _) \<rightarrow>\<^sub>M _"
+  apply(rewrite pair_measure_countable)
+  using assms 
+    apply(auto)
+  using lossless_spmf_imp_measurable_as_measure assms
+  by force
 
 lemma pure_dp_comp:
+  fixes M::"('a, 'b) mechanism" and N::"'a list \<times> 'b \<Rightarrow>'c spmf"
   assumes M:"pure_dp M \<epsilon>"
 and N:"\<And>y. pure_dp (\<lambda> x. N (x,y)) \<epsilon>'"
 and lossless_M:"\<And>x. lossless_spmf (M x)"
 and lossless_N:"\<And>x y. lossless_spmf (N (x,y))"
 and "0\<le>\<epsilon>" and "0\<le>\<epsilon>'"
-and measurable_N:"measure_spmf \<circ> N \<in> count_space UNIV \<Otimes>\<^sub>M count_space UNIV \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
+and "countable (UNIV::'a list set)" and "countable (UNIV::'b set)"
 shows "pure_dp (\<lambda>x. bind_spmf  (M x) (\<lambda>y. N (x, y))) (\<epsilon>+\<epsilon>')"
   using M N
   unfolding pure_dp_def 
@@ -545,13 +491,13 @@ proof -
   have 3:"measure_spmf \<circ> M \<in> (count_space UNIV) \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
     using lossless_M lossless_spmf_imp_measurable_as_measure
     by auto
-  have 4:"differential_privacy (measure_spmf \<circ> M) adj \<epsilon> 0 "
+  have 4:"measure_spmf \<circ> N \<in> count_space UNIV \<Otimes>\<^sub>M count_space UNIV \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
+    using assms prod_measurable by blast
+  have 5:"differential_privacy (measure_spmf \<circ> M) adj \<epsilon> 0 "
     using M unfolding pure_dp_def by simp
-  have 5:"\<forall>y\<in>space (count_space UNIV). differential_privacy (\<lambda>x. (measure_spmf \<circ> N) (x, y)) adj \<epsilon>' 0"
+  have 6:"\<forall>y\<in>space (count_space UNIV). differential_privacy (\<lambda>x. (measure_spmf \<circ> N) (x, y)) adj \<epsilon>' 0"
     using N unfolding pure_dp_def 
     by (simp add: o_def)
-  have 6:"adj \<subseteq> space (count_space UNIV) \<times> space (count_space UNIV)"
-    by simp
   have "differential_privacy (\<lambda>x. (measure_spmf \<circ> M) x \<bind> (\<lambda>y. (measure_spmf \<circ> N) (x, y))) adj (\<epsilon> + \<epsilon>') (0 + 0)"
     using differential_privacy_composition_adaptive[of "\<epsilon>" "0" "\<epsilon>'" "0" "measure_spmf \<circ> M" "count_space UNIV" "count_space UNIV" "adj"
                                                    "measure_spmf \<circ> N" "count_space UNIV"]

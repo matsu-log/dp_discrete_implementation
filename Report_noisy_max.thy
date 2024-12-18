@@ -32,7 +32,7 @@ primrec is_count_queries :: "(('a, int) query) list \<Rightarrow> bool" where
 "is_count_queries (c#cs) = (if is_sensitivity c 1 then is_count_queries cs else False)"
 
 subsection \<open>component function\<close>
-lemma argmax_int_list_index_le_length:
+lemma argmax_int_list_index_lt_length:
   shows"0<length list \<Longrightarrow> snd (argmax_int_list list) <length list"
 proof (induct list)
   case Nil
@@ -288,7 +288,6 @@ next
 qed
 
 lemma spmf_discrete_laplace_noise_add_list_zero:
-  assumes "1\<le>epsilon1" and "1\<le>epsilon2"
 shows "\<And>list. length cs \<noteq> length list \<Longrightarrow> spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) list = 0"
 proof (induct cs)
   case Nil
@@ -297,19 +296,75 @@ proof (induct cs)
 next
   case (Cons a cs)
   then show ?case 
-  proof -
-    have "ennreal (spmf (discrete_laplace_noise_add_list (a # cs) epsilon1 epsilon2 x) list) = (\<Sum>\<^sup>+ xa. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa) * (\<Sum>\<^sup>+ xb. ennreal (spmf (discrete_laplace_mechanism a (Suc 0) epsilon1 epsilon2 x) xb) * indicator {Some list} (Some (xb # xa))))"
-      unfolding discrete_laplace_noise_add_list.simps
-      apply(simp add: ennreal_spmf_bind nn_integral_measure_spmf)
-      by(simp add: ennreal_indicator)
-    show ?thesis 
-      sorry
+  proof(cases "list = []")
+    case True
+    then show ?thesis 
+    proof -
+      have "ennreal (spmf (discrete_laplace_noise_add_list (a # cs) epsilon1 epsilon2 x) list) = 0"
+        unfolding discrete_laplace_noise_add_list.simps
+        apply(rewrite ennreal_spmf_bind,rewrite nn_integral_measure_spmf,rewrite ennreal_spmf_bind,rewrite nn_integral_measure_spmf)
+        using True by simp
+      then show ?thesis by simp
+    qed
+  next
+    case False
+    then show ?thesis 
+    proof -
+      have "ennreal (spmf (discrete_laplace_noise_add_list (a # cs) epsilon1 epsilon2 x) list) 
+          = (\<Sum>\<^sup>+ xa. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa) * (\<Sum>\<^sup>+ xb. ennreal (spmf (discrete_laplace_mechanism a (Suc 0) epsilon1 epsilon2 x) xb) * (indicator {Some list} (Some (xb # xa))::ennreal)))"
+        unfolding discrete_laplace_noise_add_list.simps
+        apply(simp add: ennreal_spmf_bind nn_integral_measure_spmf)
+        by(simp add: ennreal_indicator)
+      also have "... = (\<Sum>\<^sup>+ xa.
+         ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa) *
+        (\<Sum>\<^sup>+ xb. ennreal (spmf (discrete_laplace_mechanism a (Suc 0) epsilon1 epsilon2 x) xb) * indicator {tl list} xa * indicator {hd list} xb))"
+      proof -
+        have "\<And>xa xb. (indicator {Some list} (Some (xb # xa))::ennreal) = indicator {tl list} xa *indicator {hd list} xb"
+        proof -
+          fix xa::"int list" and xb::"int"
+        have "(indicator {Some list} (Some (xb # xa))::ennreal) = (if list = xb#xa then 1::int else 0)"
+          by simp
+        also have "... = (if (hd list = xb \<and> tl list = xa) then 1 else 0)"
+          using False by force
+        also have "... = (if tl list = xa then 1 else 0) * (if hd list = xb then 1 else 0)"
+          by simp
+        also have "... = indicator {tl list} xa * indicator {hd list} xb"
+          by simp
+        finally show "(indicator {Some list} (Some (xb # xa))::ennreal) = indicator {tl list} xa * indicator {hd list} xb"
+          by simp
+      qed
+      then have "\<And>xa xb. ennreal (spmf (discrete_laplace_mechanism a (Suc 0) epsilon1 epsilon2 x) xb) * (indicator {Some list} (Some (xb # xa))::ennreal) 
+                        = ennreal (spmf (discrete_laplace_mechanism a (Suc 0) epsilon1 epsilon2 x) xb) * indicator {tl list} xa * indicator {hd list} xb"
+        by (simp add: ab_semigroup_mult_class.mult_ac(1))
+      then show ?thesis by simp
+    qed
+    also have "... = (\<Sum>\<^sup>+ xa. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa) * (ennreal (spmf (discrete_laplace_mechanism a (Suc 0) epsilon1 epsilon2 x) (hd list)) * indicator {tl list} xa))"
+      by simp
+    also have "... = (\<Sum>\<^sup>+ xa. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa) *
+                             ennreal (spmf (discrete_laplace_mechanism a (Suc 0) epsilon1 epsilon2 x) (hd list)) * indicator {tl list} xa)"
+      using no_atp(124) by meson
+    also have "... = 0"
+    proof -
+      have "\<And>xa. xa\<in>{tl list} \<Longrightarrow> ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa) = 0"
+      proof -
+        have "length cs \<noteq> length (tl list)"
+          using Cons(2) False by auto
+        then show "\<And>xa. xa\<in>{tl list} \<Longrightarrow> ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa) = 0"
+          using Cons(1)[of "tl list"] by simp
+      qed
+      then show ?thesis by simp
+    qed
+    finally have "ennreal (spmf (discrete_laplace_noise_add_list (a # cs) epsilon1 epsilon2 x) list) = 0"
+      by simp
+    then show ?thesis by simp  
   qed
 qed
-
+qed
 
 lemma pure_dp_discrete_laplace_noise_add_list:
+  fixes cs::"('a,int) query list"
   assumes "1\<le>epsilon1" and "1\<le>epsilon2"
+and "countable (UNIV::'a list set)"
   shows "is_count_queries cs \<Longrightarrow> pure_dp (discrete_laplace_noise_add_list cs epsilon1 epsilon2) (length cs *(epsilon1/epsilon2))"
 proof(induct cs)
   case Nil
@@ -358,12 +413,10 @@ next
         using assms by simp
       show "0 \<le> real epsilon1 / real epsilon2"
         using assms by simp
-      show "measure_spmf \<circ> (\<lambda>(x, noisy_cs). bind_spmf (discrete_laplace_mechanism a 1 epsilon1 epsilon2 x)  (\<lambda>noisy_c. return_spmf (noisy_c # noisy_cs))) \<in> count_space UNIV \<Otimes>\<^sub>M count_space UNIV \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
-        unfolding o_def
-        apply(rewrite case_prod_beta,rewrite measure_spmf_bind)
-        unfolding o_def
-        apply(auto)
-        sorry
+      show "countable (UNIV::int list set)"
+        by simp
+      show "countable (UNIV::'a list set)" 
+        using assms(3) by simp
     qed
     then show "pure_dp (\<lambda>b. discrete_laplace_noise_add_list cs epsilon1 epsilon2 b \<bind> (\<lambda>noisy_cs. discrete_laplace_mechanism a 1 epsilon1 epsilon2 b \<bind> (\<lambda>noisy_c. return_spmf (noisy_c # noisy_cs)))) (real (length (a # cs)) * (real epsilon1 / real epsilon2))"
       using t1 t2 by auto
@@ -376,31 +429,152 @@ lemma spmf_report_noisy_max_bottom:
   unfolding report_noisy_max_def
   by auto
 
+lemma spmf_report_noisy_max_zero:
+  assumes "0<z"
+and "length cs \<le>z"
+  shows "spmf (report_noisy_max cs epsilon1 epsilon2 x) z = 0"
+proof (cases "cs = []")
+  case True
+  then show ?thesis
+    using spmf_report_noisy_max_bottom assms by simp
+next
+  case False
+  then show ?thesis
+  proof -
+    have "ennreal (spmf (report_noisy_max cs epsilon1 epsilon2 x) z) = 0"
+      unfolding report_noisy_max_def
+    proof(simp add:ennreal_spmf_bind nn_integral_measure_spmf ennreal_indicator)
+      have "\<And>list. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) list) * indicator {Some z} (Some (snd (argmax_int_list list))) = 0"
+      proof -
+        fix list::"int list"
+        show "ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) list) * indicator {Some z} (Some (snd (argmax_int_list list))) = 0 "
+        proof(cases "length list = length cs")
+          case True
+          then show ?thesis
+          proof-
+            have "indicator {Some z} (Some (snd (argmax_int_list list))) = 0"
+              unfolding indicator_def
+              using argmax_int_list_index_lt_length[of "list"] True False list.size(3) assms
+              by simp
+            then show ?thesis by auto
+          qed
+        next
+          case False
+          then show ?thesis 
+            using spmf_discrete_laplace_noise_add_list_zero by force
+        qed
+      qed
+      then show "(\<Sum>\<^sup>+ xa. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa) * indicator {Some z} (Some (snd (argmax_int_list xa)))) = 0"
+        by(rewrite nn_integral_0_iff,auto)
+    qed
+    then show ?thesis by simp
+  qed
+qed
+
 lemma ennreal_spmf_report_noisy_max_simps:
   assumes "0<length cs"
 and "1\<le>epsilon1" and "1\<le>epsilon2"
-  shows "ennreal (spmf (report_noisy_max cs epsilon1 epsilon2 x) z) = (\<Sum>\<^sup>+ xa\<in>{list. length list = length cs \<and> z = snd (argmax_int_list list)}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa))"
+and "z<length cs"
+  shows "ennreal (spmf (report_noisy_max cs epsilon1 epsilon2 x) z) =
+         (\<Sum>\<^sup>+ (a, c)\<in>{(a,c). length a = z \<and> length c = length cs - (z+1)}. \<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a@b#c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)))"
 proof -
-  have "ennreal (spmf (report_noisy_max cs epsilon1 epsilon2 x) z) = (\<Sum>\<^sup>+ xa. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa) * indicator {Some z} (Some (snd (argmax_int_list xa))))"  
+  have "ennreal (spmf (report_noisy_max cs epsilon1 epsilon2 x) z) = (\<Sum>\<^sup>+ list. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) list) * indicator {Some z} (Some (snd (argmax_int_list list))))"  
     unfolding report_noisy_max_def
     by(simp add: ennreal_spmf_bind nn_integral_measure_spmf ennreal_indicator)
-  also have "... = (\<Sum>\<^sup>+ xa. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa) * (if z = snd (argmax_int_list xa) then 1 else 0))"
-  proof -  
-    have "\<And>xa. indicator {Some z} (Some (snd (argmax_int_list xa))) = (if z = snd (argmax_int_list xa) then 1 else 0)"  
-      by auto
-    then have "\<And>xa. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa) * indicator {Some z} (Some (snd (argmax_int_list xa))) =  ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa) * (if z = snd (argmax_int_list xa) then 1 else 0)"
-      by simp
-    then show ?thesis by simp  
-  qed
-  also have "... = nn_integral (count_space {list. length list = length cs}) (\<lambda>xa. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa) * (if z = snd (argmax_int_list xa) then 1 else 0))"  
-    apply(rewrite nn_integral_count_space_eq[of "UNIV" " {list. length list = length cs}"],auto)
-    using spmf_discrete_laplace_noise_add_list_zero assms
+  also have "... =  (\<Sum>\<^sup>+ list\<in>{list. length list = length cs}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) list) * indicator {Some z} (Some (snd (argmax_int_list list))))"
+    apply(rule nn_integral_count_space_eq,auto)
+    using assms spmf_discrete_laplace_noise_add_list_zero 
     by metis
-  also have "... = nn_integral (count_space {list. length list = length cs \<and> z = snd (argmax_int_list list)}) (\<lambda>xa. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa) * (if z = snd (argmax_int_list xa) then 1 else 0))"
-    by(rewrite nn_integral_count_space_eq[of "{list. length list = length cs}" "{list. length list = length cs \<and> z = snd (argmax_int_list list)}"],auto)
-  also have "... = nn_integral (count_space {list. length list = length cs \<and> z = snd (argmax_int_list list)}) (\<lambda>xa. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa))"
-    by(rewrite nn_integral_cong,auto)
-  finally show ?thesis by simp  
+  also have "... =  (\<Sum>\<^sup>+ ((a, c), b)\<in>{((a,c),b). a = take z (a@b#c) \<and> b = nth (a@b#c) z \<and> c = drop (Suc z) (a@b#c) \<and> length (a@b#c) = length cs}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)) *  indicator {Some z} (Some (snd (argmax_int_list (a @ b # c)))))"
+    using nn_integral_bij_count_space[of "\<lambda>((a,c),b). a@b#c" "{((a,c),b). a = take z (a@b#c) \<and> b = nth (a@b#c) z \<and> c = drop (Suc z) (a@b#c) \<and> length (a@b#c) = length cs}" "{list. length list = length cs}"]
+    unfolding case_prod_beta' 
+    apply(rule)
+    unfolding bij_betw_def image_def inj_on_def
+  proof(rule+,force,force,force,rule,clarify,rule+)
+    fix x::"int list"
+    assume x:"x \<in> {list. length list = length cs}" 
+    show "x = fst (fst (((take z x, drop (Suc z) x),nth x z))) @ snd (((take z x, drop (Suc z) x),nth x z)) # snd (fst (((take z x, drop (Suc z) x),nth x z)))"
+      using x assms id_take_nth_drop[of "z" "x"]
+      by simp
+    show "((take z x, drop (Suc z) x),nth x z)\<in> {list.
+             fst (fst list) = take z (fst (fst list) @ snd list # snd (fst list)) \<and>
+             snd list = (fst (fst list) @ snd list # snd (fst list)) ! z \<and>
+             snd (fst list) = drop (Suc z) (fst (fst list) @ snd list # snd (fst list)) \<and> length (fst (fst list) @ snd list # snd (fst list)) = length cs}"
+      using x assms id_take_nth_drop[of "z" "x"]
+      by(auto)
+  qed
+  also have "... = (\<Sum>\<^sup>+ ((a, c), b).
+        ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)) * indicator {Some z} (Some (snd (argmax_int_list (a @ b # c)))) * indicator {((a,c),b). a = take z (a@b#c) \<and> b = nth (a@b#c) z \<and> c = drop (Suc z) (a@b#c) \<and> length (a@b#c) = length cs} ((a,c),b))"
+    using nn_integral_count_space_indicator[of "{((a, c), b). a = take z (a @ b # c) \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c) \<and> length (a@b#c) = length cs}"
+                                             "\<lambda>((a,c),b). ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)) * indicator {Some z} (Some (snd (argmax_int_list (a @ b # c))))"]
+    unfolding case_prod_beta
+    by simp
+  also have "...
+        = (\<Sum>\<^sup>+ (a,c). (\<Sum>\<^sup>+ b.  ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)) * indicator {Some z} (Some (snd (argmax_int_list (a @ b # c))))
+                               *  (indicator {((a, c), b). a = take z (a @ b # c) \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c) \<and> length (a@b#c) = length cs} ((a, c), b)::ennreal)))"
+    using nn_integral_fst_count_space[of "\<lambda>((a,c),b).  ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)) * indicator {Some z} (Some (snd (argmax_int_list (a @ b # c))))
+                               *  indicator {((a, c), b). a = take z (a @ b # c) \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c) \<and> length (a@b#c) = length cs} ((a, c), b)"]
+    unfolding case_prod_beta
+    by(auto)
+  also have "... = (\<Sum>\<^sup>+ (a, c)\<in>{(a,c). length a = z \<and> length c = length cs - (z+1)}. \<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a@b#c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)))"
+  proof -   
+    have "(\<Sum>\<^sup>+ (a,c). (\<Sum>\<^sup>+ b.  ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)) * indicator {Some z} (Some (snd (argmax_int_list (a @ b # c))))
+                               *  indicator {((a, c), b). a = take z (a @ b # c) \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c) \<and> length (a@b#c) = length cs} ((a, c), b)))
+        = (\<Sum>\<^sup>+ (a,c). (\<Sum>\<^sup>+ b.  ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)) *indicator {(a,c). length a = z \<and> length c = length cs - (z+1)} (a,c) * indicator {b. z = snd (argmax_int_list (a@b#c))} b))"
+    proof(rule nn_integral_cong,clarify,rule nn_integral_cong)
+      fix a c ::"int list" and b::int
+      have p:"indicator {Some z} (Some (snd (argmax_int_list (a @ b # c)))) * (indicator {((a, c), b). a = take z (a @ b # c) \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c) \<and> length (a @ b # c) = length cs} ((a, c), b)::ennreal) 
+          = (indicator {(a, c). length a = z \<and> length c = length cs - (z + 1)} (a, c)::ennreal) * (indicator {b. z = snd (argmax_int_list (a @ b # c))} b::ennreal)"
+      proof -
+        have "(indicator {Some z} (Some (snd (argmax_int_list (a @ b # c)))) * indicator {((a, c), b). a = take z (a @ b # c) \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c) \<and> length (a @ b # c) = length cs} ((a, c), b)::ennreal)
+            = indicator {z} (snd (argmax_int_list (a @ b # c))) * indicator {(a, c). length a = z \<and> length c = length cs - (z + 1)} (a, c)"
+        proof -
+          have 1:"indicator {Some z} (Some (snd (argmax_int_list (a @ b # c)))) = indicator {z} (snd (argmax_int_list (a @ b # c)))"
+            unfolding indicator_def by simp
+          have 2:"{((a, c), b). a = take z (a @ b # c) \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c) \<and> length (a @ b # c) = length cs} = {((a, c), b). length a = z \<and> length c = length cs -(z+1)}"
+            apply(rule+,clarify)   
+            using assms length_take[of "z"]
+              apply (metis min.absorb4)
+             apply(clarify)
+            using assms length_drop[of "Suc z"]
+             apply (metis Suc_eq_plus1)
+            apply(rule+,clarify,simp,clarify,simp)
+            using assms(4) by linarith
+          have 3:"indicator {((a, c), b). a = take z (a @ b # c) \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c) \<and> length (a @ b # c) = length cs} ((a, c), b)
+                   = indicator {(a, c). length a = z \<and> length c = length cs - (z + 1)} (a, c)"
+            apply(rewrite 2)
+            unfolding indicator_def by(auto)
+          show ?thesis 
+            by(rewrite 1, rewrite 3,simp)
+        qed
+        also have "... =indicator {(a, c). length a = z \<and> length c = length cs - (z + 1)} (a, c) * indicator {b. z = snd (argmax_int_list (a @ b # c))} b"
+          unfolding indicator_def
+          by auto
+        finally show ?thesis by simp
+      qed
+      show "ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)) * (indicator {Some z} (Some (snd (argmax_int_list (a @ b # c))))::ennreal) *
+       (indicator {((a, c), b). a = take z (a @ b # c) \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c) \<and> length (a @ b # c) = length cs} ((a, c), b)::ennreal) =
+       ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)) * (indicator {(a, c). length a = z \<and> length c = length cs - (z + 1)} (a, c)::ennreal) * (indicator {b. z = snd (argmax_int_list (a @ b # c))} b::ennreal)"
+        apply(rewrite semigroup_mult_class.mult.assoc)
+        by(rewrite p, rewrite semigroup_mult_class.mult.assoc,auto)
+    qed
+    also have "... =  (\<Sum>\<^sup>+ (a, c). (\<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a@b#c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c))  * indicator {(a, c). length a = z \<and> length c = length cs - (z + 1)} (a, c)))"
+    proof(rule nn_integral_cong,clarify)
+      fix a c::"int list"
+      show "\<integral>\<^sup>+ba\<in>{ba. z = snd (argmax_int_list (a @ ba # c))}. (ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ ba # c)) * indicator {(a, c). length a = z \<and> length c = length cs - (z + 1)} (a, c))\<partial>count_space UNIV =
+           (\<Sum>\<^sup>+ ba\<in>{ba. z = snd (argmax_int_list (a @ ba # c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ ba # c)) * indicator {(a, c). length a = z \<and> length c = length cs - (z + 1)} (a, c))"
+        by(rewrite nn_integral_count_space_indicator[of "{ba. z = snd (argmax_int_list (a @ ba # c))}"],auto)
+    qed
+    also have "... = (\<Sum>\<^sup>+ (a, c). (\<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a @ b # c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c))) * indicator {(a, c). length a = z \<and> length c = length cs - (z + 1)} (a, c))"
+      by(rewrite ab_semigroup_mult_class.mult.commute, rewrite nn_integral_cmult,simp,rewrite ab_semigroup_mult_class.mult.commute,simp)
+    also have "... = (\<Sum>\<^sup>+ (a, c)\<in>{(a,c). length a = z \<and> length c = length cs - (z+1)}. \<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a@b#c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)))"
+      using nn_integral_count_space_indicator[of "{(a,c). length a = z \<and> length c = length cs - (z+1)}" "\<lambda>(a,c). (\<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a @ b # c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)))"]
+      unfolding case_prod_beta
+      by simp
+    finally show ?thesis
+      by simp
+  qed
+  finally show ?thesis by simp
 qed
 
 lemma pointwise_pure_dp_inequality_report_noisy_max:
@@ -427,68 +601,62 @@ proof (cases "length cs =0")
   qed
 next
   case False
-  show "\<And>z. spmf (report_noisy_max cs epsilon1 epsilon2 x) z \<le> exp (real epsilon1 / real epsilon2) * spmf (report_noisy_max cs epsilon1 epsilon2 y) z "
+  assume cs:"length cs \<noteq> 0"
+  show "\<And>z. spmf (report_noisy_max cs epsilon1 epsilon2 x) z \<le> exp (real epsilon1 / real epsilon2) * spmf (report_noisy_max cs epsilon1 epsilon2 y) z"
   proof-
     fix z
-    have "ennreal (spmf (report_noisy_max cs epsilon1 epsilon2 x) z) = (\<Sum>\<^sup>+ xa\<in>{list. length list = length cs \<and> z = snd (argmax_int_list list)}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa))"
-      using ennreal_spmf_report_noisy_max_simps assms False by auto
-    have "ennreal (spmf (report_noisy_max cs epsilon1 epsilon2 y) z) = (\<Sum>\<^sup>+ xa\<in>{list. length list = length cs \<and> z = snd (argmax_int_list list)}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) xa))"
-      using ennreal_spmf_report_noisy_max_simps assms False by auto
-    have "exp(epsilon1/epsilon2) * (\<Sum>\<^sup>+ xa\<in>{list. length list = length cs \<and> z = snd (argmax_int_list list)}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) xa))
-        = (\<Sum>\<^sup>+ xa\<in>{list. length list = length cs \<and> z = snd (argmax_int_list list)}. exp(epsilon1/epsilon2) * ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) xa))"
-      by(rewrite nn_integral_cmult,auto)
-    have "(\<Sum>\<^sup>+ xa\<in>{list. length list = length cs \<and> z = snd (argmax_int_list list)}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa))
-        = (\<Sum>\<^sup>+ xa\<in>{((a, c), b). a = take z (a @ b # c) \<and> length (a @ b # c) = length cs \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c) \<and> z = snd (argmax_int_list (a @ b # c))}.
-            ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (case xa of (x, xa) \<Rightarrow> (case x of (a, c) \<Rightarrow> \<lambda>b. a @ b # c) xa)))"
-      apply(rewrite nn_integral_bij_count_space[of "\<lambda>((a,c),b). (a@b#c)"                                       
-                                         "{((a,c),b). a = take z (a@b#c) \<and> length(a@b#c)  = length cs \<and> b = nth (a@b#c) z \<and> c = drop (Suc z) (a@b#c) \<and> z= snd (argmax_int_list (a@b#c))}"
-                                         "{list. length list = length cs \<and> z = snd (argmax_int_list list)}" 
-                                         "\<lambda>list. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) list)"])
-        unfolding bij_betw_def image_def inj_on_def
-      proof(rule,clarify)
-        fix a1 c1 a2 c2::"int list" and b1 b2:: "int" 
-        assume "a1 = take (snd (argmax_int_list (a1 @ b1 # c1))) (a1@b1#c1)"
-          and  "a2 = take (snd (argmax_int_list (a1 @ b1 # c1))) (a2@b2#c2)"
-          and  "b1 = nth (a1@b1#c1) (snd (argmax_int_list (a1 @ b1 # c1)))"
-          and  "b2 = nth (a2@b2#c2) (snd (argmax_int_list (a1 @ b1 # c1)))"
-          and  "c1 = drop (Suc (snd (argmax_int_list (a1 @ b1 # c1)))) (a1@b1#c1)"
-          and  "c2 = drop (Suc (snd (argmax_int_list (a1 @ b1 # c1)))) (a2@b2#c2)"
-        then show "a1 @ b1 # c1 = a2 @ b2 # c2 \<Longrightarrow> (a1, c1) = (a2, c2) \<and> b1 = b2"
-          by metis
-      next
-        show "{y. \<exists>x\<in>{((a, c), b). a = take z (a @ b # c) \<and> length (a @ b # c) = length cs \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c) \<and> z = snd (argmax_int_list (a @ b # c))}.
-           y = (case x of (x, xa) \<Rightarrow> (case x of (a, c) \<Rightarrow> \<lambda>b. a @ b # c) xa)} = {list. length list = length cs \<and> z = snd (argmax_int_list list)}"
-        proof(rule,clarify,rule)
-          fix list
-          assume list:"list \<in> {list. length list = length cs \<and> z = snd (argmax_int_list list)}"
-          show "list \<in> {y. \<exists>x\<in>{(a, b, c). a = take z (a @ b # c) \<and> length (a @ b # c) = length cs \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c) \<and> z = snd (argmax_int_list (a @ b # c))}. y = (case x of (a, b, c) \<Rightarrow> a @ b # c)}"
-          proof(rule,rule)
-            have "snd (argmax_int_list list) < length list"
-              using False argmax_int_list_index_le_length[of "list"] list by fastforce 
-            then show "list = (case ((take (snd(argmax_int_list list)) list), (nth list (snd(argmax_int_list list))),(drop (Suc (snd(argmax_int_list list))) list)) of (a, b, c) \<Rightarrow> a @ b # c)"
-              using id_take_nth_drop[of "(snd(argmax_int_list list))" "list"] by auto
-            then have p:"take (snd (argmax_int_list list)) list@ list ! snd (argmax_int_list list)# drop (Suc (snd (argmax_int_list list))) list = list"
-              by simp
-            show "((take (snd(argmax_int_list list)) list), (nth list (snd(argmax_int_list list))),(drop (Suc (snd(argmax_int_list list))) list)) \<in> {(a, b, c). a = take z (a @ b # c) \<and> length (a @ b # c) = length cs \<and> b = (a @ b # c) ! z \<and> c = drop (Suc z) (a @ b # c) \<and> z = snd (argmax_int_list (a @ b # c))}"
-              apply(clarify,rewrite p,rewrite p,rewrite p,rewrite p,rewrite p)
-              using list by auto
-          qed
+    show "spmf (report_noisy_max cs epsilon1 epsilon2 x) z \<le> exp (real epsilon1 / real epsilon2) * spmf (report_noisy_max cs epsilon1 epsilon2 y) z"
+    proof(cases "z<length cs")
+      case True
+      then show ?thesis 
+      proof -
+        have x:"ennreal (spmf (report_noisy_max cs epsilon1 epsilon2 x) z) =  (\<Sum>\<^sup>+ (a, c)\<in>{(a, c). length a = z \<and> length c = length cs - (z + 1)}. \<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a @ b # c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)))"
+          using assms ennreal_spmf_report_noisy_max_simps[of "cs" "epsilon1" "epsilon2"  "z" "x"] True
+          by linarith
+        have y:"ennreal (spmf (report_noisy_max cs epsilon1 epsilon2 y) z) =  (\<Sum>\<^sup>+ (a, c)\<in>{(a, c). length a = z \<and> length c = length cs - (z + 1)}. \<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a @ b # c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (a @ b # c)))"
+          using assms ennreal_spmf_report_noisy_max_simps[of "cs" "epsilon1" "epsilon2"  "z" "y"] True
+          by linarith
+        have exp_y:"ennreal (exp (epsilon1/epsilon2) * spmf (report_noisy_max cs epsilon1 epsilon2 y) z) 
+                = (\<Sum>\<^sup>+ (a, c)\<in>{(a, c). length a = z \<and> length c = length cs - (z + 1)}. \<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a @ b # c))}. ennreal (exp (epsilon1/epsilon2)) * ennreal ((spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (a @ b # c))))"
+        proof-
+          have "ennreal (exp (epsilon1/epsilon2) * spmf (report_noisy_max cs epsilon1 epsilon2 y) z) = ennreal (exp (epsilon1/epsilon2)) * (\<Sum>\<^sup>+ (a, c)\<in>{(a, c). length a = z \<and> length c = length cs - (z + 1)}. \<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a @ b # c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (a @ b # c)))"
+            by(rewrite ennreal_mult',simp, rewrite y, simp)
+          also have "... = (\<Sum>\<^sup>+ (a, c)\<in>{(a, c). length a = z \<and> length c = length cs - (z + 1)}. ennreal (exp (real epsilon1 / real epsilon2)) * (\<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a @ b # c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (a @ b # c))))"
+            using nn_integral_cmult[of "\<lambda>(a,c). \<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a @ b # c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (a @ b # c))" "count_space {(a, c). length a = z \<and> length c = length cs - (z + 1)}"
+                                       "ennreal (exp(epsilon1/epsilon2))"] 
+            unfolding case_prod_beta
+            by(rule,simp)
+          also have "... = (\<Sum>\<^sup>+ (a, c)\<in>{(a, c). length a = z \<and> length c = length cs - (z + 1)}. \<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a @ b # c))}. ennreal (exp (real epsilon1 / real epsilon2)) * ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (a @ b # c)))"
+            by(rewrite nn_integral_cmult,auto)
+          finally show ?thesis by simp
         qed
-        show "(\<Sum>\<^sup>+ xa\<in>{list. length list = length cs \<and> z = snd (argmax_int_list list)}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa)) =
-              (\<Sum>\<^sup>+ xa\<in>{list. length list = length cs \<and> z = snd (argmax_int_list list)}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) xa))"
-          by auto
+        have "ennreal (spmf (report_noisy_max cs epsilon1 epsilon2 x) z) \<le> ennreal (exp (epsilon1/epsilon2) * spmf (report_noisy_max cs epsilon1 epsilon2 y) z)"
+          apply(rewrite x, rewrite exp_y)
+        proof(rule nn_integral_mono,auto)
+          fix a c::"int list"
+          assume "z = length a"
+            and "length c = length cs - Suc(length a)"
+          show "(\<Sum>\<^sup>+ b\<in>{b. length a = snd (argmax_int_list (a @ b # c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)))
+           \<le> (\<Sum>\<^sup>+ b\<in>{b. length a = snd (argmax_int_list (a @ b # c))}. ennreal (exp (real epsilon1 / real epsilon2)) * ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (a @ b # c)))"
+            sorry
+        qed
+        then show ?thesis by simp
       qed
-      also have "... = ..."
-        find_theorems "(_,_,_)"
-        find_theorems "(\<Sum>\<^sup>+ _\<in>_.(\<Sum>\<^sup>+_. _))"
+    next
+      case False
+      then show ?thesis
+        using spmf_report_noisy_max_zero[of "z" "cs"] cs by simp
+    qed
+  qed
+qed      
         
-qed
+
 
 lemma pure_dp_report_noisy_max:
   assumes "1\<le>epsilon1" and "1\<le>epsilon2"
 and "is_count_queries cs"
   shows "pure_dp (report_noisy_max cs epsilon1 epsilon2) (epsilon1/epsilon2)"
-  using pointwise_pure_dp_inequality_report_noisy_max[of "cs" _ _ "epsilon1" "epsilon2"]
+  using pointwise_pure_dp_inequality_report_noisy_max[of "cs" _ _ _ "epsilon1" "epsilon2"]
         pointwise_spmf_bound_imp_pure_dp_nat[of "(\<lambda>l. report_noisy_max cs epsilon1 epsilon2 l)" "epsilon1/epsilon2"] 
         assms
   by simp
