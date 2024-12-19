@@ -577,6 +577,122 @@ proof -
   finally show ?thesis by simp
 qed
 
+lemma test:
+"\<And>rs1 rs2. length rs1 = length cs \<Longrightarrow> length rs2 = length cs \<Longrightarrow> ((map2 (\<lambda>r::int. (\<lambda>c. r+c))) rs1 cs = (map2 (\<lambda>r::int. (\<lambda>c. r+c)))  rs2 cs) = (rs1 = rs2)"
+proof (induct cs)
+  case Nil
+  then show ?case 
+    by simp
+next
+  case (Cons a cs)
+  then show ?case
+    unfolding zip_Cons
+  proof(auto)
+    assume H:"map (\<lambda>(x, y). x + y) (case rs1 of [] \<Rightarrow> [] | z # zs \<Rightarrow> (z, a) # zip zs cs) = map (\<lambda>(x, y). x + y) (case rs2 of [] \<Rightarrow> [] | z # zs \<Rightarrow> (z, a) # zip zs cs) "
+    have 1:"rs1 \<noteq> []"
+      using Cons by auto
+    have 2:"rs2 \<noteq> []"
+      using Cons by auto
+    have 3:"map (\<lambda>(x, y). x + y) (case rs1 of [] \<Rightarrow> [] | z # zs \<Rightarrow> (z, a) # zip zs cs) = (hd rs1 + a)#(map (\<lambda>(x, y). x + y) (zip (tl rs1) cs))"
+      using 1 list.case_eq_if list.map
+      by (simp add: list.case_eq_if)
+    have 4:"map (\<lambda>(x, y). x + y) (case rs2 of [] \<Rightarrow> [] | z # zs \<Rightarrow> (z, a) # zip zs cs) = (hd rs2 + a)#(map (\<lambda>(x, y). x + y) (zip (tl rs2) cs))"
+      using 2 list.case_eq_if list.map
+      by (simp add: list.case_eq_if)
+    have "(hd rs1 + a)#(map (\<lambda>(x, y). x + y) (zip (tl rs1) cs)) =  (hd rs2 + a)#(map (\<lambda>(x, y). x + y) (zip (tl rs2) cs))"
+      using H 3 4 by simp
+    then have "hd rs1 = hd rs2 \<and> tl rs1 = tl rs2"
+      using Cons by auto
+    then show "rs1 = rs2" 
+      using "1" "2" list.expand by blast
+  qed
+qed
+
+
+
+lemma ennreal_spmf_report_noisy_max_simps2:
+  assumes "0<length cs"
+and "1\<le>epsilon1" and "1\<le>epsilon2"
+and "z<length cs"
+  shows "ennreal (spmf (report_noisy_max cs epsilon1 epsilon2 x) z) =
+         (\<Sum>\<^sup>+ (ra, rc)\<in>{(ra, rc). length ra = z \<and> length rc = length cs - (z + 1)}.
+       \<Sum>\<^sup>+ rb\<in>{rb. z = snd (argmax_int_list (map2 (+) ra (take z (map (\<lambda>q. q x) cs)) @ (rb+nth cs z x) # map2 (+) rc (drop (Suc z) (map (\<lambda>q. q x) cs))))}.
+         ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (map2 (+) ra (take z (map (\<lambda>q. q x) cs)) @ (rb+nth cs z x) # map2 (+) rc (drop (Suc z) (map (\<lambda>q. q x) cs)))))"
+proof -
+  have "ennreal (spmf (report_noisy_max cs epsilon1 epsilon2 x) z) 
+    = (\<Sum>\<^sup>+ (a, c)\<in>{(a,c). length a = z \<and> length c = length cs - (z+1)}. \<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a@b#c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)))"
+    using ennreal_spmf_report_noisy_max_simps assms by simp    
+  also have "... = (\<Sum>\<^sup>+ (ra, rc)\<in>{(ra,rc). length ra = z \<and> length rc = length cs - (z+1)}. \<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list ((map2 (\<lambda>r::int. (\<lambda>c. r+c)) ra (take z (map (\<lambda>q. q(x)) cs)))@b#(map2 (\<lambda>r::int. (\<lambda>c. r+c)) rc (drop (Suc z) (map (\<lambda>q. q(x)) cs)))))}.
+                                                                                             ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) ((map2 (\<lambda>r::int. (\<lambda>c. r+c)) ra (take z (map (\<lambda>q. q(x)) cs))) @ b # (map2 (\<lambda>r::int. (\<lambda>c. r+c)) rc (drop (Suc z) (map (\<lambda>q. q(x)) cs))))))"
+    using nn_integral_bij_count_space[of "\<lambda>(ra,rc). ((map2 (\<lambda>r::int. (\<lambda>c. r+c)) ra (take z (map (\<lambda>q. q(x)) cs))), (map2 (\<lambda>r::int. (\<lambda>c. r+c)) rc (drop (Suc z) (map (\<lambda>q. q(x)) cs))))"
+                                         "{(ra,rc). length ra = z \<and> length rc = length cs - (z+1)}" "{(a,c). length a = z \<and> length c = length cs - (z+1)}"
+                                         "\<lambda>(a,c). (\<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a @ b # c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)))"]  
+    unfolding case_prod_beta fst_conv snd_conv
+    apply(rule)
+    unfolding bij_betw_def inj_on_def image_def
+  proof(rule+,auto)
+    fix a b aa ba::"int list"
+    assume H1:"map (\<lambda>p. fst p + snd p) (zip a (take (length a) (map (\<lambda>q. q x) cs))) = map (\<lambda>p. fst p + snd p) (zip aa (take (length a) (map (\<lambda>q. q x) cs))) "    
+      and H2:"length aa = length a"
+      and H3:"z = length a"
+      and H4:"map (\<lambda>p. fst p + snd p) (zip b (drop (Suc (length a)) (map (\<lambda>q. q x) cs))) = map (\<lambda>p. fst p + snd p) (zip ba (drop (Suc (length a)) (map (\<lambda>q. q x) cs)))"
+      and H5:"length b = length cs - Suc (length a)" and H6:" length ba = length cs - Suc (length a)"
+    have 1:"length a = length (take (length a) (map (\<lambda>q. q x) cs))"
+      using H3 assms by simp
+    have 2:"length aa = length (take (length a) (map (\<lambda>q. q x) cs))"
+      using H2 H3 assms by simp
+    have 3:"map2 (+) a (take (length a) (map (\<lambda>q. q x) cs)) = map2 (+) aa (take (length a) (map (\<lambda>q. q x) cs))"
+      using H1 unfolding case_prod_beta by simp
+    show "a = aa"
+      using test[of "a" "(take (length a) (map (\<lambda>q. q x) cs))" "aa"] 1 2 3
+      by simp
+    have 4:"length b = length (drop (Suc (length a)) (map (\<lambda>q. q x) cs))"
+      using H5 H3 assms by simp
+    have 5:"length ba = length (drop (Suc (length a)) (map (\<lambda>q. q x) cs))"
+      using H6 H3 assms by simp
+    have 6:"map2 (+) b (drop (Suc (length a)) (map (\<lambda>q. q x) cs)) = map2 (+) ba (drop (Suc (length a)) (map (\<lambda>q. q x) cs))"
+      using H4 unfolding case_prod_beta by simp
+    show "b=ba"
+      using test[of "b" "(drop (Suc (length a)) (map (\<lambda>q. q x) cs))" "ba"] 4 5 6
+      by simp
+  next
+    fix aa ba::"int list"
+    assume "z = length aa" and "length ba = length cs - Suc (length aa)"
+    then show "min (length cs) (length aa) = length aa"
+      using assms by simp
+  next
+    fix a b::"int list"
+    assume H1:"length b = length cs - Suc (length a)" and H2:"z = length a"
+    show "\<exists>aa. length aa = length a \<and> (\<exists>ba. length ba = length cs - Suc (length a) \<and> a = map (\<lambda>p. fst p + snd p) (zip aa (take (length a) (map (\<lambda>q. q x) cs))) \<and> b = map (\<lambda>p. fst p + snd p) (zip ba (drop (Suc (length a)) (map (\<lambda>q. q x) cs))))"  
+      sorry
+  qed
+  also have "... = (\<Sum>\<^sup>+ (ra, rc)\<in>{(ra, rc). length ra = z \<and> length rc = length cs - (z + 1)}.
+         \<Sum>\<^sup>+ rb\<in>{rb. z = snd (argmax_int_list (map2 (+) ra (take z (map (\<lambda>q. q x) cs)) @ (rb+nth cs z x) # map2 (+) rc (drop (Suc z) (map (\<lambda>q. q x) cs))))}.
+         ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (map2 (+) ra (take z (map (\<lambda>q. q x) cs)) @ (rb+nth cs z x) # map2 (+) rc (drop (Suc z) (map (\<lambda>q. q x) cs)))))"
+  proof(rule nn_integral_cong,auto)
+    fix a b::"int list"
+    assume "z = length a" and "length b = length cs - Suc(length a)"
+    show "(\<Sum>\<^sup>+ ba\<in>{ba. length a = snd (argmax_int_list (map2 (+) a (take (length a) (map (\<lambda>q. q x) cs)) @ ba # map2 (+) b (drop (Suc (length a)) (map (\<lambda>q. q x) cs))))}.
+              ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (map2 (+) a (take (length a) (map (\<lambda>q. q x) cs)) @ ba # map2 (+) b (drop (Suc (length a)) (map (\<lambda>q. q x) cs))))) =
+           (\<Sum>\<^sup>+ rb\<in>{rb. length a = snd (argmax_int_list (map2 (+) a (take (length a) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length a) x) # map2 (+) b (drop (Suc (length a)) (map (\<lambda>q. q x) cs))))}.
+              ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (map2 (+) a (take (length a) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length a) x) # map2 (+) b (drop (Suc (length a)) (map (\<lambda>q. q x) cs)))))"
+      using nn_integral_bij_count_space[of "\<lambda>rb. rb+(cs!length a) x" "{rb. length a = snd (argmax_int_list (map2 (+) a (take (length a) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length a) x) # map2 (+) b (drop (Suc (length a)) (map (\<lambda>q. q x) cs))))}"
+                                             "{ba. length a = snd (argmax_int_list (map2 (+) a (take (length a) (map (\<lambda>q. q x) cs)) @ ba # map2 (+) b (drop (Suc (length a)) (map (\<lambda>q. q x) cs))))}"
+                                             "\<lambda>ba. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (map2 (+) a (take (length a) (map (\<lambda>q. q x) cs)) @ ba # map2 (+) b (drop (Suc (length a)) (map (\<lambda>q. q x) cs))))"]
+      unfolding case_prod_beta fst_conv snd_conv
+      apply(rule)
+      unfolding bij_betw_def inj_on_def image_def
+    proof(auto,rule)
+      fix xa::int
+      assume "length a = snd (argmax_int_list (map (\<lambda>p. fst p + snd p) (zip a (take (length a) (map (\<lambda>q. q x) cs))) @ xa # map (\<lambda>p. fst p + snd p) (zip b (drop (Suc (length a)) (map (\<lambda>q. q x) cs)))))"
+      then show "length a = snd (argmax_int_list (map (\<lambda>p. fst p + snd p) (zip a (take (length a) (map (\<lambda>q. q x) cs))) @ ((xa-(cs ! length a) x) + (cs ! length a) x) # map (\<lambda>p. fst p + snd p) (zip b (drop (Suc (length a)) (map (\<lambda>q. q x) cs))))) \<and> xa = (xa-(cs ! length a) x) + (cs ! length a) x "
+        by auto
+    qed
+  qed
+  finally show ?thesis
+    by simp
+qed
+
 lemma pointwise_pure_dp_inequality_report_noisy_max:
   assumes "is_count_queries cs"
 and "(x,y)\<in>adj"
