@@ -561,8 +561,8 @@ proof -
     also have "... =  (\<Sum>\<^sup>+ (a, c). (\<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a@b#c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c))  * indicator {(a, c). length a = z \<and> length c = length cs - (z + 1)} (a, c)))"
     proof(rule nn_integral_cong,clarify)
       fix a c::"int list"
-      show "(\<integral>\<^sup>+ba\<in>{ba. z = snd (argmax_int_list (a @ ba # c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ ba # c)) * indicator {(a, c). length a = z \<and> length c = length cs - (z + 1)} (a, c)\<partial>count_space UNIV) =
-           (\<Sum>\<^sup>+ ba\<in>{ba. z = snd (argmax_int_list (a @ ba # c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ ba # c)) * indicator {(a, c). length a = z \<and> length c = length cs - (z + 1)} (a, c))"
+      show "\<integral>\<^sup>+ba\<in>{ba. z = snd (argmax_int_list (a @ ba # c))}. (ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ ba # c)) * indicator {(a, c). length a = z \<and> length c = length cs - (z + 1)} (a, c))\<partial>count_space UNIV =
+           (\<Sum>\<^sup>+ ba\<in>{ba. z = snd (argmax_int_list (a @ ba # c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ ba # c)) * indicator {(a, c). length a = z \<and> length c = length cs - (z + 1)} (a, c)) "
         by(rewrite nn_integral_count_space_indicator[of "{ba. z = snd (argmax_int_list (a @ ba # c))}"],auto)
     qed
     also have "... = (\<Sum>\<^sup>+ (a, c). (\<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a @ b # c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c))) * indicator {(a, c). length a = z \<and> length c = length cs - (z + 1)} (a, c))"
@@ -609,11 +609,46 @@ next
 qed
 
 lemma test2:
-  shows"\<And>list. 0<length list \<Longrightarrow> length list = length list2 \<Longrightarrow> list = map (\<lambda>p. fst p + snd p) (zip (map2 (\<lambda>a c. a-c) list list2) list2)"
-  sorry
-
-
-
+  fixes list2::"int list"
+  shows"\<And>list. length list = length list2 \<Longrightarrow> list = map (\<lambda>p. fst p + snd p) (zip (map2 (\<lambda>a c. a-c) list list2) list2)"
+proof(induct list2)
+  case Nil
+  then show ?case by simp
+next
+  case (Cons a list2)
+  then show ?case 
+  proof -
+    have 1:"list = hd list # tl list"
+    proof-
+      have "list \<noteq> []" using Cons by auto
+      then show ?thesis by simp
+    qed
+    show ?thesis
+      apply(rewrite 1)
+      unfolding zip.simps 
+    proof -
+      have 1:"(case list of [] \<Rightarrow> [] | z # zs \<Rightarrow> (z, a) # zip zs list2)
+          = (hd list, a) # zip (tl list) list2"
+        using list.cases(2)[of _ _ "hd list" "tl list"] 1 by auto
+      have 2:"map (\<lambda>(x, y). x - y) (case list of [] \<Rightarrow> [] | z # zs \<Rightarrow> (z, a) # zip zs list2)
+            = (hd list - a)# (map (\<lambda>(x, y). x - y) (zip (tl list) list2))"
+        apply(rewrite 1)
+        using list.map(2) by simp
+      have 3:"(case map (\<lambda>(x, y). x - y) (case list of [] \<Rightarrow> [] | z # zs \<Rightarrow> (z, a) # zip zs list2) of [] \<Rightarrow> [] | z # zs \<Rightarrow> (z, a) # zip zs list2)
+          = (hd list-a, a) # zip ((map (\<lambda>(x, y). x - y) (zip (tl list) list2))) list2"
+        apply(rewrite 2)
+        using list.case(2)[of _ _ "hd list- a"] by simp
+      have 4:"map (\<lambda>p. fst p + snd p) (case map (\<lambda>(x, y). x - y) (case list of [] \<Rightarrow> [] | z # zs \<Rightarrow> (z, a) # zip zs list2) of [] \<Rightarrow> [] | z # zs \<Rightarrow> (z, a) # zip zs list2)
+          = (hd list) #  map (\<lambda>p. fst p + snd p) (zip ((map (\<lambda>(x, y). x - y) (zip (tl list) list2))) list2)"
+        apply(rewrite 3)
+        using list.map(2)[of "(\<lambda>p. fst p + snd p)" "(hd list-a,a)" "zip (map2 (-) (tl list) list2) list2"] unfolding case_prod_beta
+        by(auto)
+      show "hd list # tl list = map (\<lambda>p. fst p + snd p) (case map (\<lambda>(x, y). x - y) (case list of [] \<Rightarrow> [] | z # zs \<Rightarrow> (z, a) # zip zs list2) of [] \<Rightarrow> [] | z # zs \<Rightarrow> (z, a) # zip zs list2)"
+        apply(rewrite 4)
+        using Cons(1)[of "tl list"] Cons(2) by simp
+    qed
+  qed
+qed
 
 lemma ennreal_spmf_report_noisy_max_simps2:
   assumes "0<length cs"
@@ -673,10 +708,9 @@ proof -
     have 2:"length (map2 (\<lambda>a c. a-c) b (drop (Suc(length a)) (map (\<lambda>q. q x) cs))) = length cs - Suc (length a)"
       using assms H1 by auto
     have 3:"a = map (\<lambda>p. fst p + snd p) (zip (map2 (\<lambda>a c. a-c) a (take (length a) (map (\<lambda>q. q x) cs))) (take (length a) (map (\<lambda>q. q x) cs)))"
-      using test2[of"a" "map2 (\<lambda>a c. a-c) a (take (length a) (map (\<lambda>q. q x) cs))"] 1 H2 assms
-      sorry
+      using test2 H2 1 by simp
     have 4:"b = map (\<lambda>p. fst p + snd p) (zip (map2 (\<lambda>a c. a-c) b (drop (Suc(length a)) (map (\<lambda>q. q x) cs))) (drop (Suc (length a)) (map (\<lambda>q. q x) cs)))"
-      sorry
+      using test2 H1 2 by simp
     show "\<exists>aa. length aa = length a \<and> (\<exists>ba. length ba = length cs - Suc (length a) \<and> a = map (\<lambda>p. fst p + snd p) (zip aa (take (length a) (map (\<lambda>q. q x) cs))) \<and> b = map (\<lambda>p. fst p + snd p) (zip ba (drop (Suc (length a)) (map (\<lambda>q. q x) cs))))"  
       using 1 2 3 4 by blast
   qed
@@ -706,6 +740,123 @@ proof -
   finally show ?thesis
     by simp
 qed
+
+lemma fix_noise:
+  assumes "1\<le>epsilon1"
+    and "1\<le>epsilon2"
+    and "length cs = length ra + length rc +1"
+  shows "spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))
+        = (\<Prod>(r,i)\<in>set (zip (map real_of_int ra) [0.. int(length ra)-1]). exp (- (real epsilon1 * \<bar>r\<bar>) / epsilon2))
+          * exp (- (real epsilon1 * \<bar>rb\<bar>) / real epsilon2) 
+          * (\<Prod>(r,i)\<in>set (zip (map real_of_int rc) [int(length ra+1).. int(length cs -1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / epsilon2))"
+proof-
+  have "spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))
+      = ((exp (real epsilon1 / real epsilon2) - 1) / (exp (real epsilon1 / real epsilon2) + 1)) ^ length cs *
+    (\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) cs) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [0..int (length cs - 1)]).
+       exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2))"
+  apply(rewrite spmf_discrete_laplace_noise_add_list)
+    using assms by simp_all  
+  have "(\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) cs) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [0..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2))
+      = (\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]). exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2)) *
+        (\<Prod>((c, z), i)\<in>{((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra))}. exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2)) *
+        (\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra)) cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2))"
+  proof -
+    have 1:"set (zip (zip (map (\<lambda>h x. real_of_int (h x)) cs) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [0..int (length cs - 1)])
+           = set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y)  cs))))) [0..int(length ra -1)])
+           \<union> {(((\<lambda>x::'a list. real_of_int ((cs ! length ra)x)), real_of_int(rb + (cs ! length ra) y)), int (length ra))}
+           \<union> set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra))cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y)  cs))))) [(length ra +1)..int(length cs -1)])"
+    proof -
+      have 1:"zip (zip (map (\<lambda>h x. real_of_int (h x)) cs) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [0..int (length cs - 1)]
+      = zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y)  cs))))) [0..int(length ra -1)] @
+        (((\<lambda>x::'a list. real_of_int ((cs ! length ra)x)), real_of_int(rb + (cs ! length ra) y)), int (length ra)) #
+       zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra))cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y)  cs))))) [(length ra +1)..int(length cs -1)]"
+        sorry
+      then show ?thesis by simp
+    qed
+    have 2:"(set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]) \<union>
+             {((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra))}) \<inter>
+            set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra)) cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [int (length ra + 1)..int (length cs - 1)]) = {}"
+    proof(rule,clarify)
+      fix a b ba
+      assume H:"((a, b), ba)
+       \<in> set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]) \<union>
+          {((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra))}"
+      have 1:"ba \<in> set  [0..int (length ra - 1)]\<union> {int (length ra)}"
+        using H set_zip_rightD by fast
+      have "((a, b), ba) \<notin> set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra)) cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [int (length ra + 1)..int (length cs - 1)])"
+        using 1 set_zip_rightD[of "(a,b)" "ba" _ "[int (length ra + 1)..int (length cs - 1)]"]
+        by fastforce
+      then show "((a, b), ba) \<in> set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra)) cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [int (length ra + 1)..int (length cs - 1)]) \<Longrightarrow> ((a, b), ba) \<in> {}"
+        by simp
+    next
+      show "{} \<subseteq> (set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]) \<union>
+           {((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra))}) \<inter>
+          set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra)) cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [int (length ra + 1)..int (length cs - 1)])"
+        by simp
+    qed
+    have 3:"set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]) \<inter>
+    {((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra))} = {}"
+    proof(rule,clarify)
+      fix a b ba
+      have " ((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra))
+         \<notin> set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)])"
+        sorry
+      then show "((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra))
+         \<in> set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]) \<Longrightarrow>
+        ((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra)) \<in> {}" by simp
+    next
+      show "{} \<subseteq> set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]) \<inter>
+            {((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra))}" by simp
+     qed
+     show ?thesis
+       apply(rewrite 1)
+       apply(rewrite comm_monoid_mult_class.prod.union_disjoint,simp,simp)
+       using 2 apply(simp)
+       apply(rewrite comm_monoid_mult_class.prod.union_disjoint,simp,simp)
+       using 3 by auto
+   qed
+   have " (\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]). exp (- (epsilon1 * \<bar>z - c y\<bar>) / epsilon2))
+       = (\<Prod>(r,i)\<in>set (zip (map real_of_int ra) [0.. int(length ra)-1]). exp (- (real epsilon1 * \<bar>r\<bar>) / epsilon2))"
+    using comm_monoid_mult_class.prod.reindex_bij_betw[of "\<lambda>((c,z),i). (z - c y,i)" "set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)])"
+                                                         "set (zip ra [0.. int(length ra)-1])" "\<lambda>(r,i). exp (- (epsilon1 * \<bar>r\<bar>) / epsilon2)"]
+    unfolding case_prod_beta fst_conv snd_conv
+  proof(rule)
+    show "bij_betw (\<lambda>p. (snd (fst p) - fst (fst p) y, snd p)) (set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (take (length ra) cs)) (map real_of_int (map (\<lambda>p. fst p + snd p) (zip ra (take (length ra) (map (\<lambda>q. q y) cs)))))) [0..int (length ra - 1)]))
+     (set (map (\<lambda>p. (real_of_int (fst p), snd p)) (zip ra [0..int (length ra) - 1])))"
+      sorry
+    show "(\<Prod>p\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>fst p\<bar>) / real epsilon2)) = (\<Prod>p\<in>set (map (\<lambda>p. (real_of_int (fst p), snd p)) (zip ra [0..int (length ra) - 1])). exp (- (real epsilon1 * \<bar>fst p\<bar>) / real epsilon2))"
+    proof-
+      have "set (zip (map real_of_int ra) [0..int (length ra) - 1]) = set (map (\<lambda>p. (real_of_int (fst p), snd p)) (zip ra [0..int (length ra) - 1]))"
+        sorry
+      then show ?thesis by auto
+    qed
+  qed
+  have "(\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra)) cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2))
+      = (\<Prod>(r,i)\<in>set (zip (map real_of_int rc) [int(length ra+1).. int(length cs -1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / epsilon2))"
+    using comm_monoid_mult_class.prod.reindex_bij_betw[of "\<lambda>((c,z),i). (z - c y,i)" "set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra)) cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [int (length ra + 1)..int (length cs - 1)])"
+                                                          "set (zip (map real_of_int rc) [int(length ra+1).. int(length cs -1)])" "\<lambda>(r,i). exp (- (epsilon1 * \<bar>r\<bar>) / epsilon2)"]
+    unfolding case_prod_beta fst_conv snd_conv
+  proof(rule)
+    show "bij_betw (\<lambda>p. (snd (fst p) - fst (fst p) y, snd p))
+     (set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (drop (Suc (length ra)) cs)) (map real_of_int (map (\<lambda>p. fst p + snd p) (zip rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))))) [int (length ra + 1)..int (length cs - 1)]))
+     (set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]))"
+      sorry
+    show "(\<Prod>p\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>fst p\<bar>) / real epsilon2)) =
+    (\<Prod>p\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>fst p\<bar>) / real epsilon2))"
+      by simp
+  qed
+  have "(\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]). exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2)) *
+    (\<Prod>((c, z), i)\<in>{((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra))}. exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2)) *
+    (\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra)) cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [int (length ra + 1)..int (length cs - 1)]).
+       exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2))
+        = (\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]). exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2)) *
+    (\<Prod>((c, z), i)\<in>{((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra))}. exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2)) *
+    (\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra)) cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [int (length ra + 1)..int (length cs - 1)]).
+       exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2))"
+    sorry
+  show ?thesis sorry
+qed
+
 
 lemma pointwise_pure_dp_inequality_report_noisy_max:
   assumes "is_count_queries cs"
@@ -765,23 +916,81 @@ next
           also have "... =(\<Sum>\<^sup>+ (ra, rc)\<in>{(ra, rc). length ra = z \<and> length rc = length cs - (z + 1)}. ennreal (exp(epsilon1/epsilon2)) *
        (\<Sum>\<^sup>+ rb\<in>{rb. z = snd (argmax_int_list (map2 (+) ra (take z (map (\<lambda>q. q y) cs)) @ (rb + (cs ! z) y) # map2 (+) rc (drop (Suc z) (map (\<lambda>q. q y) cs))))}.
          ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (map2 (+) ra (take z (map (\<lambda>q. q y) cs)) @ (rb + (cs ! z) y) # map2 (+) rc (drop (Suc z) (map (\<lambda>q. q y) cs))))))"
-            using nn_integral_cmult[of "\<lambda>(a,c). ennreal(exp(epsilon1/epsilon2)) * (\<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a @ b # c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (a @ b # c)))" "count_space {(a, c). length a = z \<and> length c = length cs - (z + 1)}"
+            using nn_integral_cmult[of "\<lambda>(ra, rc).  (\<Sum>\<^sup>+ rb\<in>{rb. z = snd (argmax_int_list (map2 (+) ra (take z (map (\<lambda>q. q y) cs)) @ (rb + (cs ! z) y) # map2 (+) rc (drop (Suc z) (map (\<lambda>q. q y) cs))))}.
+         ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (map2 (+) ra (take z (map (\<lambda>q. q y) cs)) @ (rb + (cs ! z) y) # map2 (+) rc (drop (Suc z) (map (\<lambda>q. q y) cs)))))"
+                                    "count_space {(ra, rc). length ra = z \<and> length rc = length cs - (z + 1)}"
                                        "ennreal (exp(epsilon1/epsilon2))"] 
             unfolding case_prod_beta
-            apply(auto)
-          also have "... = (\<Sum>\<^sup>+ (a, c)\<in>{(a, c). length a = z \<and> length c = length cs - (z + 1)}. \<Sum>\<^sup>+ b\<in>{b. z = snd (argmax_int_list (a @ b # c))}. ennreal (exp (real epsilon1 / real epsilon2)) * ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (a @ b # c)))"
+            by(auto)
+          also have "... =(\<Sum>\<^sup>+ (ra, rc)\<in>{(ra, rc). length ra = z \<and> length rc = length cs - (z + 1)}.
+                    \<Sum>\<^sup>+ rb\<in>{rb. z = snd (argmax_int_list (map2 (+) ra (take z (map (\<lambda>q. q y) cs)) @ (rb + (cs ! z) y) # map2 (+) rc (drop (Suc z) (map (\<lambda>q. q y) cs))))}.
+                 exp (epsilon1/epsilon2) *  ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (map2 (+) ra (take z (map (\<lambda>q. q y) cs)) @ (rb + (cs ! z) y) # map2 (+) rc (drop (Suc z) (map (\<lambda>q. q y) cs)))))"            
             by(rewrite nn_integral_cmult,auto)
           finally show ?thesis by simp
         qed
         have "ennreal (spmf (report_noisy_max cs epsilon1 epsilon2 x) z) \<le> ennreal (exp (epsilon1/epsilon2) * spmf (report_noisy_max cs epsilon1 epsilon2 y) z)"
           apply(rewrite x, rewrite exp_y)
         proof(rule nn_integral_mono,auto)
-          fix a c::"int list"
-          assume "z = length a"
-            and "length c = length cs - Suc(length a)"
-          show "(\<Sum>\<^sup>+ b\<in>{b. length a = snd (argmax_int_list (a @ b # c))}. ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (a @ b # c)))
-           \<le> (\<Sum>\<^sup>+ b\<in>{b. length a = snd (argmax_int_list (a @ b # c))}. ennreal (exp (real epsilon1 / real epsilon2)) * ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (a @ b # c)))"
-            sorry
+          fix ra rc::"int list"
+          assume H1:"z = length ra"
+            and H2:"length rc = length cs - Suc(length ra)"
+          show "(\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))))}.
+              ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))))
+           \<le> (\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))}.
+                 ennreal (exp (real epsilon1 / real epsilon2)) *
+                 ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))))"
+          proof -
+            have 1:"(\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))))}.
+              ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))))
+              = ennreal ((\<Prod>(r, i)\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))
+                * (\<Prod>(r, i)\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2)))
+                * (\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))))}. exp (- (real epsilon1 * real_of_int \<bar>rb\<bar>) / real epsilon2))"
+              apply(rewrite fix_noise)
+              using assms apply(simp,simp)
+              using H2 
+              using H1 True apply linarith
+              apply(rewrite ab_semigroup_mult_class.mult.commute[of _ "(\<Prod>(r, i)\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))"])
+              apply(rewrite comm_semiring_1_class.semiring_normalization_rules(18))
+              apply(rewrite ennreal_mult'',simp)
+              apply(rewrite nn_integral_cmult,simp)
+              apply(rewrite ab_semigroup_mult_class.mult.commute[of "(\<Prod>(r, i)\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))"])
+              by simp
+            have 2:"(\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))}.
+                 ennreal (exp (real epsilon1 / real epsilon2)) *
+                 ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))))
+                = ennreal ((\<Prod>(r, i)\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))
+                * (\<Prod>(r, i)\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2)))
+                * (\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))}. 
+                   (exp (real epsilon1 / real epsilon2)) * exp (- (real epsilon1 * real_of_int \<bar>rb\<bar>) / real epsilon2))"
+              apply(rewrite fix_noise)
+              using assms apply(simp,simp)
+              using H1 H2 True apply linarith
+              apply(rewrite ab_semigroup_mult_class.mult.commute[of _ "(\<Prod>(r, i)\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))"])
+              apply(rewrite ab_semigroup_mult_class.mult.commute[of "ennreal (exp (real epsilon1 / real epsilon2))" ])
+              apply(rewrite comm_semiring_1_class.semiring_normalization_rules(18))
+              apply(rewrite ennreal_mult'',simp)
+              apply(rewrite ennreal_mult'[of "exp (real epsilon1 / real epsilon2)"],simp)
+              apply(rewrite semigroup_mult_class.mult.assoc)
+              apply(rewrite nn_integral_cmult,simp)
+              apply(rewrite ab_semigroup_mult_class.mult.commute[of _ "(\<Prod>(r, i)\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))"])
+              apply(rewrite ab_semigroup_mult_class.mult.commute[of _ "ennreal (exp (real epsilon1 / real epsilon2))"])  
+              by simp
+            have 3:"(\<Sum>\<^sup>+ x\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))))}. ennreal (exp (- (real epsilon1 * real_of_int \<bar>x\<bar>) / real epsilon2)))
+                \<le> (\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))}. 
+                   (exp (real epsilon1 / real epsilon2)) * exp (- (real epsilon1 * real_of_int \<bar>rb\<bar>) / real epsilon2))"
+              sorry
+            have 4:"ennreal ((\<Prod>(r, i)\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))
+                * (\<Prod>(r, i)\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2)))
+                * (\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))))}. exp (- (real epsilon1 * real_of_int \<bar>rb\<bar>) / real epsilon2))
+              \<le> ennreal ((\<Prod>(r, i)\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))
+                * (\<Prod>(r, i)\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2)))
+                * (\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))}. 
+                   (exp (real epsilon1 / real epsilon2)) * exp (- (real epsilon1 * real_of_int \<bar>rb\<bar>) / real epsilon2))"
+              using 3 ordered_semiring_class.mult_left_mono[of _ _ "ennreal ((\<Prod>(r, i)\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))
+                * (\<Prod>(r, i)\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2)))"]
+              by simp
+            show ?thesis using 1 2 4 by simp
+          qed
         qed
         then show ?thesis by simp
       qed
