@@ -1,6 +1,6 @@
 section \<open>Differential Privacy\<close>
 
-theory Differential_Privacy2
+theory Differential_Privacy_spmf
   imports "HOL-Probability.Probability"
           "Differential_Privacy.Differential_Privacy_Standard"
 begin

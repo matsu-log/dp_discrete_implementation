@@ -2,7 +2,7 @@ section \<open>Report Noisy Max with discrete laplace distribution\<close>
 
 theory Report_noisy_max
   imports "sampler/Discrete_laplace_rat"
-          Differential_Privacy
+          Differential_Privacy_spmf
           Discrete_laplace_mechanism
 begin
 

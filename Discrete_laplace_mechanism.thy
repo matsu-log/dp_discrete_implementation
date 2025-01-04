@@ -2,7 +2,7 @@ section \<open>Discrete Laplace Mechanism\<close>
 
 theory Discrete_laplace_mechanism
   imports "sampler/Discrete_laplace_rat"
-          Differential_Privacy
+          Differential_Privacy_spmf
 begin 
 
 subsection \<open>Integer Query: SampCert Implementation\<close>
