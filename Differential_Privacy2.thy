@@ -2,7 +2,7 @@ section \<open>Differential Privacy\<close>
 
 theory Differential_Privacy2
   imports "HOL-Probability.Probability"
-          "formalization.Differential_Privacy_Standard"
+          "Differential_Privacy.Differential_Privacy_Standard"
 begin
 
 subsection \<open>Auxiliary Lemmas for pointwise_spmf_bound_imp_pure_dp\<close>
@@ -479,8 +479,6 @@ shows "pure_dp (\<lambda>x. bind_spmf  (M x) (\<lambda>y. N (x, y))) (\<epsilon>
   using M N
   unfolding pure_dp_def 
 proof -
-  thm differential_privacy_composition_adaptive[of "\<epsilon>" "0" "\<epsilon>'" "0" "measure_spmf \<circ> M" _ _ "adj"
-                                                   "measure_spmf \<circ> N" _]
   have 1:" \<And>y. (\<lambda>x. (measure_spmf \<circ> N) (x, y)) = (measure_spmf \<circ> (\<lambda>x. N (x, y)))"
     unfolding o_def
     by simp                                                                            
@@ -499,7 +497,7 @@ proof -
     using N unfolding pure_dp_def 
     by (simp add: o_def)
   have "differential_privacy (\<lambda>x. (measure_spmf \<circ> M) x \<bind> (\<lambda>y. (measure_spmf \<circ> N) (x, y))) adj (\<epsilon> + \<epsilon>') (0 + 0)"
-    using differential_privacy_composition_adaptive[of "\<epsilon>" "0" "\<epsilon>'" "0" "measure_spmf \<circ> M" "count_space UNIV" "count_space UNIV" "adj"
+    using differential_privacy_composition_adaptive[of "\<epsilon>" "\<epsilon>'" "measure_spmf \<circ> M" "count_space UNIV" "count_space UNIV" "adj" "0"
                                                    "measure_spmf \<circ> N" "count_space UNIV"]
                                                  3 4 5 6 assms
     by auto

@@ -1,15 +1,14 @@
 section \<open>Report Noisy Max with discrete laplace distribution\<close>
 
 theory Report_noisy_max
-  imports Discrete_laplace_rat
+  imports "sampler/Discrete_laplace_rat"
           Differential_Privacy2
-          formalization.Differential_Privacy_Example_Report_Noisy_Max
           Discrete_laplace_mechanism
 begin
 
 primrec argmax_int_list :: "int list \<Rightarrow> (int \<times> nat)" where
 "argmax_int_list [] = (0,0)"|
-"argmax_int_list (x#xs) = (if xs = [] then (x,0) else (let (m,i) = argmax_int_list xs in (if x>m then (x,0) else (m,i+1))))"
+"argmax_int_list (x#xs) = (if xs = [] then (x,0) else (let (m,i) = argmax_int_list xs in (if x\<ge>m then (x,0) else (m,i+1))))"
 
 primrec discrete_laplace_noise_add_list :: "(('a, int) query) list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a list \<Rightarrow> (int list) spmf" where
 "discrete_laplace_noise_add_list [] epsilon1 epsilon2  ls = return_spmf []"|
@@ -53,10 +52,11 @@ proof(induct list)
     by simp
 next
   case (Cons a list)
-  then show ?case
+  show ?case
     unfolding argmax_int_list.simps fst_def
-    apply (simp add: prod.case_eq_if)
-    by (metis List.finite_set Max_ge_iff max.absorb_iff2 not_le_imp_less set_empty2)
+    apply(auto simp: prod.case_eq_if)
+    using Cons(1) apply auto
+    by(rewrite max_def,rewrite linorder_class.Max_ge_iff,auto)        
 qed
 
 lemma argmax_int_list_snd:
@@ -74,6 +74,110 @@ qed
 lemma argmax_int_list_snd':
   shows "length list > 0 \<Longrightarrow>nth list (snd (argmax_int_list list)) = Max(set list)"
   using argmax_int_list_fst argmax_int_list_snd by auto
+
+lemma argmax_int_list_snd2:
+  shows "\<And>i. length list > 0 \<longrightarrow> (list ! i = Max (set list) \<and> (\<forall>k<i. list ! i > list ! k)) = (i = snd (argmax_int_list list))"
+proof(induct list)
+  case Nil
+  then show ?case by simp
+next
+  case (Cons a list)
+  then show ?case
+  proof(cases "list = []")
+    case True
+    then show ?thesis by fastforce
+  next
+    case False
+    assume list:"list \<noteq> []"
+    show ?thesis
+    proof(cases "a < Max(set list)")
+      case True
+      show ?thesis
+      proof(rule+)
+        fix i
+        assume H:"(a # list) ! i = Max (set (a # list)) \<and> (\<forall>k<i. (a # list) ! k < (a # list) ! i)"
+        have "(a#list) ! 0 < Max(set (a#list))"
+          apply(rewrite nth_Cons_0)
+          unfolding set_simps
+          apply(rewrite Max_insert)
+          using list True by(auto)
+        then have i:"1\<le>i"
+          using H list less_imp_neq linorder_le_less_linear by blast
+        then have "list ! (i-1) = (a#list) ! i"
+          by simp
+        also have "... = Max(set (list))"
+          apply(rewrite H)
+          apply(rewrite set_simps, rewrite Max_insert)
+          using list True by auto
+        finally have 1:"list ! (i - 1) = Max (set list)" by simp
+        have 2:"(\<forall>k<i-1. list ! k < list ! (i-1))"
+          using H True i 
+          by (metis Suc_mono diff_Suc_1 diff_is_0_eq not0_implies_Suc not_less_eq_eq nth_Cons_pos zero_less_Suc)
+        have p:"i-1 = snd (argmax_int_list(list))"
+          using 1 2 Cons(1) list i by blast
+        show "i = snd (argmax_int_list (a # list))"
+          unfolding argmax_int_list.simps
+          apply(auto simp:list)
+          unfolding case_prod_beta
+          apply(rewrite p[symmetric], rewrite argmax_int_list_fst,simp add:list)
+          apply(rewrite argmax_int_list_fst, simp add:list)
+          using True i by force
+      next
+        fix i
+        assume H:"i = snd (argmax_int_list (a # list))"
+        have 0:"0 \<noteq> snd (argmax_int_list (a#list))"
+          unfolding argmax_int_list.simps
+          apply(auto simp:list)
+          unfolding case_prod_beta
+          apply(rewrite argmax_int_list_fst,simp add:list,rewrite argmax_int_list_fst,simp add:list)
+          using True by simp
+        then have i:"1\<le> i"
+          using H by simp
+        have p:"i-1 = snd (argmax_int_list (list))"
+          apply(rewrite H)
+          unfolding argmax_int_list.simps
+          apply(simp add:list) unfolding case_prod_beta
+          apply(rewrite argmax_int_list_fst,simp add:list)
+          using True by(simp)
+        have 1:"list ! (i-1) = Max (set (list))"
+          using p Cons(1) list by auto
+        have 2:"(\<forall>k<i-1. list ! k < list ! (i-1))"
+          using p Cons(1) list by auto
+        show "(a # list) ! i = Max (set (a # list)) \<and> (\<forall>k<i. (a # list) ! k < (a # list) ! i)"
+          using 1 2 i True list apply(rewrite set_simps, rewrite Max_insert,auto)
+          using i 0
+          by (metis One_nat_def Suc_le_D Suc_le_eq diff_Suc_1 less_Suc_eq_le nth_non_equal_first_eq)
+      qed
+    next
+      case False
+      show ?thesis
+      proof(rule+)
+        fix i
+        assume H:"(a # list) ! i = Max (set (a # list)) \<and> (\<forall>k<i. (a # list) ! k < (a # list) ! i)"
+        have "(a # list) ! 0 = Max (set (a # list)) \<and> (\<forall>k<0. (a # list) ! k < (a # list) ! 0)"
+          using False by(auto,rewrite Max_insert,auto simp :list)
+        then have i:"i=0"
+          using  False H by fastforce
+        show "i = snd (argmax_int_list (a # list))"
+          apply(rewrite i) unfolding argmax_int_list.simps
+          apply(simp add:list) unfolding case_prod_beta
+          apply(rewrite argmax_int_list_fst,simp add:list)
+          using False by simp
+      next
+        fix i
+        assume H:"i = snd (argmax_int_list (a # list))"
+        have i:"i=0"
+          apply(rewrite H) unfolding argmax_int_list.simps
+          apply(auto simp:list) unfolding case_prod_beta
+          apply(rewrite argmax_int_list_fst,simp add:list)
+          using False by simp
+        show "(a # list) ! i = Max (set (a # list)) \<and> (\<forall>k<i. (a # list) ! k < (a # list) ! i)"
+          apply(simp add: i,rewrite Max_insert,auto simp:list,rewrite max_def)
+          using False by simp
+      qed
+    qed
+  qed
+qed
 
 lemma count_queries:
   shows "is_count_queries cs \<Longrightarrow> \<forall> c\<in> (set cs). is_sensitivity c 1"
@@ -746,17 +850,18 @@ lemma fix_noise:
     and "1\<le>epsilon2"
     and "length cs = length ra + length rc +1"
   shows "spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))
-        = (\<Prod>(r,i)\<in>set (zip (map real_of_int ra) [0.. int(length ra)-1]). exp (- (real epsilon1 * \<bar>r\<bar>) / epsilon2))
+        = ((exp (real epsilon1 / real epsilon2) - 1) / (exp (real epsilon1 / real epsilon2) + 1)) ^ length cs * 
+          (\<Prod>(r,i)\<in>set (zip (map real_of_int ra) [0.. int(length ra)-1]). exp (- (real epsilon1 * \<bar>r\<bar>) / epsilon2))
           * exp (- (real epsilon1 * \<bar>rb\<bar>) / real epsilon2) 
           * (\<Prod>(r,i)\<in>set (zip (map real_of_int rc) [int(length ra+1).. int(length cs -1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / epsilon2))"
 proof-
-  have "spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))
+  have 1:"spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))
       = ((exp (real epsilon1 / real epsilon2) - 1) / (exp (real epsilon1 / real epsilon2) + 1)) ^ length cs *
     (\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) cs) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [0..int (length cs - 1)]).
        exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2))"
   apply(rewrite spmf_discrete_laplace_noise_add_list)
     using assms by simp_all  
-  have "(\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) cs) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [0..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2))
+  have 2:"(\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) cs) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [0..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2))
       = (\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]). exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2)) *
         (\<Prod>((c, z), i)\<in>{((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra))}. exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2)) *
         (\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra)) cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2))"
@@ -766,11 +871,100 @@ proof-
            \<union> {(((\<lambda>x::'a list. real_of_int ((cs ! length ra)x)), real_of_int(rb + (cs ! length ra) y)), int (length ra))}
            \<union> set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra))cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y)  cs))))) [(length ra +1)..int(length cs -1)])"
     proof -
-      have 1:"zip (zip (map (\<lambda>h x. real_of_int (h x)) cs) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [0..int (length cs - 1)]
-      = zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y)  cs))))) [0..int(length ra -1)] @
-        (((\<lambda>x::'a list. real_of_int ((cs ! length ra)x)), real_of_int(rb + (cs ! length ra) y)), int (length ra)) #
-       zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra))cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y)  cs))))) [(length ra +1)..int(length cs -1)]"
-        sorry
+      have 1:"zip
+                  (zip 
+                      (map (\<lambda>h x. real_of_int (h x)) cs) 
+                      (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) 
+                                        @ (rb + (cs ! length ra) y) 
+                                        # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) 
+                   [0..int (length cs - 1)]
+      = zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs))  (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y)  cs))))) [0..int(length ra -1)] 
+        @ (((\<lambda>x::'a list. real_of_int ((cs ! length ra)x)), real_of_int(rb + (cs ! length ra) y)), int (length ra)) 
+        # zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra))cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y)  cs))))) [(length ra +1)..int(length cs -1)]" (is "?lhs = ?rhs")
+      proof -
+        have r1:"(((\<lambda>x::'a list. real_of_int ((cs ! length ra)x)), real_of_int(rb + (cs ! length ra) y)), int (length ra))# zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra))cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y)  cs))))) [(length ra +1)..int(length cs -1)]
+            = zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (length ra)cs)) (map real_of_int (map2 (+) (rb#rc) (drop (length ra) (map (\<lambda>q. q y)  cs))))) [(length ra)..int(length cs -1)]"
+        proof(rewrite list_eq_iff_nth_eq,rule,simp add:assms,rule,auto)
+          fix i
+          assume i:"i < Suc (min (length rc) (length cs - Suc (length ra))) "
+          show "(((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int rb + real_of_int ((cs ! length ra) y)), int (length ra)) #
+          zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra)) cs)) (map (real_of_int \<circ> (\<lambda>(x, y). x + y)) (zip rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [1 + int (length ra)..int (length cs - Suc 0)]) !
+         i =
+         zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (length ra) cs)) (map (real_of_int \<circ> (\<lambda>(x, y). x + y)) (zip (rb # rc) (drop (length ra) (map (\<lambda>q. q y) cs))))) [int (length ra)..int (length cs - Suc 0)] ! i"
+          proof(cases "i=0")
+            case True
+            then show ?thesis
+              apply(rewrite True, rewrite True, rewrite nth_Cons_0)
+              apply(rewrite nth_zip,simp add:assms, simp add:assms)
+              apply(rewrite nth_zip, simp add:assms,simp add:assms)
+              apply(auto)
+              by(rewrite drop_map[symmetric], rewrite nth_drop, simp_all add: assms)
+          next
+            case False
+            then show ?thesis 
+              using i assms by(simp_all)
+          qed
+        qed
+        have r:"?rhs = zip (zip (map (\<lambda>h x. real_of_int (h x)) cs)  (map real_of_int (map2 (+) (ra@rb#rc) (map (\<lambda>q. q y)  cs)))) [0..int(length cs -1)]"
+          apply(rewrite r1)
+          apply(cases "ra = []")
+          apply(simp)
+          apply(rewrite zip_append[symmetric],simp add:assms)
+           apply (metis Suc_pred int_ops(4) length_greater_0_conv nat_int)
+          apply(rewrite zip_append,simp add:assms)
+           apply (metis Suc_pred int_ops(4) length_greater_0_conv nat_int)
+          apply(rewrite zip_append[symmetric],simp add:assms)
+           apply (metis Suc_pred int_ops(4) length_greater_0_conv nat_int)
+        proof -
+          assume ra:"ra \<noteq> [] "
+          have 1:"zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)))) @
+                zip (map (\<lambda>h x. real_of_int (h x)) (drop (length ra) cs)) (map real_of_int (map2 (+) (rb # rc) (drop (length ra) (map (\<lambda>q. q y) cs)))) 
+               = zip (map (\<lambda>h x. real_of_int (h x)) cs) (map real_of_int (map2 (+) (ra@rb#rc)  (map (\<lambda>q. q y) cs)))"
+            apply(rewrite zip_append[symmetric], simp add: assms)
+            apply(rewrite drop_map[symmetric],rewrite take_map[symmetric])
+            apply(rewrite append_take_drop_id)
+            apply(rewrite map_append[symmetric])
+            apply(rewrite map_append[symmetric])
+            apply(rewrite zip_append[symmetric], simp add:assms)
+            apply(rewrite append_take_drop_id)
+            by simp
+          have 2:"[0..int (length ra - 1)] @ [int (length ra)..int (length cs - 1)] = [0..(length cs -1)]"
+            using assms ra 
+            by (smt (verit) add_implies_diff int_ops(2) int_ops(6) length_0_conv of_nat_le_0_iff upto_split1)
+          show "zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)))) @ zip (map (\<lambda>h x. real_of_int (h x)) (drop (length ra) cs)) (map real_of_int (map2 (+) (rb # rc) (drop (length ra) (map (\<lambda>q. q y) cs)))))
+                    ([0..int (length ra - 1)] @ [int (length ra)..int (length cs - 1)])
+              = zip (zip (map (\<lambda>h x. real_of_int (h x)) cs) (map real_of_int (map2 (+) (ra @ rb # rc) (map (\<lambda>q. q y) cs)))) [0..int (length cs - 1)]"
+            using 1 2 by simp
+        qed
+        have l:"?lhs = zip (zip (map (\<lambda>h x. real_of_int (h x)) cs) (map real_of_int (map2 (+) (ra @ rb # rc) (map (\<lambda>q. q y) cs)))) [0..int (length cs - 1)]"
+        proof -
+          have " (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))) = (map2 (+) (ra @ rb # rc) (map (\<lambda>q. q y) cs))"
+          proof -
+            have 1:"(rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)) =  map2 (+) (rb#rc) (drop (length ra) (map (\<lambda>q. q y) cs))"
+            proof(rewrite list_eq_iff_nth_eq,rule,simp add:assms,auto)
+              fix i 
+              assume i:"i < Suc (min (length rc) (length cs - Suc (length ra)))"
+              show "((rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))) ! i = map2 (+) (rb # rc) (drop (length ra) (map (\<lambda>q. q y) cs)) ! i "
+              proof(cases"i=0")
+                case True
+                then show ?thesis 
+                  apply(rewrite True,rewrite True, rewrite nth_Cons_0)
+                  by(rewrite nth_map,simp add:assms, rewrite nth_zip,simp_all add:assms)
+              next
+                case False
+                then show ?thesis
+                  using i assms by simp
+              qed
+            qed
+            show ?thesis
+              apply(rewrite 1)
+              apply(rewrite map_append[symmetric], rewrite zip_append[symmetric],simp add:assms)
+              by(rewrite append_take_drop_id, simp)
+          qed
+          then show ?thesis by simp
+        qed
+        show ?thesis using l r by simp
+      qed
       then show ?thesis by simp
     qed
     have 2:"(set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]) \<union>
@@ -800,7 +994,7 @@ proof-
       fix a b ba
       have " ((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra))
          \<notin> set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)])"
-        sorry
+        by(rewrite in_set_zip, auto)
       then show "((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra))
          \<in> set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]) \<Longrightarrow>
         ((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra)) \<in> {}" by simp
@@ -815,23 +1009,118 @@ proof-
        apply(rewrite comm_monoid_mult_class.prod.union_disjoint,simp,simp)
        using 3 by auto
    qed
-   have " (\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]). exp (- (epsilon1 * \<bar>z - c y\<bar>) / epsilon2))
+   have ra:"(\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]). exp (- (epsilon1 * \<bar>z - c y\<bar>) / epsilon2))
        = (\<Prod>(r,i)\<in>set (zip (map real_of_int ra) [0.. int(length ra)-1]). exp (- (real epsilon1 * \<bar>r\<bar>) / epsilon2))"
-    using comm_monoid_mult_class.prod.reindex_bij_betw[of "\<lambda>((c,z),i). (z - c y,i)" "set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)])"
+   proof(cases "ra=[]")
+     case True
+     then show ?thesis by simp
+   next
+     case False
+     show ?thesis
+       using comm_monoid_mult_class.prod.reindex_bij_betw[of "\<lambda>((c,z),i). (z - c y,i)" "set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)])"
                                                          "set (zip ra [0.. int(length ra)-1])" "\<lambda>(r,i). exp (- (epsilon1 * \<bar>r\<bar>) / epsilon2)"]
-    unfolding case_prod_beta fst_conv snd_conv
-  proof(rule)
-    show "bij_betw (\<lambda>p. (snd (fst p) - fst (fst p) y, snd p)) (set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (take (length ra) cs)) (map real_of_int (map (\<lambda>p. fst p + snd p) (zip ra (take (length ra) (map (\<lambda>q. q y) cs)))))) [0..int (length ra - 1)]))
-     (set (map (\<lambda>p. (real_of_int (fst p), snd p)) (zip ra [0..int (length ra) - 1])))"
-      sorry
-    show "(\<Prod>p\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>fst p\<bar>) / real epsilon2)) = (\<Prod>p\<in>set (map (\<lambda>p. (real_of_int (fst p), snd p)) (zip ra [0..int (length ra) - 1])). exp (- (real epsilon1 * \<bar>fst p\<bar>) / real epsilon2))"
-    proof-
-      have "set (zip (map real_of_int ra) [0..int (length ra) - 1]) = set (map (\<lambda>p. (real_of_int (fst p), snd p)) (zip ra [0..int (length ra) - 1]))"
-        sorry
-      then show ?thesis by auto
-    qed
-  qed
-  have "(\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra)) cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2))
+       unfolding case_prod_beta fst_conv snd_conv
+     proof(rule)
+       show "bij_betw (\<lambda>p. (snd (fst p) - fst (fst p) y, snd p)) (set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (take (length ra) cs)) (map real_of_int (map (\<lambda>p. fst p + snd p) (zip ra (take (length ra) (map (\<lambda>q. q y) cs)))))) [0..int (length ra - 1)]))
+       (set (map (\<lambda>p. (real_of_int (fst p), snd p)) (zip ra [0..int (length ra) - 1])))"
+         unfolding bij_betw_def inj_on_def image_def
+       proof(rule,clarify,simp)
+         fix a1 b1 c a2 b2 c1 xa
+         assume H1:"((a1, b1), c1) \<in> set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (take (length ra) cs)) (map (real_of_int \<circ> (\<lambda>p. fst p + snd p)) (zip ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - Suc 0)])"
+           and H2:"((a2, b2), c1) \<in> set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (take (length ra) cs)) (map (real_of_int \<circ> (\<lambda>p. fst p + snd p)) (zip ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - Suc 0)])" 
+         show "b1 - a1 y = b2 - a2 y \<Longrightarrow> c = c1 \<Longrightarrow> a1 = a2 \<and> b1 = b2"
+           using H1 H2 unfolding in_set_zip
+           by auto
+       next
+         show "{ya. \<exists>x\<in>set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (take (length ra) cs)) (map real_of_int (map (\<lambda>p. fst p + snd p) (zip ra (take (length ra) (map (\<lambda>q. q y) cs)))))) [0..int (length ra - 1)]). ya = (snd (fst x) - fst (fst x) y, snd x)} 
+             = set (map (\<lambda>p. (real_of_int (fst p), snd p)) (zip ra [0..int (length ra) - 1]))"
+         proof(auto simp: image_def)
+           fix a b c
+           assume H:"((a, b), c) \<in> set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (take (length ra) cs)) (map (real_of_int \<circ> (\<lambda>p. fst p + snd p)) (zip ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - Suc 0)])"
+           have c:"0\<le>c"
+             using H set_zip_rightD by fastforce
+           have c':"c\<le> length ra - Suc 0"
+             using H set_zip_rightD by fastforce
+           have c_ra:"nat c < length ra"   
+             using False c' Suc_le_eq length_0_conv nat.distinct(1) of_nat_diff of_nat_le_0_iff of_nat_less_imp_less by fastforce
+           have a:"a = (map (\<lambda>h p. real_of_int (h p)) (take(length ra) cs)) ! (nat c)"
+             using H c unfolding in_set_zip by auto
+           have b:"b = (map (real_of_int \<circ> (\<lambda>p. fst p + snd p)) (zip ra (take (length ra) (map (\<lambda>q. q y) cs))))! (nat c)"
+             using H c unfolding in_set_zip by auto    
+           show "\<exists>x\<in>set (zip ra [0..int (length ra) - 1]). b - a y = real_of_int (fst x) \<and> c = snd x"
+           proof
+             show "(ra!(nat c), c)\<in>set (zip ra [0..int (length ra) - 1])"
+             proof-
+               have "(ra!(nat c), c) = (zip ra [0..int(length ra) -1])! (nat c)"
+                 apply(rewrite nth_zip)
+                 using c c_ra by(auto)
+               then show ?thesis
+                 unfolding in_set_zip using c_ra by auto
+             qed
+             show "b - a y = real_of_int (fst (ra!(nat c), c)) \<and> c = snd (ra!(nat c), c)"
+             proof(simp_all)
+               have a1:"a y = (cs ! (nat c)) y"
+                 apply(rewrite a)
+                 apply(rewrite nth_map, simp add: assms c_ra)
+                 by(rewrite nth_take, simp_all add:c_ra)
+               have b1:"b = ra ! (nat c) + (cs ! (nat c)) y"
+                 apply(rewrite b)
+                 apply(rewrite nth_map,simp add: assms c_ra)
+                 apply(rewrite nth_zip, simp_all add: assms c_ra)
+                 apply(rewrite nth_map)
+                 using assms c_ra by simp_all
+               show "b - a y = real_of_int (ra ! nat c)"
+                 using a1 b1 by simp
+             qed
+           qed
+         next
+           fix r i
+           assume H:"(r, i) \<in> set (zip ra [0..int (length ra) - 1])"
+           have i1:"0\<le> i"
+             using H set_zip_rightD by fastforce
+           have i2:"nat i < length ra "
+             using H set_zip_rightD by fastforce
+           show "\<exists>x\<in>set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (take (length ra) cs)) (map (real_of_int \<circ> (\<lambda>p. fst p + snd p)) (zip ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - Suc 0)]). 
+                  real_of_int r = snd (fst x) - fst (fst x) y \<and> i = snd x"
+           proof-
+             have 1:"real_of_int r = snd (fst ((cs ! (nat i), (cs ! (nat i)) y + r),i) ) - fst (fst ((cs ! (nat i), (cs ! (nat i)) y + r),i)) y \<and> i = snd ((cs ! (nat i), (cs ! (nat i)) y + r),i)"
+               by simp
+             have 2:"((cs ! (nat i), (cs ! (nat i)) y + r),i) \<in> set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (take (length ra) cs)) (map (real_of_int \<circ> (\<lambda>p. fst p + snd p)) (zip ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - Suc 0)])"
+               unfolding in_set_zip
+             proof(simp,rule,auto)
+               show "zip (map (\<lambda>h p. real_of_int (h p)) (take (length ra) cs)) (map (real_of_int \<circ> (\<lambda>p. fst p + snd p)) (zip ra (take (length ra) (map (\<lambda>q. q y) cs)))) ! (nat i) = (\<lambda>x. real_of_int ((cs ! nat i) x), real_of_int ((cs ! nat i) y) + real_of_int r)"
+                 apply(rewrite nth_zip,simp_all add:i2 assms)
+                 apply(rewrite nth_map)
+                 using i2 assms apply(simp_all)
+                 using H unfolding in_set_zip by auto
+               show "[0..int (length ra - Suc 0)] ! (nat i) = i"
+                 using i1 i2 by simp
+               show "nat i < length cs"
+                 using i2 assms by simp
+               show "nat i < length ra"
+                 using i2 by simp
+               show "nat i < nat (int (length ra - Suc 0) + 1)"
+                 using i2 by simp
+             qed
+             show ?thesis
+               apply(rule)
+               using 1 2 by(auto)
+           qed
+         qed
+       qed
+       show "(\<Prod>p\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>fst p\<bar>) / real epsilon2)) = (\<Prod>p\<in>set (map (\<lambda>p. (real_of_int (fst p), snd p)) (zip ra [0..int (length ra) - 1])). exp (- (real epsilon1 * \<bar>fst p\<bar>) / real epsilon2))"
+       proof-
+         have "set (zip (map real_of_int ra) [0..int (length ra) - 1]) = set (map (\<lambda>p. (real_of_int (fst p), snd p)) (zip ra [0..int (length ra) - 1]))"
+         proof -
+           have "zip (map real_of_int ra) [0..int (length ra) - 1] = map (\<lambda>p. (real_of_int (fst p), snd p)) (zip ra [0..int (length ra) - 1])"
+             by(rewrite zip_map1,auto)
+           then show ?thesis by simp
+         qed
+         then show ?thesis by auto
+       qed
+     qed
+   qed
+  have rc:"(\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra)) cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2))
       = (\<Prod>(r,i)\<in>set (zip (map real_of_int rc) [int(length ra+1).. int(length cs -1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / epsilon2))"
     using comm_monoid_mult_class.prod.reindex_bij_betw[of "\<lambda>((c,z),i). (z - c y,i)" "set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra)) cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [int (length ra + 1)..int (length cs - 1)])"
                                                           "set (zip (map real_of_int rc) [int(length ra+1).. int(length cs -1)])" "\<lambda>(r,i). exp (- (epsilon1 * \<bar>r\<bar>) / epsilon2)"]
@@ -840,21 +1129,116 @@ proof-
     show "bij_betw (\<lambda>p. (snd (fst p) - fst (fst p) y, snd p))
      (set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (drop (Suc (length ra)) cs)) (map real_of_int (map (\<lambda>p. fst p + snd p) (zip rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))))) [int (length ra + 1)..int (length cs - 1)]))
      (set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]))"
-      sorry
+      unfolding bij_betw_def inj_on_def image_def
+    proof(rule,clarify,simp)
+      fix a b ba aa bb bc
+      assume H1:"((a, b), bc) \<in> set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (drop (Suc (length ra)) cs)) (map (real_of_int \<circ> (\<lambda>p. fst p + snd p)) (zip rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [1 + int (length ra)..int (length cs - Suc 0)])"
+        and H2:"((aa, bb), bc) \<in> set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (drop (Suc (length ra)) cs)) (map (real_of_int \<circ> (\<lambda>p. fst p + snd p)) (zip rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [1 + int (length ra)..int (length cs - Suc 0)])"
+      show "b - a y = bb - aa y \<Longrightarrow> ba = bc \<Longrightarrow> a = aa \<and> b = bb"
+        using H1 H2 assms unfolding in_set_zip
+        by auto
+    next 
+      show "{ya. \<exists>x\<in>set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (drop (Suc (length ra)) cs)) (map real_of_int (map (\<lambda>p. fst p + snd p) (zip rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))))) [int (length ra + 1)..int (length cs - 1)]). ya = (snd (fst x) - fst (fst x) y, snd x)} 
+            = set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)])"
+      proof(auto simp:image_def)
+        fix a b c
+        assume H:"((a, b), c) \<in> set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (drop (Suc (length ra)) cs)) (map (real_of_int \<circ> (\<lambda>p. fst p + snd p)) (zip rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [1 + int (length ra)..int (length cs - Suc 0)])"
+        have c1:"1+length ra \<le> nat c"
+          using H set_zip_rightD by fastforce
+        have c2:"nat c<length cs"
+          using H set_zip_rightD by fastforce
+        have c:"c = [1 + int (length ra)..int (length cs - Suc 0)] ! (nat c - length ra - 1)"
+          using c1 c2 by simp
+        have "\<And>n.  n < length [1 + int (length ra)..int (length cs - Suc 0)] \<Longrightarrow> (c = [1 + int (length ra)..int (length cs - Suc 0)] ! n) \<Longrightarrow> n = (nat c - length ra - 1)"
+          using c by auto
+        then have ab:"(a,b) = (zip (map (\<lambda>h p. real_of_int (h p)) (drop (Suc (length ra)) cs)) (map (real_of_int \<circ> (\<lambda>p. fst p + snd p)) (zip rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) ! (nat c - length ra - 1)"
+          using H unfolding in_set_zip by auto
+        have a:"a = (map (\<lambda>h p. real_of_int (h p)) cs) ! (nat c)"
+        proof -
+          have "a = (map (\<lambda>h p. real_of_int (h p)) (drop (Suc (length ra)) cs)) ! (nat c - length ra -1)"
+            using nth_zip[of "nat c - length ra -1" "(map (\<lambda>h p. real_of_int (h p)) (drop (Suc (length ra)) cs))" _ ] assms c1 c2 ab by simp 
+          also have "(map (\<lambda>h p. real_of_int (h p)) (drop (Suc (length ra)) cs)) ! (nat c - length ra -1) = (map (\<lambda>h p. real_of_int (h p)) cs) ! (nat c)"
+            apply(rewrite nth_map)
+            using c1 c2 assms apply(simp)
+            apply(rewrite nth_drop, simp add:assms)
+            apply(rewrite nth_map)
+            using c1 c2 assms apply(simp)
+            using c1 le_add_diff_inverse by fastforce
+          finally show ?thesis by simp
+        qed
+        have b:"b= (rc ! (nat c - length ra -1))+ ((cs ! nat c) y)"
+        proof-
+          have "b = (map (real_of_int \<circ> (\<lambda>p. fst p + snd p)) (zip rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))) ! (nat c-length ra - 1)"
+            using ab nth_zip[of "nat c -length ra-1"] assms c1 c2 by simp 
+          also have "... = (rc ! (nat c - length ra -1))+ ((cs ! nat c) y)"
+            apply(rewrite nth_map)
+            using assms c1 c2 apply(simp)
+            apply(rewrite nth_zip)
+            using assms c1 c2 by(simp_all)
+          finally show ?thesis by simp
+        qed
+        have p:"b- a y = rc ! (nat c-length ra -1)"
+          by(rewrite a, rewrite b, rewrite nth_map,simp_all add:c2)
+        show "(b - a y, c) \<in> set (zip (map real_of_int rc) [1 + int (length ra)..int (length cs - Suc 0)])"
+          apply(rewrite p, rewrite c)
+          apply(rewrite in_set_zip)
+        proof
+          show "map real_of_int rc ! (nat c-length ra -1) = fst (real_of_int (rc ! (nat ([1 + int (length ra)..int (length cs - Suc 0)] ! (nat c - length ra - 1)) - length ra - 1)), c) \<and>
+    [1 + int (length ra)..int (length cs - Suc 0)] ! (nat c-length ra -1) = snd (real_of_int (rc ! (nat ([1 + int (length ra)..int (length cs - Suc 0)] ! (nat c - length ra - 1)) - length ra - 1)), c) \<and>
+    (nat c-length ra -1) < length (map real_of_int rc) \<and> (nat c-length ra -1) < length [1 + int (length ra)..int (length cs - Suc 0)] "
+            apply(auto,rewrite nth_map)
+            using assms c1 c2 apply(simp_all)
+            using c1 c2
+            by (simp add: of_nat_diff split_nat)
+        qed
+      next
+        fix r i
+        assume H:"(r, i) \<in> set (zip (map real_of_int rc) [1 + int (length ra)..int (length cs - Suc 0)])"
+        have i1:"1+length ra \<le> nat i"
+          using H set_zip_rightD by fastforce
+        have i2:"nat i \<le> length cs - 1"
+          using H set_zip_rightD by fastforce
+        have i:"i = [1+int (length ra) ..int(length cs - 1)] ! (nat i -length ra -1)"
+          using H i1 i2 unfolding in_set_zip by simp
+        have r:"r = rc ! (nat i - length ra -1)"
+          using H i i1 i2 unfolding in_set_zip by fastforce
+        show "\<exists>x\<in>set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (drop (Suc (length ra)) cs)) (map (real_of_int \<circ> (\<lambda>p. fst p + snd p)) (zip rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [1 + int (length ra)..int (length cs - Suc 0)]).
+              r = snd (fst x) - fst (fst x) y \<and> i = snd x "
+        proof(rule)
+          show "r= snd (fst (((map (\<lambda>h p. real_of_int (h p)) cs) ! (nat i),real_of_int (rc ! (nat i - length ra -1))+ ((cs ! nat i) y)), i)) 
+                 - fst (fst (((map (\<lambda>h p. real_of_int (h p)) cs) ! (nat i),real_of_int(rc ! (nat i - length ra -1))+ ((cs ! nat i) y)), i)) y
+                   \<and> i = snd (((map (\<lambda>h p. real_of_int (h p)) cs) ! (nat i),real_of_int(rc ! (nat i - length ra -1))+ ((cs ! nat i) y)), i)"
+            apply(rewrite r,simp, rewrite nth_map)
+            using i2 i1 by simp_all
+          show "((map (\<lambda>h p. real_of_int (h p)) cs ! nat i, real_of_int (rc ! (nat i - length ra - 1)) + real_of_int ((cs ! nat i) y)), i)
+    \<in> set (zip (zip (map (\<lambda>h p. real_of_int (h p)) (drop (Suc (length ra)) cs)) (map (real_of_int \<circ> (\<lambda>p. fst p + snd p)) (zip rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [1 + int (length ra)..int (length cs - Suc 0)])"
+          proof(rewrite in_set_zip, auto, rule,auto)
+            show "zip (map (\<lambda>h p. real_of_int (h p)) (drop (Suc (length ra)) cs)) (map (real_of_int \<circ> (\<lambda>p. fst p + snd p)) (zip rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))) ! (nat i -length ra -1) 
+               = (map (\<lambda>h p. real_of_int (h p)) cs ! nat i, real_of_int (rc ! (nat i - Suc (length ra))) + real_of_int ((cs ! nat i) y))"
+              apply(rewrite nth_zip)
+              using i1 i2 assms by(simp_all)
+            show "[1 + int (length ra)..int (length cs - Suc 0)] ! (nat i - length ra - 1) = i"
+              using i by simp
+            show "nat i - length ra - 1 < length rc" using i1 i2 assms by simp
+            show "nat i - length ra - 1 < length cs - Suc (length ra)" using i1 i2 assms by simp
+            show "nat i - length ra - 1 < nat (int (length cs - Suc 0) - int (length ra)) " using i1 i2 by simp
+          qed
+        qed
+      qed
+    qed
     show "(\<Prod>p\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>fst p\<bar>) / real epsilon2)) =
     (\<Prod>p\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>fst p\<bar>) / real epsilon2))"
       by simp
   qed
-  have "(\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]). exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2)) *
+  have 3:"(\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]). exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2)) *
     (\<Prod>((c, z), i)\<in>{((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra))}. exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2)) *
     (\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra)) cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [int (length ra + 1)..int (length cs - 1)]).
        exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2))
-        = (\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))))) [0..int (length ra - 1)]). exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2)) *
-    (\<Prod>((c, z), i)\<in>{((\<lambda>x. real_of_int ((cs ! length ra) x), real_of_int (rb + (cs ! length ra) y)), int (length ra))}. exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2)) *
-    (\<Prod>((c, z), i)\<in>set (zip (zip (map (\<lambda>h x. real_of_int (h x)) (drop (Suc (length ra)) cs)) (map real_of_int (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))) [int (length ra + 1)..int (length cs - 1)]).
-       exp (- (real epsilon1 * \<bar>z - c y\<bar>) / real epsilon2))"
-    sorry
-  show ?thesis sorry
+        = (\<Prod>(r, i)\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2)) * exp (- (real epsilon1 * \<bar>rb\<bar>) / real epsilon2) *
+    (\<Prod>(r, i)\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))"
+    by(rewrite ra, rewrite rc,auto)
+  show ?thesis
+    by(rewrite 1,rewrite 2,rewrite 3,simp)
 qed
 
 
@@ -891,7 +1275,7 @@ next
       case True
       then show ?thesis 
       proof -
-        thm ennreal_spmf_report_noisy_max_simps2[of "cs" "epsilon1" "epsilon2" "z" "y"]
+        assume z:"z<length cs"
         have x:"ennreal (spmf (report_noisy_max cs epsilon1 epsilon2 x) z) 
               = (\<Sum>\<^sup>+ (ra, rc)\<in>{(ra, rc). length ra = z \<and> length rc = length cs - (z + 1)}.
                   \<Sum>\<^sup>+ rb\<in>{rb. z = snd (argmax_int_list (map2 (+) ra (take z (map (\<lambda>q. q x) cs)) @ (rb + (cs ! z) x) # map2 (+) rc (drop (Suc z) (map (\<lambda>q. q x) cs))))}.
@@ -942,7 +1326,7 @@ next
           proof -
             have 1:"(\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))))}.
               ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 x) (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))))
-              = ennreal ((\<Prod>(r, i)\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))
+              = ennreal (((exp (real epsilon1 / real epsilon2) - 1) / (exp (real epsilon1 / real epsilon2) + 1)) ^ length cs * (\<Prod>(r, i)\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))
                 * (\<Prod>(r, i)\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2)))
                 * (\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))))}. exp (- (real epsilon1 * real_of_int \<bar>rb\<bar>) / real epsilon2))"
               apply(rewrite fix_noise)
@@ -958,7 +1342,7 @@ next
             have 2:"(\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))}.
                  ennreal (exp (real epsilon1 / real epsilon2)) *
                  ennreal (spmf (discrete_laplace_noise_add_list cs epsilon1 epsilon2 y) (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))))
-                = ennreal ((\<Prod>(r, i)\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))
+                = ennreal (((exp (real epsilon1 / real epsilon2) - 1) / (exp (real epsilon1 / real epsilon2) + 1)) ^ length cs * (\<Prod>(r, i)\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))
                 * (\<Prod>(r, i)\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2)))
                 * (\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))}. 
                    (exp (real epsilon1 / real epsilon2)) * exp (- (real epsilon1 * real_of_int \<bar>rb\<bar>) / real epsilon2))"
@@ -978,15 +1362,170 @@ next
             have 3:"(\<Sum>\<^sup>+ x\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))))}. ennreal (exp (- (real epsilon1 * real_of_int \<bar>x\<bar>) / real epsilon2)))
                 \<le> (\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))}. 
                    (exp (real epsilon1 / real epsilon2)) * exp (- (real epsilon1 * real_of_int \<bar>rb\<bar>) / real epsilon2))"
-              sorry
-            have 4:"ennreal ((\<Prod>(r, i)\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))
+            proof(cases "length cs = 1")
+              case True
+              show ?thesis
+              proof -
+                have ra:"ra = []" using True H1 H2 z by simp
+                have rc:"rc = []" using True H2 by simp
+                have "(\<Sum>\<^sup>+ x\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))))}. ennreal (exp (- (real epsilon1 * real_of_int \<bar>x\<bar>) / real epsilon2)))
+                    = (\<Sum>\<^sup>+ x\<in>{rb. True}. ennreal (exp (- (real epsilon1 * real_of_int \<bar>x\<bar>) / real epsilon2)))"
+                  using ra rc by simp
+                also have "... \<le>  (\<Sum>\<^sup>+ rb\<in>{rb. True}. (exp (real epsilon1 / real epsilon2)) * exp (- (real epsilon1 * real_of_int \<bar>rb\<bar>) / real epsilon2))"
+                  by(rule nn_integral_mono, auto)
+                also have "... = (\<Sum>\<^sup>+ x\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))}. ennreal (exp (real epsilon1 / real epsilon2) * exp (- (real epsilon1 * real_of_int \<bar>x\<bar>) / real epsilon2)))"
+                  using ra rc by simp
+                finally show ?thesis by simp
+              qed
+            next
+              case False
+              then show ?thesis
+              proof -
+                let ?p = "\<lambda>rb x. (\<forall>k<length ra. (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))) ! k < (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))) ! length ra)"
+                have "(\<Sum>\<^sup>+ x\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))))}. ennreal (exp (- (real epsilon1 * real_of_int \<bar>x\<bar>) / real epsilon2)))
+                    = (\<Sum>\<^sup>+ x\<in>{rb. rb\<ge> Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))) - (cs ! (length ra)) x \<and> ?p rb x}. ennreal (exp (- (real epsilon1 * real_of_int \<bar>x\<bar>) / real epsilon2)))"
+                proof -
+                  have "{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))))}
+                      = {rb. rb\<ge> Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))) - (cs ! (length ra)) x \<and> ?p rb x}"
+                  proof -
+                    have "\<And>rb. (length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))))
+                                = (Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))) - (cs ! length ra) x \<le> rb \<and> ?p rb x)"
+                    proof -
+                      fix rb
+                      have "(length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))))
+                          = ((map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))) ! (length ra) = Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))) \<and> ?p rb x)"
+                        using argmax_int_list_snd2[of "(map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))"]
+                        by simp
+                      also have "... = (rb\<ge> Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))) - (cs ! (length ra)) x \<and> ?p rb x)"
+                      proof -
+                        have "(map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))) ! length ra = Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))))
+                            = (rb\<ge> Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))) - (cs ! (length ra)) x)"
+                        proof -
+                          have p:"(map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))) ! length ra = rb + (cs ! length ra)x"
+                          proof -
+                            have "length (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs))) = length ra"
+                              apply(rewrite length_map,rewrite length_zip,rewrite length_take,rewrite length_map)
+                              using H1 z by linarith
+                            then show ?thesis
+                              using nth_append_length by(rule subst)
+                          qed
+                          show ?thesis
+                            apply(rewrite p)
+                            apply(rewrite set_append, rewrite set_simps)
+                            apply(simp,rewrite Max_insert,auto)
+                            using H1 H2 z False by auto
+                        qed
+                        then show ?thesis by simp
+                      qed
+                      finally show "(length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))))
+                                = (Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))) - (cs ! length ra) x \<le> rb \<and> ?p rb x)"
+                        by simp
+                    qed
+                    then show ?thesis by simp
+                  qed 
+                  then show ?thesis by simp
+                qed
+                also have "... \<le> (\<Sum>\<^sup>+ x\<in>{rb. rb \<ge> Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))) - (cs ! (length ra)) y -  1 \<and> ?p (rb+1) y}. ennreal (exp (- (real epsilon1 * real_of_int \<bar>x\<bar>) / real epsilon2)))"            
+                proof-      
+                  have 1:"Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))- (cs ! (length ra)) y -1
+                           \<le> Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))) -  (cs ! (length ra)) x"
+                    sorry
+                  have 2:"\<And>rb. ?p rb x \<Longrightarrow> ?p (rb+1) y"
+                    sorry
+                  show ?thesis
+                    apply(rewrite restrict_count_space_subset[symmetric, of _ "UNIV"])
+                     apply auto[1]
+                    apply(rewrite restrict_count_space_subset[symmetric, of "{rb. rb \<ge> Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))) - (cs ! (length ra)) y -  1 \<and> ?p (rb+1) y}" "UNIV"])
+                     apply auto[1]
+                    apply(rewrite nn_integral_restrict_space)
+                     apply auto[1]
+                    apply(rewrite nn_integral_restrict_space)
+                     apply auto[1]
+                    apply(rewrite nn_set_integral_set_mono)
+                    using 1 2 by auto
+                qed
+                also have "... = (\<Sum>\<^sup>+ x\<in>{rb. Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))) - (cs ! (length ra)) y \<le> rb \<and> ?p rb y}. ennreal (exp (- (real epsilon1 * real_of_int \<bar>x-1\<bar>) / real epsilon2)))"
+                  apply(rewrite nn_integral_bij_count_space[symmetric, of "\<lambda>x. x-1" "{rb. Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))) - (cs ! (length ra)) y \<le> rb \<and> ?p rb y}"])
+                  unfolding bij_betw_def inj_on_def image_def
+                proof(rule,simp,rule,auto,rule)
+                  show "\<And>x. Max ((\<lambda>x. case x of (x, xa) \<Rightarrow> x + xa) ` set (zip ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> (\<lambda>x. case x of (x, xa) \<Rightarrow> x + xa) ` set (zip rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))) - (cs ! length ra) y - 1 \<le> x \<Longrightarrow>
+                            ?p (x+1) y \<Longrightarrow>
+                                Max ((\<lambda>x. case x of (x, xa) \<Rightarrow> x + xa) ` set (zip ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> (\<lambda>x. case x of (x, xa) \<Rightarrow> x + xa) ` set (zip rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))) - (cs ! length ra) y \<le> (\<lambda>x. x+1) x
+                            \<and> ?p ((\<lambda>x. x+1) x) y
+                            \<and> x = (\<lambda>x. x+1) x - 1"
+                    by simp                  
+                qed                
+                also have "... \<le> (\<Sum>\<^sup>+ x\<in>{rb. Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))) - (cs ! (length ra)) y \<le> rb \<and> ?p rb y}. ennreal (exp (- (real epsilon1 * (real_of_int \<bar>x\<bar>-1)) / real epsilon2)))"
+                proof(rewrite nn_integral_mono,auto)
+                  fix x                  
+                  have "\<bar>real_of_int x\<bar> - 1 \<le> \<bar>real_of_int x -1\<bar>"
+                    by simp                    
+                  then show "epsilon1 * (\<bar>real_of_int x\<bar> - 1)/epsilon2 \<le> epsilon1 * \<bar>real_of_int x - 1\<bar>/epsilon2"
+                    using assms                    
+                    by (simp add: divide_right_mono)
+                qed                
+                also have "... = (\<Sum>\<^sup>+ x\<in>{rb. Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))) - (cs ! (length ra)) y \<le> rb \<and> ?p rb y}.
+                                      ennreal (exp (real epsilon1 / real epsilon2) * exp (- (real epsilon1 * real_of_int \<bar>x\<bar>) / real epsilon2)))"
+                proof-                
+                  have "\<And>x. ennreal (exp (- (real epsilon1 * (real_of_int \<bar>x\<bar> - 1)) / real epsilon2)) = ennreal (exp (real epsilon1 / real epsilon2) * exp (- (real epsilon1 * real_of_int \<bar>x\<bar>) / real epsilon2))"                  
+                    by(rewrite ring_class.right_diff_distrib,rewrite mult_exp_exp,rewrite group_add_class.minus_diff_eq,rewrite division_ring_class.diff_divide_distrib, auto)                    
+                  then show ?thesis                  
+                    using nn_integral_cong by simp                 
+                qed                
+                also have "... = (\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))}.
+                   (exp (real epsilon1 / real epsilon2)) * exp (- (real epsilon1 * real_of_int \<bar>rb\<bar>) / real epsilon2))"
+                proof-
+                  have "{rb. Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))- (cs ! (length ra)) y  \<le> rb \<and> ?p rb y} 
+                      = {rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))}"
+                  proof -
+                    have "\<And>rb. (Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))- (cs ! (length ra)) y  \<le> rb \<and> ?p rb y)
+                              = (length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))))"
+                    proof -
+                      fix rb
+                      have "(length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))))
+                          = ((map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))) ! length ra =
+                              Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))) \<and> ?p rb y)"
+                        using argmax_int_list_snd2[of "(map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))"]
+                        by simp
+                      also have "... = (Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))- (cs ! (length ra)) y  \<le> rb \<and> ?p rb y)"
+                      proof-
+                        have "((map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))) ! length ra = Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))))
+                            = (Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))- (cs ! (length ra)) y  \<le> rb)"
+                        proof-
+                          have p:"(map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))) ! length ra = rb + (cs ! length ra)y"
+                          proof -
+                            have "length (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) = length ra"
+                              apply(rewrite length_map,rewrite length_zip,rewrite length_take,rewrite length_map)
+                              using H1 z by linarith
+                            then show ?thesis
+                              using nth_append_length by(rule subst)
+                          qed
+                          show ?thesis
+                            apply(rewrite p)
+                            apply(rewrite set_append, rewrite set_simps)
+                            apply(simp,rewrite Max_insert,auto)
+                            using H1 H2 z False by auto
+                        qed
+                        then show ?thesis by simp
+                      qed
+                      finally show "(Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))- (cs ! (length ra)) y  \<le> rb \<and> ?p rb y)
+                              = (length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))))" by simp
+                    qed
+                    then show ?thesis by simp
+                  qed
+                  then show ?thesis by simp
+                qed
+                finally show ?thesis by simp
+              qed
+            qed
+            have 4:"ennreal (((exp (real epsilon1 / real epsilon2) - 1) / (exp (real epsilon1 / real epsilon2) + 1)) ^ length cs * (\<Prod>(r, i)\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))
                 * (\<Prod>(r, i)\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2)))
                 * (\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))))}. exp (- (real epsilon1 * real_of_int \<bar>rb\<bar>) / real epsilon2))
-              \<le> ennreal ((\<Prod>(r, i)\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))
+              \<le> ennreal (((exp (real epsilon1 / real epsilon2) - 1) / (exp (real epsilon1 / real epsilon2) + 1)) ^ length cs  * (\<Prod>(r, i)\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))
                 * (\<Prod>(r, i)\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2)))
                 * (\<Sum>\<^sup>+ rb\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))}. 
                    (exp (real epsilon1 / real epsilon2)) * exp (- (real epsilon1 * real_of_int \<bar>rb\<bar>) / real epsilon2))"
-              using 3 ordered_semiring_class.mult_left_mono[of _ _ "ennreal ((\<Prod>(r, i)\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))
+              using 3 ordered_semiring_class.mult_left_mono[of _ _ "ennreal (((exp (real epsilon1 / real epsilon2) - 1) / (exp (real epsilon1 / real epsilon2) + 1)) ^ length cs * (\<Prod>(r, i)\<in>set (zip (map real_of_int ra) [0..int (length ra) - 1]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2))
                 * (\<Prod>(r, i)\<in>set (zip (map real_of_int rc) [int (length ra + 1)..int (length cs - 1)]). exp (- (real epsilon1 * \<bar>r\<bar>) / real epsilon2)))"]
               by simp
             show ?thesis using 1 2 4 by simp
