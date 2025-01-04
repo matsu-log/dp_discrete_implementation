@@ -1,8 +1,8 @@
 section \<open>Discrete Laplace Mechanism\<close>
 
 theory Discrete_laplace_mechanism_Z2k
-  imports Discrete_laplace_rat
-          Differential_Privacy2
+  imports "sampler/Discrete_laplace_rat"
+          Differential_Privacy
           IEEE_Floating_Point.Double
 begin 
 

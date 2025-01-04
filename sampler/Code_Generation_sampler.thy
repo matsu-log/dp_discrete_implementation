@@ -1,9 +1,8 @@
-theory Code_Generation 
+theory Code_Generation_sampler
   imports "Executable_Randomized_Algorithms.Randomized_Algorithm"
           "Bernoulli_exp_minus_rat"
           "Bernoulli_rat"
           "Discrete_Laplace_rat"
-          "Discrete_laplace_mechanism"
           "Probabilistic_While.Fast_Dice_Roll"
 begin
 context fixes n :: nat notes [[function_internals]] begin
@@ -331,68 +330,6 @@ proof-
   thus ?thesis
     unfolding rel_fun_def rel_spmf_of_ra_def by simp
 qed
-
-definition discrete_laplace_mechanism_ra :: "('a list \<Rightarrow> int) \<Rightarrow> nat  \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a list \<Rightarrow> int random_alg" where
-"discrete_laplace_mechanism_ra f \<Delta> epsilon1 epsilon2 x = 
-do { 
-  noise \<leftarrow> discrete_laplace_rat_ra (epsilon2 * \<Delta>) epsilon1;
-  return_ra (noise + f x)
-}"
-
-lemma discrete_laplace_mechanisms_ra_correct:
-"spmf_of_ra (discrete_laplace_mechanism_ra f \<Delta> epsilon1 epsilon2 x) = discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x"
-  unfolding discrete_laplace_mechanism_def discrete_laplace_mechanism_ra_def
-  by(simp add: spmf_of_ra_simps discrete_laplace_rat_ra_correct)
-
-export_code discrete_laplace_mechanism_ra in OCaml
-
-definition discrete_laplace_mechanism_Z2k_unit_ra :: "('a list \<Rightarrow> double) \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> 'a list \<Rightarrow> int random_alg" where
-"discrete_laplace_mechanism_Z2k_unit_ra f i epsilon1 epsilon2 k x = do {
-  noise::int \<leftarrow> discrete_laplace_rat_ra (epsilon2 * i) epsilon1;
-  return_ra (noise  + (findNearstMultiple_2k (f x) k))
-}
-"
-
-lemma discrete_laplace_mechanism_Z2k_unit_ra_correct:
-"spmf_of_ra (discrete_laplace_mechanism_Z2k_unit_ra f i epsilon1 epsilon2 k x) = discrete_laplace_mechanism_Z2k_unit f i epsilon1 epsilon2 k x"
-  unfolding discrete_laplace_mechanism_Z2k_unit_def discrete_laplace_mechanism_Z2k_unit_ra_def
-  by(simp add: spmf_of_ra_simps discrete_laplace_rat_ra_correct)
-
-definition postprocess_ra :: "('a list \<Rightarrow> 'b random_alg) \<Rightarrow> ('b \<Rightarrow> 'c) \<Rightarrow>  'a list \<Rightarrow> 'c random_alg" where
-"postprocess_ra M pp l = do {
-  A \<leftarrow> M l;
-  return_ra (pp A)
-}"
-
-definition discrete_laplace_mechanism_Z2k_ra :: "('a list \<Rightarrow> double) \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> 'a list \<Rightarrow> real random_alg" where
-"discrete_laplace_mechanism_Z2k_ra f i epsilon1 epsilon2 k x = do {
-  postprocess_ra (discrete_laplace_mechanism_Z2k_unit_ra f i epsilon1 epsilon2 k) (\<lambda>ans. ans * power_2 k) x
-}
-"
-lemma discrete_laplace_mechanism_Z2k_ra_correct:
-"spmf_of_ra (discrete_laplace_mechanism_Z2k_ra f i epsilon1 epsilon2 k x) = discrete_laplace_mechanism_Z2k f i epsilon1 epsilon2 k x"
-  unfolding discrete_laplace_mechanism_Z2k_def discrete_laplace_mechanism_Z2k_ra_def postprocess_ra_def postprocess_def
-  by(simp add: spmf_of_ra_simps discrete_laplace_mechanism_Z2k_unit_ra_correct)
-
-definition discrete_laplace_mechanism_Z2k_to_double_ra :: "('a list \<Rightarrow> double) \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> 'a list \<Rightarrow> double random_alg" where
-"discrete_laplace_mechanism_Z2k_to_double_ra f i epsilon1 epsilon2 k x = do {
-  postprocess_ra (discrete_laplace_mechanism_Z2k_ra f i epsilon1 epsilon2 k) round_to_double x
-}
-"
-
-lemma discrete_laplace_mechanism_Z2k_to_double_ra_correct:
-"spmf_of_ra (discrete_laplace_mechanism_Z2k_to_double_ra f i epsilon1 epsilon2 k x) = discrete_laplace_mechanism_Z2k_to_double f i epsilon1 epsilon2 k x"
-  unfolding discrete_laplace_mechanism_Z2k_to_double_def discrete_laplace_mechanism_Z2k_to_double_ra_def postprocess_ra_def postprocess_def
-  by(simp add: spmf_of_ra_simps discrete_laplace_mechanism_Z2k_ra_correct)
-
-definition discrete_laplace_mechanism_Z2k_to_double2_ra :: "('a list \<Rightarrow> double) \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> 'a list \<Rightarrow> double random_alg" where
-"discrete_laplace_mechanism_Z2k_to_double2_ra f i epsilon1 epsilon2 k x = do {
-  postprocess_ra (discrete_laplace_mechanism_Z2k_unit_ra f i epsilon1 epsilon2 k) (\<lambda>ans. mul_2k_to_double ans k) x
-}
-"
-
-export_code discrete_laplace_mechanism_Z2k_to_double2_ra in SML
-
 
 
 end
