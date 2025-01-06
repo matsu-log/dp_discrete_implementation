@@ -1,7 +1,7 @@
 section \<open>Discrete Laplace Mechanism\<close>
 
 theory Discrete_laplace_mechanism
-  imports "sampler/Discrete_laplace_rat"
+  imports "sampler/Discrete_Laplace_rat"
           Differential_Privacy_spmf
 begin 
 

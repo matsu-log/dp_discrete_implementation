@@ -1,7 +1,7 @@
 section \<open>Report Noisy Max with discrete laplace distribution\<close>
 
 theory Report_noisy_max
-  imports "sampler/Discrete_laplace_rat"
+  imports "sampler/Discrete_Laplace_rat"
           Differential_Privacy_spmf
           Discrete_laplace_mechanism
 begin
@@ -26,9 +26,14 @@ definition report_noisy_max:: "(('a, int) query) list \<Rightarrow> nat \<Righta
 }
 "
 
+definition is_count_query :: "('a, int) query \<Rightarrow> bool" where
+"is_count_query c = (\<forall>(l1, l2)\<in>adj. \<bar>c l1 - c l2\<bar>\<le>1 \<and> 
+                                           (if length l1 < length l2 then c l1 \<le> c l2 
+                                            else c l2 \<le> c l1))"
+
 primrec is_count_queries :: "(('a, int) query) list \<Rightarrow> bool" where
 "is_count_queries [] = True" |
-"is_count_queries (c#cs) = (if is_sensitivity c 1 then is_count_queries cs else False)"
+"is_count_queries (c#cs) = (is_count_query c \<and> is_count_queries cs)"
 
 subsection \<open>component function\<close>
 lemma argmax_int_list_index_lt_length:
@@ -179,7 +184,11 @@ next
   qed
 qed
 
-lemma count_queries:
+lemma count_query_imp_sensitivity_1:
+  shows "is_count_query c \<Longrightarrow> is_sensitivity c 1"
+  unfolding is_count_query_def is_sensitivity_def by auto
+
+lemma count_queries_imp_sensitivity_1:
   shows "is_count_queries cs \<Longrightarrow> \<forall> c\<in> (set cs). is_sensitivity c 1"
 proof (induct cs)
   case Nil
@@ -192,11 +201,11 @@ next
     assume c:"c \<in> set (a # cs)"
     then show "is_sensitivity c 1"
       apply(cases "c \<in> set cs")
-      using Cons is_count_queries.simps(2)[of "a" "cs"]
-       apply(presburger)
+      using Cons is_count_queries.simps(2)[of "a" "cs"] 
+       apply simp
       apply(cases "a\<in> set cs",simp)
-      using Cons is_count_queries.simps(2)[of "a" "cs"]
-      by(simp,argo)
+      using Cons is_count_queries.simps(2)[of "a" "cs"] count_query_imp_sensitivity_1
+      by auto
   qed
 qed
 
@@ -484,7 +493,7 @@ next
     have cs:"is_count_queries cs"
       using a_cs unfolding is_count_queries.simps by argo
     have a:"is_sensitivity a 1"
-      using a_cs unfolding is_count_queries.simps by argo
+      using a_cs count_queries_imp_sensitivity_1 by fastforce
     have t1:"(\<lambda>x. discrete_laplace_noise_add_list cs epsilon1 epsilon2 x \<bind> (\<lambda>y. case (x, y) of (x, noisy_cs) \<Rightarrow> discrete_laplace_mechanism a 1 epsilon1 epsilon2 x \<bind> (\<lambda>noisy_c. return_spmf (noisy_c # noisy_cs))))
         = (\<lambda>b. discrete_laplace_noise_add_list cs epsilon1 epsilon2 b \<bind> (\<lambda>noisy_cs. discrete_laplace_mechanism a 1 epsilon1 epsilon2 b \<bind> (\<lambda>noisy_c. return_spmf (noisy_c # noisy_cs))))"
       by simp
@@ -928,9 +937,19 @@ proof-
             apply(rewrite zip_append[symmetric], simp add:assms)
             apply(rewrite append_take_drop_id)
             by simp
-          have 2:"[0..int (length ra - 1)] @ [int (length ra)..int (length cs - 1)] = [0..(length cs -1)]"
-            using assms ra 
-            by (smt (verit) add_implies_diff int_ops(2) int_ops(6) length_0_conv of_nat_le_0_iff upto_split1)
+          have 2:"[0..int (length ra - 1)] @ [int (length ra)..int (length cs - 1)] = [0..(length cs -1)]" 
+          proof -
+            have "int (length ra - 1) = int (length ra) - 1"
+            proof(rewrite SMT.int_ops(6),simp)
+              have "0 < length ra"
+                using ra by simp
+              then show "\<not> int (length ra) < 1"
+                by linarith
+            qed
+            then show ?thesis
+              using ra assms
+              by (metis add_implies_diff le_add1 nat_int_comparison(3) of_nat_0_le_iff upto_split1)
+          qed
           show "zip (zip (map (\<lambda>h x. real_of_int (h x)) (take (length ra) cs)) (map real_of_int (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)))) @ zip (map (\<lambda>h x. real_of_int (h x)) (drop (length ra) cs)) (map real_of_int (map2 (+) (rb # rc) (drop (length ra) (map (\<lambda>q. q y) cs)))))
                     ([0..int (length ra - 1)] @ [int (length ra)..int (length cs - 1)])
               = zip (zip (map (\<lambda>h x. real_of_int (h x)) cs) (map real_of_int (map2 (+) (ra @ rb # rc) (map (\<lambda>q. q y) cs)))) [0..int (length cs - 1)]"

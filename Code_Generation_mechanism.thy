@@ -1,9 +1,10 @@
 theory Code_Generation_mechanism
   imports "Executable_Randomized_Algorithms.Randomized_Algorithm"
-          "sampler/Code_generation_sampler"
+          "sampler/Code_Generation_sampler"
           "Discrete_laplace_mechanism"
           "Probabilistic_While.Fast_Dice_Roll"
           "Report_noisy_max"
+          "HOL-Library.Code_Target_Numeral"
 begin
 
 definition discrete_laplace_mechanism_ra :: "('a list \<Rightarrow> int) \<Rightarrow> nat  \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a list \<Rightarrow> int random_alg" where

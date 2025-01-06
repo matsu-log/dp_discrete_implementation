@@ -6,18 +6,18 @@ session dp_discrete_implementation = "HOL-Probability" +
     "Executable_Randomized_Algorithms"
   directories
     "sampler"
+  (*
   theories 
     "Bernoulli_rat"
     "Bernoulli_exp_minus_real"
     "Bernoulli_exp_minus_rat"
-    (*
     "Discrete_Laplace_rat"
-    "Code_Generation_Sampler"
-
-    "Differential_Privacy_spmf"
+    "Code_Generation_sampler"
+  *)
+  theories
+    (*"Differential_Privacy_spmf"*)
     "Discrete_laplace_mechanism"
-    "Report_noisy_max"
-    "Code_Generation_mechanism"
-    *)
+    (*"Report_noisy_max"*)
+(*    "Code_Generation_mechanism"*)
   document_files
     "root.tex"
