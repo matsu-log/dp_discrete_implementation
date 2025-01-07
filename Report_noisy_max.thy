@@ -209,7 +209,11 @@ next
   qed
 qed
 
-
+lemma count_queries:
+  assumes "neighbour x y"
+  and "length x < length y"
+  shows "is_count_queries cs \<Longrightarrow> \<forall>c \<in> set cs. (c x \<le> c y  \<and> c y - 1 \<le> c x)" 
+  using assms by (induct cs) (fastforce simp: is_count_query_def adj_def)+
   
 lemma lossless_discrete_laplace_noise_add_list:
   assumes "1\<le>epsilon1" and "1\<le>epsilon2"
@@ -1448,7 +1452,13 @@ next
                 proof-      
                   have 1:"Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))- (cs ! (length ra)) y -1
                            \<le> Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))) -  (cs ! (length ra)) x"
-                    sorry
+                  proof(cases "length x \<le> length y")
+                    case True
+                    then show ?thesis sorry
+                  next
+                    case False
+                    then show ?thesis sorry
+                  qed
                   have 2:"\<And>rb. ?p rb x \<Longrightarrow> ?p (rb+1) y"
                     sorry
                   show ?thesis
