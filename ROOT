@@ -17,7 +17,7 @@ session dp_discrete_implementation = "HOL-Probability" +
   theories
     (*"Differential_Privacy_spmf"*)
     "Discrete_laplace_mechanism"
-    (*"Report_noisy_max"*)
+    "Report_noisy_max"
 (*    "Code_Generation_mechanism"*)
   document_files
     "root.tex"

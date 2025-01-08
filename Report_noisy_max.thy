@@ -190,30 +190,35 @@ lemma count_query_imp_sensitivity_1:
 
 lemma count_queries_imp_sensitivity_1:
   shows "is_count_queries cs \<Longrightarrow> \<forall> c\<in> (set cs). is_sensitivity c 1"
-proof (induct cs)
-  case Nil
-  then show ?case by simp
-next
-  case (Cons a cs)
-  then show ?case 
-  proof(clarify)
-    fix c
-    assume c:"c \<in> set (a # cs)"
-    then show "is_sensitivity c 1"
-      apply(cases "c \<in> set cs")
-      using Cons is_count_queries.simps(2)[of "a" "cs"] 
-       apply simp
-      apply(cases "a\<in> set cs",simp)
-      using Cons is_count_queries.simps(2)[of "a" "cs"] count_query_imp_sensitivity_1
-      by auto
-  qed
-qed
+  using count_query_imp_sensitivity_1 is_count_query_def by(induct cs,auto)
 
-lemma count_queries:
+lemma count_queries_imp_sensitivity_1':
+  shows "is_count_queries cs \<Longrightarrow> \<forall>k < length cs. is_sensitivity (cs!k) 1"
+  using count_queries_imp_sensitivity_1 by fastforce
+
+lemma count_queries_1:
   assumes "neighbour x y"
   and "length x < length y"
   shows "is_count_queries cs \<Longrightarrow> \<forall>c \<in> set cs. (c x \<le> c y  \<and> c y - 1 \<le> c x)" 
   using assms by (induct cs) (fastforce simp: is_count_query_def adj_def)+
+
+lemma count_queries_1':
+  assumes "neighbour x y"
+  and "length x < length y"
+shows "is_count_queries cs \<Longrightarrow> \<forall>i < length cs. ((cs ! i) x \<le> (cs ! i) y  \<and> (cs ! i)y - 1 \<le> (cs!i) x)" 
+  using assms count_queries_1 by fastforce
+
+lemma count_queries_2:
+  assumes "neighbour x y"
+  and "length x \<ge> length y"
+  shows "is_count_queries cs \<Longrightarrow> \<forall>c \<in> set cs. (c y \<le> c x  \<and> c x - 1 \<le> c y)" 
+  using assms by (induct cs) (fastforce simp: is_count_query_def adj_def)+
+
+lemma count_queries_2':
+  assumes "neighbour x y"
+  and "length x \<ge> length y"
+shows "is_count_queries cs \<Longrightarrow> \<forall>i < length cs. ((cs ! i) y \<le> (cs ! i) x  \<and> (cs ! i)x - 1 \<le> (cs!i) y)" 
+  using assms count_queries_2 by fastforce
   
 lemma lossless_discrete_laplace_noise_add_list:
   assumes "1\<le>epsilon1" and "1\<le>epsilon2"
@@ -1402,7 +1407,8 @@ next
               qed
             next
               case False
-              then show ?thesis
+              assume cs_gt1:"length cs \<noteq> 1"
+              show ?thesis
               proof -
                 let ?p = "\<lambda>rb x. (\<forall>k<length ra. (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))) ! k < (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))) ! length ra)"
                 have "(\<Sum>\<^sup>+ x\<in>{rb. length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))))}. ennreal (exp (- (real epsilon1 * real_of_int \<bar>x\<bar>) / real epsilon2)))
@@ -1449,18 +1455,170 @@ next
                   then show ?thesis by simp
                 qed
                 also have "... \<le> (\<Sum>\<^sup>+ x\<in>{rb. rb \<ge> Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))) - (cs ! (length ra)) y -  1 \<and> ?p (rb+1) y}. ennreal (exp (- (real epsilon1 * real_of_int \<bar>x\<bar>) / real epsilon2)))"            
-                proof-      
+                proof-
+                  have p:"(\<exists>i. i < length ra) \<or> (\<exists>i. i < length rc)"    
+                    using cs cs_gt1 H2 
+                    by presburger
+                  have set1:"set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))
+                            =  {ra ! i + (cs ! i) y|i. i < length ra} 
+                            \<union> {rc ! i + (cs ! (Suc (length ra) + i)) y |i. i < length rc}"  
+                  proof(rewrite set_map, rewrite set_zip,rewrite length_take,rewrite set_map,rewrite set_zip,rewrite length_drop,rewrite length_map,rewrite length_map)
+                    have 1:"(\<lambda>(x, y). x + y) ` {(ra ! i, take (length ra) (map (\<lambda>q. q y) cs) ! i) |i. i < min (length ra) (min (length cs) (length ra))}
+                          = {ra ! i + (cs ! i) y |i. i < length ra}"
+                      apply(rewrite min_absorb1)
+                      using H1 z by force+           
+                    have 2:"(\<lambda>(x, y). x + y) ` {(rc ! i, drop (Suc (length ra)) (map (\<lambda>q. q y) cs) ! i) |i. i < min (length rc) (length cs - Suc (length ra))}
+                          = {rc ! i + (cs ! (Suc (length ra) + i)) y |i. i < length rc}"
+                      apply(rewrite min_absorb1)                     
+                      using H2 by force+
+                    show "(\<lambda>(x, y). x + y) ` {(ra ! i, take (length ra) (map (\<lambda>q. q y) cs) ! i) |i. i < min (length ra) (min (length cs) (length ra))}
+                        \<union> (\<lambda>(x, y). x + y) ` {(rc ! i, drop (Suc (length ra)) (map (\<lambda>q. q y) cs) ! i) |i. i < min (length rc) (length cs - Suc (length ra))} 
+                        = {ra ! i + (cs ! i) y|i. i < length ra} \<union> {rc ! i + (cs ! (Suc (length ra) + i)) y |i. i < length rc}"
+                      using 1 2 by simp  
+                  qed
+                  have set2:"set (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))
+                            =  {ra ! i + (cs ! i) x |i. i < length ra} 
+                            \<union> {rc ! i + (cs ! (Suc (length ra) + i)) x |i. i < length rc}"  
+                  proof(rewrite set_map, rewrite set_zip,rewrite length_take,rewrite set_map,rewrite set_zip,rewrite length_drop,rewrite length_map,rewrite length_map)
+                    have 1:"(\<lambda>(x, y). x + y) ` {(ra ! i, take (length ra) (map (\<lambda>q. q x) cs) ! i) |i. i < min (length ra) (min (length cs) (length ra))}
+                          = {ra ! i + (cs ! i) x |i. i < length ra}"
+                      apply(rewrite min_absorb1)
+                      using H1 z by force+           
+                    have 2:"(\<lambda>(x, y). x + y) ` {(rc ! i, drop (Suc (length ra)) (map (\<lambda>q. q x) cs) ! i) |i. i < min (length rc) (length cs - Suc (length ra))}
+                          = {rc ! i + (cs ! (Suc (length ra) + i)) x  |i. i < length rc}"
+                      apply(rewrite min_absorb1)                     
+                      using H2 by force+
+                    show "(\<lambda>(x, y). x + y) ` {(ra ! i, take (length ra) (map (\<lambda>q. q x) cs) ! i) |i. i < min (length ra) (min (length cs) (length ra))}
+                        \<union> (\<lambda>(x, y). x + y) ` {(rc ! i, drop (Suc (length ra)) (map (\<lambda>q. q x) cs) ! i) |i. i < min (length rc) (length cs - Suc (length ra))} 
+                        = {ra ! i + (cs ! i) x |i. i < length ra} \<union> {rc ! i + (cs ! (Suc (length ra) + i)) x  |i. i < length rc}"
+                      using 1 2 by simp  
+                  qed
                   have 1:"Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))- (cs ! (length ra)) y -1
                            \<le> Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))) -  (cs ! (length ra)) x"
-                  proof(cases "length x \<le> length y")
+                  proof(cases "length x < length y")
                     case True
-                    then show ?thesis sorry
+                    show ?thesis
+                    proof(rewrite set1,rewrite set2)
+                      have 1:"Max ({ra ! i + (cs ! i) y |i. i < length ra} \<union> {rc ! i + (cs ! (Suc (length ra) + i)) y |i. i < length rc})- 1
+                           \<le> Max ({ra ! i + (cs ! i) x |i. i < length ra} \<union> {rc ! i + (cs ! (Suc (length ra) + i)) x |i. i < length rc})"
+                        apply(rewrite hom_Max_commute[of "\<lambda>x. x-1"],simp,simp,simp add:p,rewrite image_Un)
+                      proof(rewrite Max_le_iff,simp_all add:p,rewrite Max_ge_iff,simp_all add:p,rule,safe)
+                        fix i
+                        assume H:"i < length ra"
+                        have "ra ! i + (cs ! i) y - 1 \<le> ra ! i + (cs ! i) x"
+                          using True H count_queries_1'[of "x" "y" "cs"] assms(1) assms(2) H1 z unfolding adj_def by simp
+                        then show "\<exists>a\<in>{ra ! i + (cs ! i) x |i. i < length ra} \<union> {rc ! i + (cs ! Suc (length ra + i)) x |i. i < length rc}. ra ! i + (cs ! i) y - 1 \<le> a"
+                          using H by blast
+                      next
+                        fix i
+                        assume H:"i < length rc"
+                        have "rc ! i + (cs ! Suc (length ra + i)) y - 1 \<le> rc ! i + (cs ! (Suc (length ra) + i)) x"
+                          using True H count_queries_1'[of "x" "y" "cs"] assms(1) assms(2) H2 unfolding adj_def by simp
+                        then show "\<exists>a\<in>{ra ! i + (cs ! i) x |i. i < length ra} \<union> {rc ! i + (cs ! Suc (length ra + i)) x |i. i < length rc}. rc ! i + (cs ! Suc (length ra + i)) y - 1 \<le> a"
+                          using H by fastforce
+                      qed
+                      have 2:"(cs ! length ra) x \<le> (cs ! length ra) y"
+                      proof -
+                        have "(cs ! length ra)\<in> set cs"
+                          using nth_mem[of "length ra" "cs"] H1 z by simp
+                        then show ?thesis
+                          using count_queries_1 assms(1) assms(2) True unfolding adj_def by fastforce
+                      qed
+                      show "Max ({ra ! i + (cs ! i) y |i. i < length ra} \<union> {rc ! i + (cs ! (Suc (length ra) + i)) y |i. i < length rc}) - (cs ! length ra) y - 1
+                          \<le> Max ({ra ! i + (cs ! i) x |i. i < length ra} \<union> {rc ! i + (cs ! (Suc (length ra) + i)) x |i. i < length rc}) - (cs ! length ra) x"
+                        using 1 2 by simp
+                    qed
                   next
                     case False
-                    then show ?thesis sorry
+                    then show ?thesis
+                    proof(rewrite set1,rewrite set2)
+                      have 1:"Max ({ra ! i + (cs ! i) y |i. i < length ra} \<union> {rc ! i + (cs ! (Suc (length ra) + i)) y |i. i < length rc})
+                           \<le> Max ({ra ! i + (cs ! i) x |i. i < length ra} \<union> {rc ! i + (cs ! (Suc (length ra) + i)) x |i. i < length rc})"
+                      proof(rewrite Max_le_iff,simp_all add:p,rewrite Max_ge_iff,simp_all add:p,rule,safe)
+                        fix i
+                        assume H:"i < length ra"
+                        have "ra ! i + (cs ! i) y \<le> ra ! i + (cs ! i) x"
+                          using False H count_queries_2'[of "x" "y" "cs"] assms(1) assms(2) H1 z unfolding adj_def by simp
+                        then show "\<exists>a\<in>{ra ! i + (cs ! i) x |i. i < length ra} \<union> {rc ! i + (cs ! Suc (length ra + i)) x |i. i < length rc}. ra ! i + (cs ! i) y \<le> a"
+                          using H by blast
+                      next
+                        fix i
+                        assume H:"i < length rc"
+                        have "rc ! i + (cs ! Suc (length ra + i)) y \<le> rc ! i + (cs ! Suc (length ra + i)) x"
+                          using False H count_queries_2'[of "x" "y" "cs"] assms(1) assms(2) H2 unfolding adj_def by simp
+                        then show "\<exists>a\<in>{ra ! i + (cs ! i) x |i. i < length ra} \<union> {rc ! i + (cs ! Suc (length ra + i)) x |i. i < length rc}. rc ! i + (cs ! Suc (length ra + i)) y \<le> a"
+                          using H by blast
+                      qed
+                      have 2:"(cs ! length ra) x - 1 \<le> (cs ! length ra) y"
+                      proof -
+                        have "(cs ! length ra)\<in> set cs"
+                          using nth_mem[of "length ra" "cs"] H1 z by simp
+                        then show ?thesis
+                          using count_queries_2 assms(1) assms(2) False unfolding adj_def by fastforce
+                      qed
+                      show "Max ({ra ! i + (cs ! i) y |i. i < length ra} \<union> {rc ! i + (cs ! (Suc (length ra) + i)) y |i. i < length rc}) - (cs ! length ra) y - 1
+                         \<le> Max ({ra ! i + (cs ! i) x |i. i < length ra} \<union> {rc ! i + (cs ! (Suc (length ra) + i)) x |i. i < length rc}) - (cs ! length ra) x"
+                        using 1 2 by simp
+                    qed
                   qed
                   have 2:"\<And>rb. ?p rb x \<Longrightarrow> ?p (rb+1) y"
-                    sorry
+                  proof(safe)
+                    fix rb k
+                    assume k:"k<length ra"
+                      and H:"\<forall>k<length ra. (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))) ! k
+                                       < (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))) ! length ra"
+                    have k1:"k < length cs"
+                      using k H1 z by simp
+                    have ra:"\<And>d. length (map2 (+) ra (take (length ra) (map (\<lambda>q. q d) cs))) = length ra"
+                      apply(rewrite length_map,rewrite length_zip,rewrite length_take,rewrite length_map)
+                      using H1 z by simp
+                    have 1:"\<And>d r. (map2 (+) ra (take (length ra) (map (\<lambda>q. q d) cs)) @ (r + (cs ! length ra) d) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q d) cs))) ! k = ra ! k + (cs ! k) d"
+                    proof -
+                      fix d r 
+                      show "(map2 (+) ra (take (length ra) (map (\<lambda>q. q d) cs)) @ (r + (cs ! length ra) d) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q d) cs))) ! k = ra ! k + (cs ! k) d"
+                        apply(rewrite nth_append,rewrite ra)
+                        using H1 z k by simp_all
+                    qed
+                    have 2:"\<And>d r. (map2 (+) ra (take (length ra) (map (\<lambda>q. q d) cs)) @ (r + (cs ! length ra) d) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q d) cs))) ! length ra = r + (cs ! length ra) d"
+                      using nth_append_length ra by metis
+                    show "(map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + 1 + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))) ! k
+                        < (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + 1 + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))) ! length ra"
+                    proof(cases "length x < length y")
+                      case True
+                      show ?thesis
+                      proof -
+                        have t1:"ra ! k + (cs ! k) y \<le> ra ! k + (cs ! k) x + 1"
+                          using k1 assms(1) assms(2) True count_queries_1'[of "x" "y" "cs"] unfolding adj_def by fastforce
+                        have t2:"(cs ! length ra) x \<le> (cs ! length ra) y"
+                          using H1 z assms(1) assms(2) True count_queries_1'[of "x" "y" "cs"] unfolding adj_def by fastforce
+                        have "(map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + 1 + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))) ! k
+                             \<le> (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))) ! k + 1"
+                          using t1 by(rewrite 1)+ simp
+                        also have "... < (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))) ! length ra + 1"
+                          using H k by auto
+                        also have "... \<le> (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + 1 + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))) ! length ra"
+                          using t2 by(rewrite 2)+ simp 
+                        finally show ?thesis by simp
+                      qed
+                    next
+                      case False
+                      show ?thesis
+                      proof -
+                        have f1:"ra ! k + (cs ! k) y \<le> ra ! k + (cs ! k) x"
+                          using k1 assms(1) assms(2) False count_queries_2'[of "x" "y" "cs"] unfolding adj_def by fastforce
+                        have f2:"(cs ! length ra) x \<le> (cs ! length ra) y + 1"
+                          using H1 z assms(1) assms(2) False count_queries_2'[of "x" "y" "cs"] unfolding adj_def by fastforce
+                        have "(map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + 1 + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))) ! k
+                             \<le> (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))) ! k"
+                          using f1 by(rewrite 1)+ simp
+                        also have "... < (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))) ! length ra"
+                          using H k by auto
+                        also have "... \<le> (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + 1 + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))) ! length ra"
+                          using f2 by(rewrite 2)+ simp 
+                        finally show ?thesis by simp
+                      qed
+                    qed
+                  qed
                   show ?thesis
                     apply(rewrite restrict_count_space_subset[symmetric, of _ "UNIV"])
                      apply auto[1]
