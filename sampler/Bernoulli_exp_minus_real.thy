@@ -184,7 +184,7 @@ interpretation loop_spmf fst body
   rewrites "body \<equiv>  (\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (True,k'+1) else (False,k'))) (bernoulli (p/k')))" 
   by(fact body_def)
 
- lemma bernoulli_exp_minus_real_from_0_to_1_loop_conv_while:
+lemma bernoulli_exp_minus_real_from_0_to_1_loop_conv_while:
  "bernoulli_exp_minus_real_from_0_to_1_loop p 1 = map_spmf snd (while (True, 1))"
 proof -
   have "bernoulli_exp_minus_real_from_0_to_1_loop p x = map_spmf snd (while (True, x))" (is "?lhs = ?rhs") for x
@@ -221,82 +221,79 @@ proof -
   from this[of 1] show ?thesis by(simp cong:map_spmf_cong)
 qed
 
+lemma lossless_while_True_2:"lossless_spmf (while (True,2))"
+proof(rule termination_0_1_immediate_invar)
+  let ?I = "\<lambda>(b,k'::nat). 2\<le>k'"
+  let ?p = "1-p/2"
+  show "\<And>s. fst s \<Longrightarrow> ?I s \<Longrightarrow> ?p \<le> spmf (map_spmf fst (case s of (b, k') \<Rightarrow> map_spmf (\<lambda>b'. if b' then (True, k' + 1) else (False, k')) (bernoulli (p / real k')))) False"     
+  proof clarify
+    fix a::bool and  b::nat 
+    assume "fst (a,b)" and I_b:"2\<le>b"
+    show "1 - p / 2 \<le> spmf (map_spmf fst (map_spmf (\<lambda>b'. if b' then (True, b + 1) else (False, b)) (bernoulli (p / real b)))) False"
+    proof -
+      have "ennreal (1-p/2)\<le> ennreal (spmf (map_spmf fst (map_spmf (\<lambda>b'. if b' then (True, b + 1) else (False, b)) (bernoulli (p / real b)))) False)"
+        apply(simp add: ennreal_spmf_map_conv_nn_integral)
+        apply(simp add: nn_integral_measure_spmf)
+        apply(simp add: UNIV_bool)
+        apply(simp add: nn_integral_count_space_finite)
+      proof-
+        have "{a.\<not>a} = {False}" by auto
+        then have "(\<Sum>a | \<not> a. spmf (bernoulli (p /b)) a) = spmf (bernoulli (p/b)) False " by simp
+        also have "... = 1 - p/b" using cond1 cond2 I_b by simp
+        also have "...  \<ge>  1-p/2" using I_b cond1
+        proof-
+          have "p/b \<le>p/2"
+            apply(rule divide_left_mono) 
+            using cond1 I_b apply(simp_all)  
+            done 
+          then show "1-p/2 \<le> 1-p/b" by simp
+        qed
+        finally have 1:"(\<Sum>a | \<not> a. spmf (bernoulli (p /b)) a) \<ge> 1-p/2" by simp
+        have 2:"0\<le>1-p/2" using cond2 by simp
+        show " ennreal (1 - p / 2) \<le> ennreal (\<Sum>a | \<not> a. spmf (bernoulli (p / real b)) a)" using 1 2 by simp
+      qed
+      then show "1 - p / 2 \<le> spmf (map_spmf fst (map_spmf (\<lambda>b'. if b' then (True, b + 1) else (False, b)) (bernoulli (p / real b)))) False" by simp
+    qed
+  qed
+  show "0<?p" using cond2 by simp
+  show "\<And>s. fst s \<Longrightarrow> ?I s \<Longrightarrow> lossless_spmf (case s of (b, k') \<Rightarrow> map_spmf (\<lambda>b'. if b' then (True, k' + 1) else (False, k')) (bernoulli (p / real k')))"
+  proof clarify
+    fix a::bool and b::nat
+    assume "fst (a,b)" and "2\<le>b"
+    show "lossless_spmf (map_spmf (\<lambda>b'. if b' then (True, b + 1) else (False, b)) (bernoulli (p / real b))) " by simp
+  qed
+  show "\<And>s s'. s' \<in> set_spmf (case s of (b, k') \<Rightarrow> map_spmf (\<lambda>b'. if b' then (True, k' + 1) else (False, k')) (bernoulli (p / real k'))) \<Longrightarrow> ?I s \<Longrightarrow> fst s \<Longrightarrow> ?I s'"
+  proof clarify
+    fix a aa::bool and b ba::nat
+    assume step:" (aa, ba) \<in> set_spmf (map_spmf (\<lambda>b'. if b' then (True, b + 1) else (False, b)) (bernoulli (p / real b)))"
+       and I_b:"2\<le>b" and guard:"fst(a,b)"
+    show "2\<le>ba"
+    proof -
+      have "b\<le>ba" using step by auto  
+      then show "2\<le>ba" using I_b by simp 
+    qed
+  qed
+  show "?I (True,2)" using cond2 by simp
+qed
+
+lemma lossless_while_False_1:"lossless_spmf (while (False,1))"
+  by(rewrite while.simps,simp)
+
 lemma lossless_bernoulli_exp_minus_real_from_0_to_1_loop [simp]: "lossless_spmf (bernoulli_exp_minus_real_from_0_to_1_loop p 1)"
 proof-
   let ?body = "(\<lambda>(b,k'::nat). map_spmf (\<lambda>b'. (if b' then (True,k'+1) else (False,k'))) (bernoulli (p/k')))" 
   have "lossless_spmf (while (True, 1))"
   proof - 
-    let ?I = "\<lambda>(b,k'::nat). 2\<le>k'"
-    let ?p = "1-p/2"
-    have lossless_over_2:"lossless_spmf (while (True, 2))"
-    proof(rule termination_0_1_immediate_invar)
-      show "\<And>s. fst s \<Longrightarrow> ?I s \<Longrightarrow> ?p \<le> spmf (map_spmf fst (case s of (b, k') \<Rightarrow> map_spmf (\<lambda>b'. if b' then (True, k' + 1) else (False, k')) (bernoulli (p / real k')))) False"
-      proof clarify
-        fix a::bool and  b::nat
-        assume "fst (a,b)" and I_b:"2\<le>b"
-        show "1 - p / 2 \<le> spmf (map_spmf fst (map_spmf (\<lambda>b'. if b' then (True, b + 1) else (False, b)) (bernoulli (p / real b)))) False"
-        proof -
-          have "ennreal (1-p/2)\<le> ennreal (spmf (map_spmf fst (map_spmf (\<lambda>b'. if b' then (True, b + 1) else (False, b)) (bernoulli (p / real b)))) False)"
-          apply(simp add: ennreal_spmf_map_conv_nn_integral)
-          apply(simp add: nn_integral_measure_spmf)
-          apply(simp add: UNIV_bool)               
-          apply(simp add: nn_integral_count_space_finite)
-          proof-
-            have "{a.\<not>a} = {False}" by auto
-            then have "(\<Sum>a | \<not> a. spmf (bernoulli (p /b)) a) = spmf (bernoulli (p/b)) False " by simp
-            also have "... = 1 - p/b" using cond1 cond2 I_b by simp
-            also have "...  \<ge>  1-p/2" using I_b cond1 
-            proof-
-              find_theorems "_/_\<le>_/_"
-              have "p/b \<le>p/2" 
-                apply(rule divide_left_mono)
-                using cond1 I_b apply(simp_all)
-                done
-              then show "1-p/2 \<le> 1-p/b" by simp
-            qed
-            finally have 1:"(\<Sum>a | \<not> a. spmf (bernoulli (p /b)) a) \<ge> 1-p/2" by simp
-            have 2:"0\<le>1-p/2" using cond2 by simp
-            show " ennreal (1 - p / 2) \<le> ennreal (\<Sum>a | \<not> a. spmf (bernoulli (p / real b)) a)" using 1 2 by simp
-          qed
-          then show "1 - p / 2 \<le> spmf (map_spmf fst (map_spmf (\<lambda>b'. if b' then (True, b + 1) else (False, b)) (bernoulli (p / real b)))) False" by simp
-        qed
-      qed
-      show "0<?p" using cond2 by simp
-      show "\<And>s. fst s \<Longrightarrow> ?I s \<Longrightarrow> lossless_spmf (case s of (b, k') \<Rightarrow> map_spmf (\<lambda>b'. if b' then (True, k' + 1) else (False, k')) (bernoulli (p / real k')))" 
-      proof clarify
-        fix a::bool and b::nat
-        assume "fst (a,b)" and "2\<le>b"
-        show "lossless_spmf (map_spmf (\<lambda>b'. if b' then (True, b + 1) else (False, b)) (bernoulli (p / real b))) " by simp
-      qed
-      show "\<And>s s'. s' \<in> set_spmf (case s of (b, k') \<Rightarrow> map_spmf (\<lambda>b'. if b' then (True, k' + 1) else (False, k')) (bernoulli (p / real k'))) \<Longrightarrow> ?I s \<Longrightarrow> fst s \<Longrightarrow> ?I s'"
-      proof clarify
-        fix a aa::bool and b ba::nat
-        assume step:" (aa, ba) \<in> set_spmf (map_spmf (\<lambda>b'. if b' then (True, b + 1) else (False, b)) (bernoulli (p / real b)))"
-           and I_b:"2\<le>b" and guard:"fst(a,b)"
-        show "2\<le>ba" 
-        proof -
-          have "b\<le>ba" using step by auto
-          then show "2\<le>ba" using I_b by simp
-        qed
-      qed
-      show "?I (True,2)" using cond2 by simp
-    qed
-    have lossless_False_1: "lossless_spmf (while (False,1))" 
-      apply(rewrite while.simps)
-      apply(simp)
-      done
     show "lossless_spmf (while (True,1))"
-      apply(rewrite while.simps)
-      apply(simp add:bind_map_spmf)
-    proof 
+    proof(rewrite while.simps,simp add:bind_map_spmf,rule) 
       fix x
       assume "x \<in> set_spmf (bernoulli p)"
       show "(x \<longrightarrow> lossless_spmf (local.while (True, Suc (Suc 0)))) \<and> (\<not> x \<longrightarrow> lossless_spmf (local.while (False, Suc 0)))"
       proof 
         show "x \<longrightarrow> lossless_spmf (local.while (True, Suc (Suc 0)))"
-          using lossless_over_2 by (simp add: numeral_2_eq_2)
+          using lossless_while_True_2 by (simp add: numeral_2_eq_2)
         show " \<not> x \<longrightarrow> lossless_spmf (local.while (False, Suc 0))"
-          using lossless_False_1 by simp
+          using lossless_while_False_1 by simp
       qed
     qed
   qed

@@ -50,39 +50,15 @@ next
 qed
 
 lemma argmax_int_list_fst: 
-shows "length list > 0 \<Longrightarrow>fst (argmax_int_list list)= Max (set list)"
-proof(induct list)
-  case Nil
-  then show ?case
-    by simp
-next
-  case (Cons a list)
-  show ?case
-    unfolding argmax_int_list.simps fst_def
-    apply(auto simp: prod.case_eq_if)
-    using Cons(1) apply auto
-    by(rewrite max_def,rewrite linorder_class.Max_ge_iff,auto)        
-qed
+  shows "length list > 0 \<Longrightarrow>fst (argmax_int_list list)= Max (set list)"
+  apply(induct list,simp)
+  unfolding argmax_int_list.simps fst_def
+  apply(simp add: prod.case_eq_if,rule)
+  by(rewrite max_def, rewrite linorder_class.Max_ge_iff,auto)
 
 lemma argmax_int_list_snd:
-  shows "length list > 0 \<Longrightarrow>nth list (snd (argmax_int_list list)) =  fst (argmax_int_list list)"
-proof(induct list)
-  case Nil
-  then show ?case by simp
-next
-  case (Cons a list)
-  then show ?case 
-    unfolding argmax_int_list.simps snd_def fst_def
-    by(simp add: prod.case_eq_if)
-qed
-
-lemma argmax_int_list_snd':
-  shows "length list > 0 \<Longrightarrow>nth list (snd (argmax_int_list list)) = Max(set list)"
-  using argmax_int_list_fst argmax_int_list_snd by auto
-
-lemma argmax_int_list_snd2:
-  shows "\<And>i. length list > 0 \<longrightarrow> (list ! i = Max (set list) \<and> (\<forall>k<i. list ! i > list ! k)) = (i = snd (argmax_int_list list))"
-proof(induct list)
+  shows "length list > 0 \<Longrightarrow> (list ! i = Max (set list) \<and> (\<forall>k<i. list ! i > list ! k)) = (i = snd (argmax_int_list list))"
+proof(induct list arbitrary: i)
   case Nil
   then show ?case by simp
 next
@@ -1423,7 +1399,7 @@ next
                       fix rb
                       have "(length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))))
                           = ((map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs))) ! (length ra) = Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))) \<and> ?p rb x)"
-                        using argmax_int_list_snd2[of "(map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))"]
+                        using argmax_int_list_snd[of "(map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs)) @ (rb + (cs ! length ra) x) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))"]
                         by simp
                       also have "... = (rb\<ge> Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q x) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q x) cs)))) - (cs ! (length ra)) x \<and> ?p rb x)"
                       proof -
@@ -1672,7 +1648,7 @@ next
                       have "(length ra = snd (argmax_int_list (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))))
                           = ((map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))) ! length ra =
                               Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))) \<and> ?p rb y)"
-                        using argmax_int_list_snd2[of "(map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))"]
+                        using argmax_int_list_snd[of "(map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs)) @ (rb + (cs ! length ra) y) # map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs)))"]
                         by simp
                       also have "... = (Max (set (map2 (+) ra (take (length ra) (map (\<lambda>q. q y) cs))) \<union> set (map2 (+) rc (drop (Suc (length ra)) (map (\<lambda>q. q y) cs))))- (cs ! (length ra)) y  \<le> rb \<and> ?p rb y)"
                       proof-

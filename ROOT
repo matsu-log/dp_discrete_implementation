@@ -12,12 +12,13 @@ session dp_discrete_implementation = "HOL-Probability" +
     "Bernoulli_exp_minus_real"
     "Bernoulli_exp_minus_rat"
     "Discrete_Laplace_rat"
-    "Code_Generation_sampler"
-  *)
+    *)
   theories
     (*"Differential_Privacy_spmf"*)
-    "Discrete_laplace_mechanism"
-    "Report_noisy_max"
-(*    "Code_Generation_mechanism"*)
+    (*"Discrete_laplace_mechanism"*)
+    "Report_noisy_max" 
+    "Bernoulli_exp_minus_real"
+(*    "Code_Generation_sampler"
+    "Code_Generation_mechanism" *)
   document_files
     "root.tex"
