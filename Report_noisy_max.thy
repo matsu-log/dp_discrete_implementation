@@ -1707,9 +1707,7 @@ next
         using spmf_report_noisy_max_zero[of "z" "cs"] cs by simp
     qed
   qed
-qed      
-        
-
+qed            
 
 lemma pure_dp_report_noisy_max:
   assumes "1\<le>epsilon1" and "1\<le>epsilon2"
@@ -1719,12 +1717,5 @@ and "is_count_queries cs"
         pointwise_spmf_bound_imp_pure_dp_nat[of "(\<lambda>l. report_noisy_max cs epsilon1 epsilon2 l)" "epsilon1/epsilon2"] 
         assms
   by simp
-  
-  
-  
-
-
-
-
 
 end

@@ -5,12 +5,11 @@ theory Discrete_laplace_mechanism
           Differential_Privacy_spmf
 begin 
 
-subsection \<open>Integer Query: SampCert Implementation\<close>
+subsection \<open>Integer Query\<close>
 (* 
   query returns integar value
   epsilon = epsilon1/epsilon2 (1\<le>epsilon1,epsilon2)
   \<Delta> is sensitivity of f:: nat
-  this is same as implementation of SampCert
 *)
 
 definition discrete_laplace_mechanism :: "('a list \<Rightarrow> int) \<Rightarrow> nat  \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a list \<Rightarrow> int spmf" where
@@ -146,6 +145,4 @@ shows "pure_dp (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2) (epsilo
         assms 
   by simp
       
-
-
 end
