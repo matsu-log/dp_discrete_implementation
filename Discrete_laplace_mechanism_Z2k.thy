@@ -7,6 +7,7 @@ theory Discrete_laplace_mechanism_Z2k
 begin 
 
 subsection \<open>granularity:multiples of 2^k\<close>
+(*work in progress*)
 (*
   Reference:
   https://github.com/opendp/opendp/blob/main/rust/src/measurements/laplace/float/mod.rs
