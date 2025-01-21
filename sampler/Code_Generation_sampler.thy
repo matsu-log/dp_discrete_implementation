@@ -44,7 +44,6 @@ lemma fast_uniform_ra_correct:
   unfolding fast_uniform_def fast_uniform_ra_def
   by (simp add: fast_dice_roll_ra_correct)
 
-
 context
   includes lifting_syntax
 begin
@@ -55,7 +54,6 @@ lemma fast_uniform_ra_transfer [transfer_rule]:
   using fast_uniform_ra_correct by auto
 
 end
-
 
 definition bernoulli_rat_ra :: "nat \<Rightarrow> nat \<Rightarrow> bool random_alg" where
 "bernoulli_rat_ra n d = 
@@ -107,10 +105,10 @@ definition  bernoulli_exp_minus_rat_from_0_to_1_ra :: "rat \<Rightarrow> bool ra
   "
 
 context notes [[function_internals]] begin
-partial_function (random_alg) bernoulli_exp_minus_rat_loop_ra :: "rat \<Rightarrow> nat \<Rightarrow> bool random_alg" where
-  "bernoulli_exp_minus_rat_loop_ra p k = (if 1\<le>k then do {
+partial_function (random_alg) bernoulli_exp_minus_rat_loop_ra :: "nat \<Rightarrow> bool random_alg" where
+  "bernoulli_exp_minus_rat_loop_ra k = (if 1\<le>k then do {
                                 b \<leftarrow> bernoulli_exp_minus_rat_from_0_to_1_ra 1;
-                                if b then bernoulli_exp_minus_rat_loop_ra p (k-1) else return_ra False
+                                if b then bernoulli_exp_minus_rat_loop_ra (k-1) else return_ra False
                                 } 
                 else return_ra True)"
 end
@@ -124,7 +122,7 @@ definition bernoulli_exp_minus_rat_ra :: "rat  \<Rightarrow> bool random_alg" wh
     else if 0 \<le> p & p\<le>1  then bernoulli_exp_minus_rat_from_0_to_1_ra p
     else
      do {
-        b \<leftarrow> bernoulli_exp_minus_rat_loop_ra p (nat (floor p));
+        b \<leftarrow> bernoulli_exp_minus_rat_loop_ra (nat (floor p));
         if b then bernoulli_exp_minus_rat_from_0_to_1_ra (p- (of_int (floor p))) else return_ra b
       }
   )
@@ -187,18 +185,17 @@ lemma bernoulli_exp_minus_rat_from_0_to_1_ra_transfer [transfer_rule]:
 end
 
 lemma bernoulli_exp_minus_rat_loop_ra_correct:
-"spmf_of_ra (bernoulli_exp_minus_rat_loop_ra p k) = bernoulli_exp_minus_rat_loop p k"
+"spmf_of_ra (bernoulli_exp_minus_rat_loop_ra k) = bernoulli_exp_minus_rat_loop k"
 proof -
   include lifting_syntax
-  have "((=) ===> rel_spmf_of_ra) (\<lambda>pair. bernoulli_exp_minus_rat_loop (fst pair) (snd pair)) (\<lambda>pair. bernoulli_exp_minus_rat_loop_ra (fst pair) (snd pair))"
+  have "((=) ===> rel_spmf_of_ra) bernoulli_exp_minus_rat_loop  bernoulli_exp_minus_rat_loop_ra"
     unfolding bernoulli_exp_minus_rat_loop_def bernoulli_exp_minus_rat_loop_ra_def curry_def
-    apply(simp add: Basic_BNF_LFPs.xtor_rel)
     apply(rule fixp_ra_parametric)
     using bernoulli_exp_minus_rat_loop.mono 
-    unfolding curry_def apply(simp)
+    apply(simp)
     using bernoulli_exp_minus_rat_loop_ra.mono 
-    unfolding curry_def apply(simp)
-      by(transfer_prover)
+     apply(simp)
+    by transfer_prover
   thus ?thesis
     unfolding rel_fun_def rel_spmf_of_ra_def by simp
 qed
@@ -332,5 +329,6 @@ proof-
     unfolding rel_fun_def rel_spmf_of_ra_def by simp
 qed
 
+export_code discrete_laplace_rat_ra in Scala
 
 end

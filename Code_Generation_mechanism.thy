@@ -58,4 +58,7 @@ lemma report_noisy_max_ra_correct:
   shows "spmf_of_ra(report_noisy_max_ra cs epsilon1 epsilon2 x) = report_noisy_max cs epsilon1 epsilon2 x"
   unfolding report_noisy_max_ra_def report_noisy_max_def
   by(simp add: spmf_of_ra_simps discrete_laplace_noise_add_list_ra_correct)
+
+export_code discrete_laplace_mechanism_ra report_noisy_max_ra in Scala
+
 end

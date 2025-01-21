@@ -2,4 +2,6 @@
 /.*/
 /document/
 /output/
-/test/
+/test/.*
+/test/project
+/test/target

@@ -30,7 +30,7 @@ shows "lossless_spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x)
 lemma spmf_discrete_laplace_mechanism:
   assumes "1\<le>epsilon1" and "1\<le>epsilon2"
 and "1\<le> \<Delta>"
-shows "spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z = (exp (epsilon1 /(epsilon2*\<Delta>))-1) * exp (-(epsilon1*\<bar>z-(f x)\<bar>/(epsilon2*\<Delta>)))/(exp (epsilon1/(epsilon2*\<Delta>))+1)"
+shows "spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z = (exp (epsilon1 /(epsilon2*\<Delta>))-1)/(exp (epsilon1/(epsilon2*\<Delta>))+1) * exp (-(epsilon1*\<bar>z-(f x)\<bar>/(epsilon2*\<Delta>)))"
 proof -
   have "spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z 
         = spmf (discrete_laplace_rat (epsilon2 * \<Delta>) epsilon1 \<bind> (\<lambda>noise. return_spmf (noise + f x))) z"

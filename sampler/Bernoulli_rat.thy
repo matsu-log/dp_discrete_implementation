@@ -38,6 +38,10 @@ definition bernoulli_rat :: "nat \<Rightarrow> nat \<Rightarrow> bool spmf" wher
             return_spmf (x<n)
 })"
 
+term"do {
+            x \<leftarrow> fast_uniform d;
+            return_spmf (x<n)}"
+
 subsection \<open>Properties of bernoulli_rat\<close>
 
 lemma pmf_bernoulli_rat_None: "pmf (bernoulli_rat n d) None = 0"
@@ -62,8 +66,9 @@ qed
 lemma lossless_bernoulli_rat [simp]: "lossless_spmf (bernoulli_rat n d)"
   by(simp add: lossless_iff_pmf_None pmf_bernoulli_rat_None)
 
-lemma [simp]: assumes "n/d\<le>1"
-  shows bernoulli_rat_True: "spmf (bernoulli_rat n d) True = n/d" 
+lemma bernoulli_rat_True[simp]: 
+  assumes "n/d\<le>1"
+  shows  "spmf (bernoulli_rat n d) True = n/d" 
 proof (cases "d=0")
   case True
   then show ?thesis by(simp add: bernoulli_rat_def)
@@ -78,8 +83,9 @@ next
     by (metis card_lessThan inf.absorb_iff2 lessThan_def lessThan_subset_iff)   
 qed
 
-lemma [simp]: assumes "n/d\<le>1"
-  shows bernoulli_rat_False: "spmf (bernoulli_rat n d) False = 1-n/d"
+lemma bernoulli_rat_False[simp]: 
+  assumes "n/d\<le>1"
+  shows "spmf (bernoulli_rat n d) False = 1-n/d"
 proof -
   show ?thesis using bernoulli_rat_True
     by (simp add: assms spmf_False_conv_True)

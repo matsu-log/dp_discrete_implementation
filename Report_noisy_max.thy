@@ -31,9 +31,8 @@ definition is_count_query :: "('a, int) query \<Rightarrow> bool" where
                                            (if length l1 < length l2 then c l1 \<le> c l2 
                                             else c l2 \<le> c l1))"
 
-primrec is_count_queries :: "(('a, int) query) list \<Rightarrow> bool" where
-"is_count_queries [] = True" |
-"is_count_queries (c#cs) = (is_count_query c \<and> is_count_queries cs)"
+definition is_count_queries :: "(('a, int) query) list \<Rightarrow> bool" where
+"is_count_queries cs = (\<forall>c\<in>set cs. is_count_query c)"
 
 subsection \<open>component function\<close>
 lemma argmax_int_list_index_lt_length:
@@ -166,7 +165,8 @@ lemma count_query_imp_sensitivity_1:
 
 lemma count_queries_imp_sensitivity_1:
   shows "is_count_queries cs \<Longrightarrow> \<forall> c\<in> (set cs). is_sensitivity c 1"
-  using count_query_imp_sensitivity_1 is_count_query_def by(induct cs,auto)
+  unfolding is_count_queries_def
+  using count_query_imp_sensitivity_1 by auto
 
 lemma count_queries_imp_sensitivity_1':
   shows "is_count_queries cs \<Longrightarrow> \<forall>k < length cs. is_sensitivity (cs!k) 1"
@@ -175,20 +175,25 @@ lemma count_queries_imp_sensitivity_1':
 lemma count_queries_1:
   assumes "neighbour x y"
   and "length x < length y"
-  shows "is_count_queries cs \<Longrightarrow> \<forall>c \<in> set cs. (c x \<le> c y  \<and> c y - 1 \<le> c x)" 
-  using assms by (induct cs) (fastforce simp: is_count_query_def adj_def)+
+  and "is_count_queries cs"
+shows "\<forall>c \<in> set cs. (c x \<le> c y  \<and> c y - 1 \<le> c x)" 
+  using assms unfolding is_count_queries_def is_count_query_def adj_def
+  by fastforce
 
 lemma count_queries_1':
   assumes "neighbour x y"
   and "length x < length y"
-shows "is_count_queries cs \<Longrightarrow> \<forall>i < length cs. ((cs ! i) x \<le> (cs ! i) y  \<and> (cs ! i)y - 1 \<le> (cs!i) x)" 
+  and "is_count_queries cs"
+shows " \<forall>i < length cs. ((cs ! i) x \<le> (cs ! i) y  \<and> (cs ! i)y - 1 \<le> (cs!i) x)" 
   using assms count_queries_1 by fastforce
 
 lemma count_queries_2:
   assumes "neighbour x y"
   and "length x \<ge> length y"
-  shows "is_count_queries cs \<Longrightarrow> \<forall>c \<in> set cs. (c y \<le> c x  \<and> c x - 1 \<le> c y)" 
-  using assms by (induct cs) (fastforce simp: is_count_query_def adj_def)+
+  and "is_count_queries cs"
+shows "\<forall>c \<in> set cs. (c y \<le> c x  \<and> c x - 1 \<le> c y)" 
+  using assms unfolding is_count_queries_def is_count_query_def adj_def 
+  by fastforce
 
 lemma count_queries_2':
   assumes "neighbour x y"
@@ -476,7 +481,7 @@ next
   proof -
     assume a_cs:"is_count_queries (a # cs)"
     have cs:"is_count_queries cs"
-      using a_cs unfolding is_count_queries.simps by argo
+      using a_cs unfolding is_count_queries_def by auto
     have a:"is_sensitivity a 1"
       using a_cs count_queries_imp_sensitivity_1 by fastforce
     have t1:"(\<lambda>x. discrete_laplace_noise_add_list cs epsilon1 epsilon2 x \<bind> (\<lambda>y. case (x, y) of (x, noisy_cs) \<Rightarrow> discrete_laplace_mechanism a 1 epsilon1 epsilon2 x \<bind> (\<lambda>noisy_c. return_spmf (noisy_c # noisy_cs))))

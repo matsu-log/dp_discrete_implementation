@@ -9,40 +9,39 @@ begin
 subsection \<open>Definite bernoulli_exp_minus_rat\<close>
 context notes [[function_internals]] begin
 partial_function (spmf) bernoulli_exp_minus_rat_from_0_to_1_loop :: "rat  \<Rightarrow> nat  \<Rightarrow> nat spmf" where
- "bernoulli_exp_minus_rat_from_0_to_1_loop p k = 
+ "bernoulli_exp_minus_rat_from_0_to_1_loop \<gamma> k = 
     do {
-       a \<leftarrow> let (n,d) = quotient_of p in bernoulli_rat (nat n) (nat (d*k));
-      if a then bernoulli_exp_minus_rat_from_0_to_1_loop p (k+1) else return_spmf k
+       a \<leftarrow> let (n,d) = quotient_of \<gamma> in bernoulli_rat (nat n) (nat (d*k));
+      if a then bernoulli_exp_minus_rat_from_0_to_1_loop \<gamma> (k+1) else return_spmf k
     }
 "
 end
 
 definition  bernoulli_exp_minus_rat_from_0_to_1 :: "rat \<Rightarrow> bool spmf" where
-  "bernoulli_exp_minus_rat_from_0_to_1 p = 
+  "bernoulli_exp_minus_rat_from_0_to_1 \<gamma> = 
     do {
-        k \<leftarrow> bernoulli_exp_minus_rat_from_0_to_1_loop p 1;
+        k \<leftarrow> bernoulli_exp_minus_rat_from_0_to_1_loop \<gamma> 1;
         if odd k then return_spmf True else return_spmf False
     }
   "
-
 context notes [[function_internals]] begin
-partial_function (spmf) bernoulli_exp_minus_rat_loop :: "rat \<Rightarrow> nat \<Rightarrow> bool spmf" where
-  "bernoulli_exp_minus_rat_loop p k = (if 1\<le>k then do {
+partial_function (spmf) bernoulli_exp_minus_rat_loop :: "nat \<Rightarrow> bool spmf" where
+  "bernoulli_exp_minus_rat_loop k = (if 1\<le>k then do {
                                 b \<leftarrow> bernoulli_exp_minus_rat_from_0_to_1 1;
-                                if b then bernoulli_exp_minus_rat_loop p (k-1) else return_spmf False
+                                if b then bernoulli_exp_minus_rat_loop (k-1) else return_spmf False
                                 } 
                 else return_spmf True)"
 end
 
 definition bernoulli_exp_minus_rat :: "rat  \<Rightarrow> bool spmf" where
-  "bernoulli_exp_minus_rat p = 
+  "bernoulli_exp_minus_rat \<gamma> = 
   (
-    if p < 0 then return_spmf True  
-    else if 0 \<le> p & p\<le>1  then bernoulli_exp_minus_rat_from_0_to_1 p
+    if \<gamma> < 0 then return_spmf True  
+    else if 0 \<le> \<gamma> & \<gamma>\<le>1  then bernoulli_exp_minus_rat_from_0_to_1 \<gamma>
     else
      do {
-        b \<leftarrow> bernoulli_exp_minus_rat_loop p (nat (floor p));
-        if b then bernoulli_exp_minus_rat_from_0_to_1 (p- (of_int (floor p))) else return_spmf b
+        b \<leftarrow> bernoulli_exp_minus_rat_loop (nat (floor \<gamma>));
+        if b then bernoulli_exp_minus_rat_from_0_to_1 (\<gamma>- (of_int (floor \<gamma>))) else return_spmf b
       }
   )
 "
@@ -57,10 +56,12 @@ lemma bernoulli_exp_minus_rat_from_0_to_1_loop_fixp_induct [case_names adm botto
   using assms by (rule bernoulli_exp_minus_rat_from_0_to_1_loop.fixp_induct)
 
 lemma bernoulli_exp_minus_rat_loop_fixp_induct [case_names adm bottom step]:
-  assumes "spmf.admissible (\<lambda>bernoulli_exp_minus_rat_loop. P (curry bernoulli_exp_minus_rat_loop))"
-    and "P (\<lambda>bernoulli_exp_minus_rat_loop p. return_pmf None)"
-    and "(\<And>bernoulli_exp_minus_rat_loop'. P bernoulli_exp_minus_rat_loop' \<Longrightarrow> P (\<lambda>a b. if 1 \<le> b then bernoulli_exp_minus_rat_from_0_to_1 1 \<bind> (\<lambda>ba. if ba then bernoulli_exp_minus_rat_loop' a (b - 1) else return_spmf False) else return_spmf True))"
-  shows "P bernoulli_exp_minus_rat_loop"
+  assumes "spmf.admissible P"
+and "P (\<lambda>bernoulli_exp_minus_rat_loop. return_pmf None)"
+and "(\<And>k. P k \<Longrightarrow>
+      P (\<lambda>ka. if 1 \<le> ka then bernoulli_exp_minus_rat_from_0_to_1 1 \<bind> (\<lambda>b. if b then k (ka - 1) else return_spmf False)
+               else return_spmf True))"
+shows "P bernoulli_exp_minus_rat_loop"
   using assms by (rule bernoulli_exp_minus_rat_loop.fixp_induct)
 
 lemma sublemma_for_bernoulli_exp_minus_rat_from_0_to_1_loop_eq_bernoulli_exp_minus_real_from_0_to_1_loop:
@@ -93,11 +94,11 @@ proof-
 qed
 
 lemma bernoulli_exp_minus_rat_from_0_to_1_loop_eq_bernoulli_exp_minus_real_from_0_to_1_loop:
-  fixes p::rat
-  assumes "0\<le>p"
-  shows "bernoulli_exp_minus_rat_from_0_to_1_loop p 1 = bernoulli_exp_minus_real_from_0_to_1_loop (of_rat p) 1" 
+  fixes \<gamma>::rat
+  assumes "0\<le>\<gamma>"
+  shows "bernoulli_exp_minus_rat_from_0_to_1_loop \<gamma> 1 = bernoulli_exp_minus_real_from_0_to_1_loop (of_rat \<gamma>) 1" 
 proof - 
-  have "bernoulli_exp_minus_rat_from_0_to_1_loop p x = bernoulli_exp_minus_real_from_0_to_1_loop (of_rat p) x" (is "?lhs = ?rhs") for x
+  have "bernoulli_exp_minus_rat_from_0_to_1_loop \<gamma> x = bernoulli_exp_minus_real_from_0_to_1_loop (of_rat \<gamma>) x" (is "?lhs = ?rhs") for x
   proof (rule spmf.leq_antisym)
     show "ord_spmf (=) ?lhs ?rhs"
     proof (induction arbitrary: x rule :bernoulli_exp_minus_rat_from_0_to_1_loop_fixp_induct)
@@ -137,97 +138,95 @@ proof -
 qed
 
 lemma bernoulli_exp_minus_rat_from_0_to_1_eq_bernoulli_exp_minus_real_from_0_to_1:
-  fixes p::rat
-  assumes "0\<le>p"
-  shows "bernoulli_exp_minus_rat_from_0_to_1 p = bernoulli_exp_minus_real_from_0_to_1 (of_rat p)"
+  fixes \<gamma>::rat
+  assumes "0\<le>\<gamma>"
+  shows "bernoulli_exp_minus_rat_from_0_to_1 \<gamma> = bernoulli_exp_minus_real_from_0_to_1 (of_rat \<gamma>)"
   apply(rewrite bernoulli_exp_minus_rat_from_0_to_1_def)
   apply(rewrite bernoulli_exp_minus_real_from_0_to_1_def)
   using bernoulli_exp_minus_rat_from_0_to_1_loop_eq_bernoulli_exp_minus_real_from_0_to_1_loop assms by simp
 
 lemma bernoulli_exp_minus_rat_loop_eq_bernoulli_exp_minus_real_loop:
-  fixes p::rat
-  assumes "0\<le>p"
-  shows "bernoulli_exp_minus_rat_loop p k = bernoulli_exp_minus_real_loop (of_rat p) k" (is "?lhs = ?rhs")
+  shows "bernoulli_exp_minus_rat_loop k = bernoulli_exp_minus_real_loop k"
 proof (rule spmf.leq_antisym)
-  show "ord_spmf (=) ?lhs ?rhs"
-  proof (induction arbitrary: k rule: bernoulli_exp_minus_rat_loop_fixp_induct)
+  show "ord_spmf (=) (bernoulli_exp_minus_rat_loop k) (bernoulli_exp_minus_real_loop k)"
+  proof(induction arbitrary:k rule: bernoulli_exp_minus_rat_loop_fixp_induct)
     case adm
     then show ?case by simp
   next
     case bottom
     then show ?case by simp
   next
-    case (step loop2_alt')
-    then show ?case 
+    case (step k)
+    then show ?case
       apply(rewrite bernoulli_exp_minus_real_loop.simps)
-      apply(simp add: bernoulli_exp_minus_rat_from_0_to_1_eq_bernoulli_exp_minus_real_from_0_to_1)
-      apply(clarsimp intro!: ord_spmf_bind_reflI)
-      done
+      apply(rewrite bernoulli_exp_minus_rat_from_0_to_1_eq_bernoulli_exp_minus_real_from_0_to_1,simp)
+      by(clarsimp intro!: ord_spmf_bind_reflI)
   qed
-  show "ord_spmf (=) ?rhs ?lhs"
-  proof (induction arbitrary: k rule: bernoulli_exp_minus_real_loop_fixp_induct)
+next
+  show "ord_spmf (=) (bernoulli_exp_minus_real_loop k) (bernoulli_exp_minus_rat_loop k)"
+  proof(induction arbitrary:k rule: bernoulli_exp_minus_real_loop_fixp_induct)
     case adm
     then show ?case by simp
   next
     case bottom
     then show ?case by simp
   next
-    case (step loop2)
-    then show ?case 
+    case (step k)
+    then show ?case
       apply(rewrite bernoulli_exp_minus_rat_loop.simps)
-      apply(simp add: bernoulli_exp_minus_rat_from_0_to_1_eq_bernoulli_exp_minus_real_from_0_to_1)
-      apply(clarsimp intro!: ord_spmf_bind_reflI)
-      done
+      apply(rewrite bernoulli_exp_minus_rat_from_0_to_1_eq_bernoulli_exp_minus_real_from_0_to_1,simp)
+      by(clarsimp intro!: ord_spmf_bind_reflI)
   qed
 qed
 
+
 lemma sublemma_for_bernoulli_exp_minus_rat_eq_bernoulli_exp_minus_real:
-  fixes p::rat
-  assumes "0\<le>p"
-  shows "bernoulli_exp_minus_rat_from_0_to_1 (p - rat_of_int \<lfloor>p\<rfloor>) = bernoulli_exp_minus_real_from_0_to_1 (of_rat p - real_of_int \<lfloor>real_of_rat p\<rfloor>)"
+  fixes \<gamma>::rat
+  assumes "0\<le>\<gamma>"
+  shows "bernoulli_exp_minus_rat_from_0_to_1 (\<gamma> - rat_of_int \<lfloor>\<gamma>\<rfloor>) = bernoulli_exp_minus_real_from_0_to_1 (of_rat \<gamma> - real_of_int \<lfloor>real_of_rat \<gamma>\<rfloor>)"
 proof -
-  have "of_rat (p - rat_of_int \<lfloor>p\<rfloor>) = of_rat p - real_of_int \<lfloor>real_of_rat p\<rfloor>"
+  have "of_rat (\<gamma> - rat_of_int \<lfloor>\<gamma>\<rfloor>) = of_rat \<gamma> - real_of_int \<lfloor>real_of_rat \<gamma>\<rfloor>"
     by (simp add: of_rat_diff)
   then show ?thesis
     using  assms bernoulli_exp_minus_rat_from_0_to_1_eq_bernoulli_exp_minus_real_from_0_to_1 by simp
 qed
 
 lemma bernoulli_exp_minus_rat_eq_bernoulli_exp_minus_real:
-  fixes p::rat
-  assumes "0\<le>p"
-  shows "bernoulli_exp_minus_rat p = bernoulli_exp_minus_real (of_rat p)"
+  fixes \<gamma>::rat
+  assumes "0\<le>\<gamma>"
+  shows "bernoulli_exp_minus_rat \<gamma> = bernoulli_exp_minus_real (of_rat \<gamma>)"
   apply(rewrite bernoulli_exp_minus_rat_def)
   apply(rewrite bernoulli_exp_minus_real_def)
-  apply(simp add: bernoulli_exp_minus_rat_loop_eq_bernoulli_exp_minus_real_loop bernoulli_exp_minus_rat_from_0_to_1_eq_bernoulli_exp_minus_real_from_0_to_1)
+  apply(simp add: bernoulli_exp_minus_rat_from_0_to_1_eq_bernoulli_exp_minus_real_from_0_to_1)
   apply(rewrite sublemma_for_bernoulli_exp_minus_rat_eq_bernoulli_exp_minus_real)
-  by(simp_all add: assms)
+  by(simp_all add: assms bernoulli_exp_minus_rat_loop_eq_bernoulli_exp_minus_real_loop)
 
 lemma lossless_bernoulli_exp_minus_rat:
-  fixes p::rat
-  assumes "0\<le>p"
-  shows "lossless_spmf (bernoulli_exp_minus_rat p)"
+  fixes \<gamma>::rat
+  assumes "0\<le>\<gamma>"
+  shows "lossless_spmf (bernoulli_exp_minus_rat \<gamma>)"
   using assms  bernoulli_exp_minus_rat_eq_bernoulli_exp_minus_real by simp
 
 lemma spmf_bernoulli_exp_minus_rat_True[simp]:
-  fixes p::rat
-  assumes "0\<le>p"
-  shows "spmf (bernoulli_exp_minus_rat p) True = exp(-(of_rat p))"
+  fixes \<gamma>::rat
+  assumes "0\<le>\<gamma>"
+  shows "spmf (bernoulli_exp_minus_rat \<gamma>) True = exp(-(of_rat \<gamma>))"
 proof -
-  have "spmf (bernoulli_exp_minus_rat p) True = spmf (bernoulli_exp_minus_real (of_rat p)) True"
+  have "spmf (bernoulli_exp_minus_rat \<gamma>) True = spmf (bernoulli_exp_minus_real (of_rat \<gamma>)) True"
     using bernoulli_exp_minus_rat_eq_bernoulli_exp_minus_real assms by simp
-  also have "... = exp(-(of_rat p))"
+  also have "... = exp(-(of_rat \<gamma>))"
     using assms by simp
   finally show ?thesis by simp
 qed
 
 lemma spmf_bernoulli_exp_minus_rat_False[simp]:
-  fixes p::rat
-  assumes "0\<le>p"
-  shows "spmf (bernoulli_exp_minus_rat p) False = 1-exp(-(of_rat p))"
+  fixes \<gamma>::rat
+  assumes "0\<le>\<gamma>"
+  shows "spmf (bernoulli_exp_minus_rat \<gamma>) False = 1-exp(-(of_rat \<gamma>))"
 proof -
-  have "spmf (bernoulli_exp_minus_rat p) False = spmf (bernoulli_exp_minus_real (of_rat p)) False"
+  have "spmf (bernoulli_exp_minus_rat \<gamma>) False = spmf (bernoulli_exp_minus_real (of_rat \<gamma>)) False"
     using bernoulli_exp_minus_rat_eq_bernoulli_exp_minus_real assms by simp
-  also have "... = 1 - exp(-(of_rat p))"
+  also have "... = 1 - exp(-(of_rat \<gamma>))"
     using assms by simp
   finally show ?thesis by simp
 qed
