@@ -6,9 +6,10 @@ theory Report_noisy_max
           Discrete_laplace_mechanism
 begin
 
-primrec argmax_int_list :: "int list \<Rightarrow> (int \<times> nat)" where
+fun argmax_int_list :: "int list \<Rightarrow> (int \<times> nat)" where
 "argmax_int_list [] = (0,0)"|
-"argmax_int_list (x#xs) = (if xs = [] then (x,0) else (let (m,i) = argmax_int_list xs in (if x\<ge>m then (x,0) else (m,i+1))))"
+"argmax_int_list [x] = (x,0)"|
+"argmax_int_list (x#xs) =(let (m,i) = argmax_int_list xs in (if x\<ge>m then (x,0) else (m,i+1)))"
 
 primrec discrete_laplace_noise_add_list :: "(('a, int) query) list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a list \<Rightarrow> (int list) spmf" where
 "discrete_laplace_noise_add_list [] epsilon1 epsilon2  ls = return_spmf []"|
@@ -37,124 +38,131 @@ definition is_count_queries :: "(('a, int) query) list \<Rightarrow> bool" where
 subsection \<open>component function\<close>
 lemma argmax_int_list_index_lt_length:
   shows"0<length list \<Longrightarrow> snd (argmax_int_list list) <length list"
-proof (induct list)
-  case Nil
-  then show ?case 
-    by auto
+proof (induct list rule: argmax_int_list.induct) 
+  case 1
+  then show ?case by simp
 next
-  case (Cons a list)
+  case (2 x)
+  then show ?case by simp
+next
+  case (3 x v va)
   then show ?case 
-    unfolding argmax_int_list.simps Let_def snd_def
-    by (simp add: prod.case_eq_if)
+    unfolding argmax_int_list.simps snd_def Let_def 
+    thm prod.case_eq_if
+    by(simp add: prod.case_eq_if) 
 qed
 
 lemma argmax_int_list_fst: 
   shows "length list > 0 \<Longrightarrow>fst (argmax_int_list list)= Max (set list)"
-  apply(induct list,simp)
-  unfolding argmax_int_list.simps fst_def
-  apply(simp add: prod.case_eq_if,rule)
-  by(rewrite max_def, rewrite linorder_class.Max_ge_iff,auto)
+proof(induct list rule:argmax_int_list.induct)
+  case 1
+  then show ?case by simp
+next
+  case (2 x)
+  then show ?case by simp
+next
+  case (3 x v va)
+  then show ?case
+    unfolding argmax_int_list.simps fst_def
+    apply(simp add: prod.case_eq_if)
+    by(rewrite max_def, rewrite linorder_class.Max_ge_iff,auto)
+qed
 
 lemma argmax_int_list_snd:
   shows "length list > 0 \<Longrightarrow> (list ! i = Max (set list) \<and> (\<forall>k<i. list ! i > list ! k)) = (i = snd (argmax_int_list list))"
-proof(induct list arbitrary: i)
-  case Nil
+proof(induct list arbitrary: i rule: argmax_int_list.induct)
+  case 1
   then show ?case by simp
 next
-  case (Cons a list)
-  then show ?case
-  proof(cases "list = []")
-    case True
-    then show ?thesis by fastforce
+  case (2 x)
+  then show ?case by fastforce
+next
+  case (3 x v va)
+  then show ?case 
+  proof(cases "x < Max(set (v#va))")
+    case True  
+    show ?thesis  
+    proof(rule+)
+      assume H:"(x#v#va) ! i = Max (set (x#v#va)) \<and> (\<forall>k<i. (x#v#va) ! k < (x#v#va) ! i)"
+      have "(x#v#va) ! 0 < Max(set (x#v#va))"
+        apply(rewrite nth_Cons_0)        
+        unfolding set_simps        
+        apply(rewrite Max_insert)        
+        using True by auto
+      then have i:"1\<le>i"
+        using H less_imp_neq linorder_le_less_linear by blast  
+      have 1:"(v#va) ! (i - 1) = Max (set (v#va))"
+        using H Max_insert[of "set (v#va)" "x"] unfolding set_simps(2)[of "x"] 
+        using i by auto  
+      have 2:"(\<forall>k<i-1. (v#va) ! k < (v#va) ! (i-1))"
+        using H True i
+        by (metis Suc_mono diff_Suc_1 diff_is_0_eq not0_implies_Suc not_less_eq_eq nth_Cons_pos zero_less_Suc)  
+      have p:"i-1 = snd (argmax_int_list(v#va))"   
+        using 1 2 3 i by blast        
+      show "i = snd (argmax_int_list (x#v#va))"
+        unfolding argmax_int_list.simps
+        apply(simp)
+        unfolding case_prod_beta
+        apply(rewrite p[symmetric], rewrite argmax_int_list_fst,simp)
+        apply(rewrite argmax_int_list_fst,simp)
+        apply(rewrite if_not_P)
+        using True apply linarith
+        using i by simp 
+    next  
+      assume H:"i = snd (argmax_int_list (x#v#va))"
+      have 0:"0 \<noteq> snd (argmax_int_list (x#v#va))"
+        unfolding argmax_int_list.simps
+        apply(simp)
+        unfolding case_prod_beta
+        apply(rewrite argmax_int_list_fst,simp,rewrite argmax_int_list_fst, simp)
+        apply(rewrite if_not_P)
+        using True apply linarith
+        by simp
+      then have i:"1\<le> i"  
+        using H by simp
+      have p:"i-1 = snd (argmax_int_list (v#va))"          
+        apply(rewrite H)
+        unfolding argmax_int_list.simps
+        apply(simp) unfolding case_prod_beta
+        apply(rewrite argmax_int_list_fst,simp)
+        apply(rewrite if_not_P)
+        using True apply linarith
+        by simp
+      have 1:"(v#va) ! (i-1) = Max (set (v#va))"  
+        using p 3 by auto
+      have 2:"(\<forall>k<i-1. (v#va) ! k < (v#va) ! (i-1))"
+        using p 3 by auto
+      show "(x # v # va) ! i = Max (set (x # v # va)) \<and> (\<forall>k<i. (x # v # va) ! k < (x # v # va) ! i)"  
+        using 1 2 i 0 True apply(rewrite set_simps, rewrite Max_insert,auto)         
+        by (metis One_nat_def Suc_le_D Suc_le_eq diff_Suc_1 less_Suc_eq_le nth_non_equal_first_eq)
+    qed
   next
     case False
-    assume list:"list \<noteq> []"
     show ?thesis
-    proof(cases "a < Max(set list)")
-      case True
-      show ?thesis
-      proof(rule+)
-        fix i
-        assume H:"(a # list) ! i = Max (set (a # list)) \<and> (\<forall>k<i. (a # list) ! k < (a # list) ! i)"
-        have "(a#list) ! 0 < Max(set (a#list))"
-          apply(rewrite nth_Cons_0)
-          unfolding set_simps
-          apply(rewrite Max_insert)
-          using list True by(auto)
-        then have i:"1\<le>i"
-          using H list less_imp_neq linorder_le_less_linear by blast
-        then have "list ! (i-1) = (a#list) ! i"
-          by simp
-        also have "... = Max(set (list))"
-          apply(rewrite H)
-          apply(rewrite set_simps, rewrite Max_insert)
-          using list True by auto
-        finally have 1:"list ! (i - 1) = Max (set list)" by simp
-        have 2:"(\<forall>k<i-1. list ! k < list ! (i-1))"
-          using H True i 
-          by (metis Suc_mono diff_Suc_1 diff_is_0_eq not0_implies_Suc not_less_eq_eq nth_Cons_pos zero_less_Suc)
-        have p:"i-1 = snd (argmax_int_list(list))"
-          using 1 2 Cons(1) list i by blast
-        show "i = snd (argmax_int_list (a # list))"
-          unfolding argmax_int_list.simps
-          apply(auto simp:list)
-          unfolding case_prod_beta
-          apply(rewrite p[symmetric], rewrite argmax_int_list_fst,simp add:list)
-          apply(rewrite argmax_int_list_fst, simp add:list)
-          using True i by force
-      next
-        fix i
-        assume H:"i = snd (argmax_int_list (a # list))"
-        have 0:"0 \<noteq> snd (argmax_int_list (a#list))"
-          unfolding argmax_int_list.simps
-          apply(auto simp:list)
-          unfolding case_prod_beta
-          apply(rewrite argmax_int_list_fst,simp add:list,rewrite argmax_int_list_fst,simp add:list)
-          using True by simp
-        then have i:"1\<le> i"
-          using H by simp
-        have p:"i-1 = snd (argmax_int_list (list))"
-          apply(rewrite H)
-          unfolding argmax_int_list.simps
-          apply(simp add:list) unfolding case_prod_beta
-          apply(rewrite argmax_int_list_fst,simp add:list)
-          using True by(simp)
-        have 1:"list ! (i-1) = Max (set (list))"
-          using p Cons(1) list by auto
-        have 2:"(\<forall>k<i-1. list ! k < list ! (i-1))"
-          using p Cons(1) list by auto
-        show "(a # list) ! i = Max (set (a # list)) \<and> (\<forall>k<i. (a # list) ! k < (a # list) ! i)"
-          using 1 2 i True list apply(rewrite set_simps, rewrite Max_insert,auto)
-          using i 0
-          by (metis One_nat_def Suc_le_D Suc_le_eq diff_Suc_1 less_Suc_eq_le nth_non_equal_first_eq)
-      qed
+    proof(rule+)
+      assume H:"(x # v # va) ! i = Max (set (x # v # va)) \<and> (\<forall>k<i. (x # v # va) ! k < (x # v # va) ! i)"
+      have "(x # v # va) ! 0 = Max (set (x # v # va)) \<and> (\<forall>k<0. (x # v # va) ! k < (x # v # va) ! 0)"
+        using False by(simp)
+      then have i:"i=0"
+        using  False H by fastforce
+      show "i = snd (argmax_int_list (x # v # va))"
+        apply(rewrite i)
+        unfolding argmax_int_list.simps Let_def case_prod_beta
+        apply(rewrite argmax_int_list_fst,simp)
+        apply(rewrite if_P)
+        using False by(linarith)(simp)
     next
-      case False
-      show ?thesis
-      proof(rule+)
-        fix i
-        assume H:"(a # list) ! i = Max (set (a # list)) \<and> (\<forall>k<i. (a # list) ! k < (a # list) ! i)"
-        have "(a # list) ! 0 = Max (set (a # list)) \<and> (\<forall>k<0. (a # list) ! k < (a # list) ! 0)"
-          using False by(auto,rewrite Max_insert,auto simp :list)
-        then have i:"i=0"
-          using  False H by fastforce
-        show "i = snd (argmax_int_list (a # list))"
-          apply(rewrite i) unfolding argmax_int_list.simps
-          apply(simp add:list) unfolding case_prod_beta
-          apply(rewrite argmax_int_list_fst,simp add:list)
-          using False by simp
-      next
-        fix i
-        assume H:"i = snd (argmax_int_list (a # list))"
-        have i:"i=0"
-          apply(rewrite H) unfolding argmax_int_list.simps
-          apply(auto simp:list) unfolding case_prod_beta
-          apply(rewrite argmax_int_list_fst,simp add:list)
-          using False by simp
-        show "(a # list) ! i = Max (set (a # list)) \<and> (\<forall>k<i. (a # list) ! k < (a # list) ! i)"
-          apply(simp add: i,rewrite Max_insert,auto simp:list,rewrite max_def)
-          using False by simp
-      qed
+      assume H:"i = snd (argmax_int_list (x # v # va))"
+      have i:"i=0"
+        apply(rewrite H) unfolding argmax_int_list.simps Let_def case_prod_beta
+        apply(rewrite argmax_int_list_fst,simp)
+        apply(rewrite if_P)
+        using False by(linarith)(simp)
+      show "(x # v # va) ! i = Max (set (x # v # va)) \<and> (\<forall>k<i. (x # v # va) ! k < (x # v # va) ! i)"
+        apply(rewrite i)+
+        apply(rewrite set_simps(2),rewrite Max_insert)
+          apply(simp,simp,rewrite max_def)
+        using False by simp
     qed
   qed
 qed
