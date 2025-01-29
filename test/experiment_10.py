@@ -59,10 +59,10 @@ plt.bar(
 # タイトルとラベルの設定
 plt.xlabel('値')
 plt.ylabel('確率密度')
-plt.title('スケール10の離散ラプラス分布の密度関数とサンプリング結果の比較')
+plt.title('スケール10の離散ラプラス分布の密度関数とサンプリング結果の比較',fontsize = 15)
 
-# 凡例を追加
-plt.legend()
+# 凡例を追加、フォントサイズを大きく
+plt.legend(fontsize=12)
 
 # グラフの表示
 plt.show()

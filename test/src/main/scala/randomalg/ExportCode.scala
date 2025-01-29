@@ -1,6 +1,7 @@
 package randomalg
 object ExportCode{
 
+
 object Lazy {
   final class Lazy[A] (f: Unit => A) {
     var evaluated = false;
@@ -1123,6 +1124,21 @@ def int_of_nat(n : Nat.nat) : Int.int =
 
 } /* object Code_Target_Nat */
 
+object Report_noisy_max {
+
+def argmax_int_list(x0 : List[Int.int]) : (Int.int, Nat.nat) = x0 match {
+  case Nil => (Int.zero_int, Nat.zero_nata)
+  case List(x) => (x, Nat.zero_nata)
+  case x :: v :: va =>
+    {
+      val (m, i) = argmax_int_list(v :: va) : ((Int.int, Nat.nat));
+      (Int.less_eq_int(m, x) match { case true => (x, Nat.zero_nata)
+        case false => (m, Nat.plus_nata(i, Nat.one_nata)) })
+    }
+}
+
+} /* object Report_noisy_max */
+
 object Discrete_Laplace_rat {
 
 def calculate_y(x : Nat.nat, s : Nat.nat) : Nat.nat =
@@ -1348,4 +1364,50 @@ def discrete_laplace_rat_ra(t : Nat.nat,
       }))))
 
 } /* object Code_Generation_sampler */
+
+object Code_Generation_mechanism {
+
+def discrete_laplace_mechanism_ra[A](f : (List[A]) => Int.int, delta : Nat.nat,
+                                      epsilon1 : Nat.nat, epsilon2 : Nat.nat,
+                                      x : List[A]) : Randomized_Algorithm.random_alg[Int.int]
+  =
+  Randomized_Algorithm.bind_ra[Int.int,
+                                Int.int](Code_Generation_sampler.discrete_laplace_rat_ra(Nat.times_nata(epsilon2,
+                         delta),
+          epsilon1),
+  ((noise : Int.int) =>
+    Randomized_Algorithm.return_ra[Int.int](Int.plus_int(noise, f(x)))))
+
+def discrete_laplace_noise_add_list_ra[A](x0 : List[(List[A]) => Int.int],
+   epsilon1 : Nat.nat, epsilon2 : Nat.nat,
+   ls : List[A]) : Randomized_Algorithm.random_alg[List[Int.int]]
+  =
+  (x0, epsilon1, epsilon2, ls) match {
+  case (Nil, epsilon1, epsilon2, ls) =>
+    Randomized_Algorithm.return_ra[List[Int.int]](Nil)
+  case (c :: cs, epsilon1, epsilon2, ls) =>
+    Randomized_Algorithm.bind_ra[List[Int.int],
+                                  List[Int.int]](discrete_laplace_noise_add_list_ra[A](cs,
+        epsilon1, epsilon2, ls),
+          ((noisy_cs : List[Int.int]) =>
+            Randomized_Algorithm.bind_ra[Int.int,
+  List[Int.int]](discrete_laplace_mechanism_ra[A](c, Nat.one_nata, epsilon1,
+           epsilon2, ls),
+                  ((noisy_c : Int.int) =>
+                    Randomized_Algorithm.return_ra[List[Int.int]](noisy_c ::
+                            noisy_cs)))))
+}
+
+def report_noisy_max_ra[A](cs : List[(List[A]) => Int.int], epsilon1 : Nat.nat,
+                            epsilon2 : Nat.nat,
+                            x : List[A]) : Randomized_Algorithm.random_alg[Nat.nat]
+  =
+  Randomized_Algorithm.bind_ra[List[Int.int],
+                                Nat.nat](discrete_laplace_noise_add_list_ra[A](cs,
+epsilon1, epsilon2, x),
+  ((noisy_cs : List[Int.int]) =>
+    Randomized_Algorithm.return_ra[Nat.nat](Product_Type.snd[Int.int,
+                      Nat.nat](Report_noisy_max.argmax_int_list(noisy_cs)))))
+
+} /* object Code_Generation_mechanism */
 }

@@ -4,7 +4,7 @@ import randomalg.RandomAlg._
 import randomalg.Sampling._
 import randomalg.ExportCode._
 import output.ListToFile._
-
+//スケール10の離散ラプラス分布のサンプリングを１万回繰り返し、実行時間を計測
 object Main2 {
   def main(args: Array[String]): Unit = {
     val t: BigInt = 10

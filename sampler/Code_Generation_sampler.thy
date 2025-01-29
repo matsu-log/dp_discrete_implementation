@@ -4,7 +4,6 @@ theory Code_Generation_sampler
           "Bernoulli_rat"
           "Discrete_Laplace_rat"
           "Probabilistic_While.Fast_Dice_Roll"
-          "HOL-Library.Code_Target_Numeral"
 begin
 context fixes n :: nat notes [[function_internals]] begin
 
