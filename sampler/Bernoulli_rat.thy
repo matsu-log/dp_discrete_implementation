@@ -6,28 +6,6 @@ theory Bernoulli_rat
           "Probabilistic_While.Fast_Dice_Roll"
 begin
 
-subsection \<open>auxiliary lemmas\<close>
-lemma spmf_of_set_d:
-  fixes d::nat
-  assumes"0 < d"
-shows  "spmf_of_set {..<d} = spmf_of_pmf (pmf_of_set {..<d})"
-proof -
-  have "{..<d}\<noteq>{}" using assms by auto
-  then show ?thesis by simp
-qed
-
-lemma spmf_if_split:
-  "spmf (if b then p else q) x = (if b then spmf p x else spmf q x)"
-  by simp
-
-lemma spmf_return_spmf_1: 
-  shows "spmf (return_spmf True) True = 1" 
-  by simp
-
-lemma spmf_return_spmf_0:
-  shows "spmf (return_spmf False) True = 0"
-  by simp
-
 subsection \<open>Define bernoulli_rat\<close>
 
 definition bernoulli_rat :: "nat \<Rightarrow> nat \<Rightarrow> bool spmf" where
@@ -37,10 +15,6 @@ definition bernoulli_rat :: "nat \<Rightarrow> nat \<Rightarrow> bool spmf" wher
             x \<leftarrow> fast_uniform d;
             return_spmf (x<n)
 })"
-
-term"do {
-            x \<leftarrow> fast_uniform d;
-            return_spmf (x<n)}"
 
 subsection \<open>Properties of bernoulli_rat\<close>
 
@@ -53,13 +27,12 @@ next
   show ?thesis using False
     apply(simp add: bernoulli_rat_def)
     apply(simp add: fast_uniform_conv_uniform)
-    apply(simp add: spmf_of_set_d)
   proof -
-    have 1:"finite{..<d}" by simp
-    have 2:"{..<d}\<noteq>{}" using False by auto
-    show "pmf (pmf_of_set {..<d} \<bind> (\<lambda>x. return_spmf (x < n))) None = 0" using 1 2
-      apply(simp add: pmf_bind_pmf_of_set)
-      done
+    show "pmf (spmf_of_set {..<d} \<bind> (\<lambda>x. return_spmf (x < n))) None = 0"
+      apply(rewrite spmf_of_pmf_pmf_of_set[symmetric])
+        apply simp
+      using False apply blast
+      using lossless_iff_pmf_None by fastforce
   qed
 qed
 
@@ -94,20 +67,19 @@ qed
 lemma bernoulli_rat_pos [simp]:
   assumes "1\<le>n/d"
   shows  "spmf (bernoulli_rat n d) True = 1"
+and "spmf (bernoulli_rat n d) False = 0"
 proof -
   have "d \<le> n" using assms
     using div_less linorder_not_less by fastforce
-  then show ?thesis
+  show "spmf (bernoulli_rat n d) True = 1"
     apply(simp add: bernoulli_rat_def)
     apply(simp add: fast_uniform_conv_uniform)
     apply(simp add: spmf_bind)
     apply(simp add: integral_spmf_of_set)
     using assms of_nat_0_less_iff by fastforce
+  then show "spmf (bernoulli_rat n d) False = 0"
+    by (simp add: assms spmf_False_conv_True)
 qed
-
-lemma [simp]: assumes "1\<le> n/d"
-  shows "spmf (bernoulli_rat n d) False = 0"
- by (simp add: assms spmf_False_conv_True)
 
 context begin interpretation pmf_as_function .
 lemma bernoulli_rat_eq_bernoulli_pmf:
@@ -117,7 +89,7 @@ proof -
   proof (cases "1\<le>n/d")
     case True
     then show ?thesis 
-      by (metis bernoulli_eq_bernoulli_pmf bernoulli_pos bernoulli_rat_pos spmf_return_spmf_1 spmf_spmf_of_pmf)
+      by (metis bernoulli_eq_bernoulli_pmf bernoulli_pos bernoulli_rat_pos(1) bernoulli_rat_pos(2) pmf_bernoulli_True pmf_le_1 spmf_spmf_of_pmf)
   next
     case False 
     then show ?thesis by simp
