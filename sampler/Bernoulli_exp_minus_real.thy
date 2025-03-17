@@ -65,8 +65,8 @@ proof (rule summable_diff)
   have 1: "summable (\<lambda>i. p^i / fact i)"
     using summable_exp_generic[of "p"] by (simp add:inverse_eq_divide)
   show summable_2i:"summable (\<lambda>i. p ^ (2 * i) / fact (2 * i))"
-  proof (subst summable_comparison_test[of "\<lambda>i. p^(2*i) / fact (2*i)" "\<lambda>i. p^i / fact i"],simp_all)
-    show "\<exists>N. \<forall>n\<ge>N. p ^ (2 * n) / fact (2 * n) \<le> p ^ n / fact n"
+  proof (subst summable_comparison_test[of "\<lambda>i. p^(2*i) / fact (2*i)" "\<lambda>i. p^i / fact i"])
+    show "\<exists>N. \<forall>n\<ge>N. norm (p ^ (2 * n) / fact (2 * n)) \<le> p ^ n / fact n"
     proof -
       have "\<forall>n. p ^ (2 * n) / fact (2 * n) \<le> p ^ n / fact n"
       proof 
@@ -79,6 +79,7 @@ proof (rule summable_diff)
     qed
     show "summable (\<lambda>i. p ^ i / fact i)" 
       using 1 by simp
+    show "True" by simp
   qed
   show summable_2i_plus_1:"summable (\<lambda>i. p ^ (2 * i + 1) / fact (2 * i + 1))"
   proof (subst summable_comparison_test[of "\<lambda>i. p^(2*i+1) / fact (2*i+1)" "\<lambda>i. p^i / fact i"])
@@ -239,27 +240,28 @@ proof-
         assume "fst (a,b)" and I_b:"2\<le>b"
         show "1 - \<gamma> / 2 \<le> spmf (map_spmf fst (map_spmf (\<lambda>b'. if b' then (True, b + 1) else (False, b)) (bernoulli (\<gamma> / real b)))) False"
         proof -
-          have "ennreal (1-\<gamma>/2)\<le> ennreal (spmf (map_spmf fst (map_spmf (\<lambda>b'. if b' then (True, b + 1) else (False, b)) (bernoulli (\<gamma> / real b)))) False)"
+          have "ennreal (spmf (map_spmf fst (map_spmf (\<lambda>b'. if b' then (True, b + 1) else (False, b)) (bernoulli (\<gamma> / real b)))) False) =  ennreal (\<Sum>a | \<not> a. spmf (bernoulli (\<gamma> / real b)) a)"
             apply(simp add: ennreal_spmf_map_conv_nn_integral)
             apply(simp add: nn_integral_measure_spmf)
             apply(simp add: UNIV_bool)
-            apply(simp add: nn_integral_count_space_finite)
-          proof-
+            by(simp add: nn_integral_count_space_finite)  
+          also have "... =  ennreal (spmf (bernoulli (\<gamma>/b)) False)"
+          proof -
             have "{a.\<not>a} = {False}" by auto
-            then have "(\<Sum>a | \<not> a. spmf (bernoulli (\<gamma> /b)) a) = spmf (bernoulli (\<gamma>/b)) False " by simp
-            also have "... = 1 - \<gamma>/b" using cond1 cond2 I_b by simp
-            also have "...  \<ge>  1-\<gamma>/2" using I_b cond1
-            proof-
-              have "\<gamma>/b \<le>\<gamma>/2"
-                apply(rule divide_left_mono) 
-                using cond1 I_b by(simp_all)  
-              then show "1-\<gamma>/2 \<le> 1-\<gamma>/b" by simp
-            qed
-            finally have 1:"(\<Sum>a | \<not> a. spmf (bernoulli (\<gamma> /b)) a) \<ge> 1-\<gamma>/2" by simp
-            have 2:"0\<le>1-\<gamma>/2" using cond2 by simp
-            show " ennreal (1 - \<gamma> / 2) \<le> ennreal (\<Sum>a | \<not> a. spmf (bernoulli (\<gamma> / real b)) a)" using 1 2 by simp
+            then show ?thesis by simp
           qed
-          then show "1 - \<gamma> / 2 \<le> spmf (map_spmf fst (map_spmf (\<lambda>b'. if b' then (True, b + 1) else (False, b)) (bernoulli (\<gamma> / real b)))) False" by simp
+          also have "... \<ge> 1-\<gamma>/2"
+          proof -
+            have "\<gamma>/b \<le>\<gamma>/2"
+              apply(rule divide_left_mono)
+              using cond1 I_b by(simp_all)
+            then have p:"1-\<gamma>/2 \<le> 1-\<gamma>/b" by simp
+            have "1 - \<gamma> / 2 \<le> spmf (bernoulli (\<gamma>/b)) False"
+              using cond1 cond2 I_b p
+              by simp
+            then show ?thesis by simp
+          qed
+          finally show ?thesis by simp
         qed
       qed
       show "0<?p" using cond2 by simp
@@ -294,27 +296,33 @@ end
 
 lemma spmf_bernoulli_exp_minus_real_from_0_to_1_loop_zero_fixp_induct_case_adm:
   shows "spmf.admissible (\<lambda>bernoulli_exp_minus_real_from_0_to_1_loop. \<forall>l>m. spmf ((curry bernoulli_exp_minus_real_from_0_to_1_loop) \<gamma> l) m = 0)"
-proof(simp add: ccpo.admissible_def fun_lub_def spmf_lub_spmf, clarify)
-  fix A l
-  assume CA: "Complete_Partial_Order.chain spmf.le_fun A" and A: "A \<noteq> {}" and
-  H: "\<forall>x\<in>A.\<forall>l>m. spmf (x (\<gamma>, l)) m = 0" and
-  L: "l>m" 
-  have P:"spmf (lub_spmf {y. \<exists>f\<in>A. y = f (\<gamma>, l)}) m =  (\<Squnion>p\<in>{y. \<exists>f\<in>A. y = f (\<gamma>, l)}. spmf p m)"
-  proof(rule spmf_lub_spmf)
-    show "Complete_Partial_Order.chain (ord_spmf (=)) {y. \<exists>f\<in>A. y = f (\<gamma>, l)}" 
-      by (simp add: CA chain_fun)
-  next 
-    show "{y. \<exists>f\<in>A. y = f (\<gamma>, l)} \<noteq> {}" using A by blast
+proof -
+  have "\<forall>A. Complete_Partial_Order.chain spmf.le_fun A \<longrightarrow> A \<noteq> {} \<longrightarrow> (\<forall>x\<in>A. \<forall>l>m. spmf (x (\<gamma>, l)) m = 0) \<longrightarrow> (\<forall>l>m. spmf (lub_spmf {y. \<exists>f\<in>A. y = f (\<gamma>, l)}) m = 0) "
+  proof clarify
+    fix A l
+    assume CA: "Complete_Partial_Order.chain spmf.le_fun A" and A: "A \<noteq> {}" and
+      H: "\<forall>x\<in>A.\<forall>l>m. spmf (x (\<gamma>, l)) m = 0" and
+      L: "l>m" 
+    have P:"spmf (lub_spmf {y. \<exists>f\<in>A. y = f (\<gamma>, l)}) m =  (\<Squnion>p\<in>{y. \<exists>f\<in>A. y = f (\<gamma>, l)}. spmf p m)"
+    proof(rule spmf_lub_spmf)
+      show "Complete_Partial_Order.chain (ord_spmf (=)) {y. \<exists>f\<in>A. y = f (\<gamma>, l)}" 
+        by (simp add: CA chain_fun)
+    next 
+      show "{y. \<exists>f\<in>A. y = f (\<gamma>, l)} \<noteq> {}" using A by blast
+    qed
+    have "... =  \<Squnion>{0}"
+    proof (rule cong[where f=Sup and g=Sup])
+      show "Sup = Sup" by simp
+      show " (\<lambda>p. spmf p m) ` {y. \<exists>f\<in>A. y = f (\<gamma>, l)} = {0}"
+        using A H L by (auto simp add: image_def)
+    qed
+    also have "... = 0"
+      by simp
+    finally show  "spmf (lub_spmf {y. \<exists>f\<in>A. y = f (\<gamma>, l)}) m = 0"
+      using P by presburger
   qed
-  have "... =  \<Squnion>{0}"
-  proof (rule cong[where f=Sup and g=Sup],simp)
-    show " (\<lambda>p. spmf p m) ` {y. \<exists>f\<in>A. y = f (\<gamma>, l)} = {0}"
-      using A H L by (auto simp add: image_def)
-  qed
-  also have "... = 0"
-    by simp
-  finally show  "spmf (lub_spmf {y. \<exists>f\<in>A. y = f (\<gamma>, l)}) m = 0"
-    using P by presburger
+  then show ?thesis
+    by (simp add: ccpo.admissible_def fun_lub_def spmf_lub_spmf)
 qed
 
 lemma spmf_bernoulli_exp_minus_real_from_0_to_1_loop_zero:
@@ -345,7 +353,7 @@ lemma spmf_bernoulli_exp_minus_real_from_0_to_1_loop[simp]:
   shows "spmf (bernoulli_exp_minus_real_from_0_to_1_loop \<gamma> 1) m = \<gamma>^(m-1)/fact (m-1) - \<gamma>^m/fact m" (is "?lhs m = ?rhs m")
 proof -
   have P:"\<forall>k l::nat . 1\<le>k \<longrightarrow> ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop \<gamma> k) (k+l)) = \<gamma>^l /\<Prod>{k..(k+l-1)} - \<gamma>^(l+1)/\<Prod>{k..(k+l)}"
-  proof rule+
+  proof clarify
     fix l
     show "\<And>k.1 \<le> k \<Longrightarrow>
            ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop \<gamma> k) (k + l)) =
@@ -569,9 +577,10 @@ proof -
       have 1:"?s2 =(\<lambda>n. sum ?f {..n})"
         by (simp add: atMost_atLeast0)
       then have 2:"(\<lambda>n. sum ?f {..n})\<longlonglongrightarrow> (\<Sum>n.?f n) "
-      proof (subst summable_LIMSEQ',simp_all)
+      proof (subst summable_LIMSEQ')
         show "summable ?f" 
           using summable_exp_generic[of "-p"] by (simp add: inverse_eq_divide)
+        show "True" by simp
       qed
       show ?thesis
         using 1 2 by simp
@@ -618,11 +627,12 @@ lemma spmf_bernoulli_exp_minus_real_from_0_to_1_True[simp]:
   shows "spmf (bernoulli_exp_minus_real_from_0_to_1 \<gamma>) True = exp(-\<gamma>) "
 proof -
   have "ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1 \<gamma>) True) = exp(-\<gamma>)"
-    apply(simp add:bernoulli_exp_minus_real_from_0_to_1_def ennreal_spmf_bind nn_integral_measure_spmf exp_def inverse_eq_divide)
   proof -
-     have " (\<Sum>\<^sup>+ x::nat. ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop \<gamma> (Suc (0::nat))) x) * ennreal (spmf (if odd x then return_spmf True else return_spmf False) True))
-                =   (\<Sum>\<^sup>+ x::nat. ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop \<gamma> 1) x) * (if odd x then 1 else 0))"
-     proof - 
+    have "ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1 \<gamma>) True) = (\<Sum>\<^sup>+ x::nat. ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop \<gamma> (Suc 0)) x) * ennreal (spmf (if odd x then return_spmf True else return_spmf False) True))"
+      unfolding bernoulli_exp_minus_real_from_0_to_1_def
+      by(simp add: ennreal_spmf_bind nn_integral_measure_spmf exp_def inverse_eq_divide)
+     also have "... = (\<Sum>\<^sup>+ x::nat. ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop \<gamma> 1) x) * (if odd x then 1 else 0))"
+     proof -
        have 1:"\<And> x. ennreal (spmf (if odd x then return_spmf True else return_spmf False) True) = (if odd x then 1 else 0)" by simp
        show ?thesis
          by(simp add: 1)  
@@ -687,8 +697,7 @@ proof -
              by (simp add: inverse_eq_divide)
          qed
          also have "... = 0"
-           apply(rewrite suminf_def)
-           apply(rewrite sums_def')
+           unfolding suminf_def sums_def'
          proof 
            let ?f = "\<lambda>n. (-\<gamma>)^n/fact n"
            show 1:"(\<lambda>n. \<Sum>i = 0..n. ?f (2*i) + ?f (2*i+1) - ?f i) \<longlonglongrightarrow> 0"
@@ -709,8 +718,9 @@ proof -
        qed
        then show ?thesis by simp
      qed
-     finally show "(\<Sum>\<^sup>+ x::nat. ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1_loop \<gamma> (Suc (0::nat))) x) * ennreal (spmf (if odd x then return_spmf True else return_spmf False) True))
-                  = ennreal (\<Sum>n. (- \<gamma>) ^ n / fact n)"  by simp
+     also have "... = ennreal (exp (- \<gamma>))"
+       by (simp add:exp_def inverse_eq_divide)    
+     finally show ?thesis by simp
    qed
    then show ?thesis by simp
  qed
@@ -798,17 +808,21 @@ next
   proof -
     assume step:"spmf (bernoulli_exp_minus_real_loop k) True = exp (- real k)"
     have "ennreal (spmf (bernoulli_exp_minus_real_loop (Suc k)) True) = exp(-(Suc k))"
-      apply(rewrite bernoulli_exp_minus_real_loop.simps)
-      apply(simp add: ennreal_spmf_bind nn_integral_measure_spmf UNIV_bool nn_integral_count_space_finite)
-      apply(simp add: step)
     proof -
-      have 1:"0 < exp (-1::real)" by simp
-      have 2:"0 < exp (-k::real)" by simp
-      have "ennreal (exp (-1)) * ennreal (exp (-k)) = exp (-1) * exp (-k)"
-        using 1 2 by(simp add:ennreal_mult)
+      have "ennreal (spmf (bernoulli_exp_minus_real_loop (Suc k)) True) = ennreal (exp (- 1)) * ennreal (exp (- real k))"
+        apply(rewrite bernoulli_exp_minus_real_loop.simps)
+        apply(simp add: ennreal_spmf_bind nn_integral_measure_spmf UNIV_bool nn_integral_count_space_finite)
+        by(simp add: step)
+      also have "... = exp (-1) * exp (-k)"
+      proof -
+        have 1:"0 < exp (-1::real)" by simp
+        have 2:"0 < exp (-k::real)" by simp
+        show ?thesis 
+          using 1 2 by(simp add:ennreal_mult)
+      qed
       also have "... = exp (-(k+1))"
         by (simp add: mult_exp_exp)
-      finally show "ennreal (exp (-1)) * ennreal (exp (- real k)) = exp(-1- real k)" by simp
+      finally show ?thesis by simp
     qed
     then show ?thesis by simp
   qed
@@ -833,29 +847,39 @@ qed
 lemma spmf_bernoulli_exp_minus_real_True[simp]:
   assumes "0\<le>\<gamma>"
   shows "spmf (bernoulli_exp_minus_real \<gamma>) True = exp(-\<gamma>)"
-    apply(simp add: bernoulli_exp_minus_real_def)
-    apply(cases "\<gamma>\<le>1")
-     apply(simp_all)
-     apply(subst order_class.leD, simp add: assms, simp)
-proof-
-  assume cond: "\<not> \<gamma> \<le> 1"
-  have "ennreal (spmf (bernoulli_exp_minus_real_loop (nat \<lfloor>\<gamma>\<rfloor>) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_real_from_0_to_1 (\<gamma> - real_of_int \<lfloor>\<gamma>\<rfloor>) else return_spmf b)) True)
-        = ennreal (spmf (bernoulli_exp_minus_real_loop (nat \<lfloor>\<gamma>\<rfloor>)) True) * ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1 (\<gamma> - real_of_int \<lfloor>\<gamma>\<rfloor>)) True)"
-    by(simp add:ennreal_spmf_bind nn_integral_measure_spmf UNIV_bool nn_integral_count_space_finite)
-  also have "... = ennreal (exp (- nat \<lfloor>\<gamma>\<rfloor>)) * ennreal (exp (-\<gamma>+ \<lfloor>\<gamma>\<rfloor>))"
-  proof(rewrite spmf_bernoulli_exp_minus_real_loop_True)
-    show "ennreal (exp (- real (nat \<lfloor>\<gamma>\<rfloor>))) * ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1 (\<gamma> - \<lfloor>\<gamma>\<rfloor>)) True)
-        = ennreal (exp (- (nat \<lfloor>\<gamma>\<rfloor>))) * ennreal (exp (- \<gamma> + \<lfloor>\<gamma>\<rfloor>))"
-    proof (rewrite spmf_bernoulli_exp_minus_real_from_0_to_1_True, simp_all)
-      show "\<gamma> - \<lfloor>\<gamma>\<rfloor> \<le> 1" using cond by linarith
+proof (cases "\<gamma>\<le>1")
+  case True
+  then show ?thesis 
+    unfolding bernoulli_exp_minus_real_def
+    using assms by simp
+next
+  case False
+  then show ?thesis 
+  proof -
+    have "ennreal (spmf (bernoulli_exp_minus_real \<gamma>) True) = ennreal (spmf (bernoulli_exp_minus_real_loop (nat \<lfloor>\<gamma>\<rfloor>) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_real_from_0_to_1 (\<gamma> - real_of_int \<lfloor>\<gamma>\<rfloor>) else return_spmf b)) True)"
+      unfolding bernoulli_exp_minus_real_def 
+      apply(subst order_class.leD, simp add:assms)
+      using False by simp
+    also have "...
+         = ennreal (spmf (bernoulli_exp_minus_real_loop (nat \<lfloor>\<gamma>\<rfloor>)) True) * ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1 (\<gamma> - real_of_int \<lfloor>\<gamma>\<rfloor>)) True)"
+      by(simp add:ennreal_spmf_bind nn_integral_measure_spmf UNIV_bool nn_integral_count_space_finite)
+    also have "... = ennreal (exp (- nat \<lfloor>\<gamma>\<rfloor>)) * ennreal (exp (-\<gamma>+ \<lfloor>\<gamma>\<rfloor>))"
+    proof(rewrite spmf_bernoulli_exp_minus_real_loop_True)
+      show "ennreal (exp (- real (nat \<lfloor>\<gamma>\<rfloor>))) * ennreal (spmf (bernoulli_exp_minus_real_from_0_to_1 (\<gamma> - \<lfloor>\<gamma>\<rfloor>)) True)
+          = ennreal (exp (- (nat \<lfloor>\<gamma>\<rfloor>))) * ennreal (exp (- \<gamma> + \<lfloor>\<gamma>\<rfloor>))"
+      proof (rewrite spmf_bernoulli_exp_minus_real_from_0_to_1_True)
+        show "0 \<le> \<gamma> - real_of_int \<lfloor>\<gamma>\<rfloor>" by simp
+        show "\<gamma> - \<lfloor>\<gamma>\<rfloor> \<le> 1" using False by linarith
+        show "ennreal (exp (- real (nat \<lfloor>\<gamma>\<rfloor>))) * ennreal (exp (- (\<gamma> - real_of_int \<lfloor>\<gamma>\<rfloor>))) = ennreal (exp (real_of_int (- int (nat \<lfloor>\<gamma>\<rfloor>)))) * ennreal (exp (- \<gamma> + real_of_int \<lfloor>\<gamma>\<rfloor>))" by simp
+      qed
     qed
+    also have "... = exp (-(\<lfloor>\<gamma>\<rfloor>)) * exp (- \<gamma> + \<lfloor>\<gamma>\<rfloor>)"
+      using ennreal_mult' assms  by auto
+    also have "... = exp (-\<gamma>)"
+      by (simp add: mult_exp_exp)
+    finally show ?thesis
+      by simp
   qed
-  also have "... = exp (-(\<lfloor>\<gamma>\<rfloor>)) * exp (- \<gamma> + \<lfloor>\<gamma>\<rfloor>)"
-    using ennreal_mult' assms  by auto
-  also have "... = exp (-\<gamma>)"
-    by (simp add: mult_exp_exp)
-  finally show "spmf (bernoulli_exp_minus_real_loop (nat \<lfloor>\<gamma>\<rfloor>) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_real_from_0_to_1 (\<gamma> - real_of_int \<lfloor>\<gamma>\<rfloor>) else return_spmf b)) True = exp (- \<gamma>)"
-    by simp
 qed
     
 lemma spmf_bernoulli_exp_minus_real_False[simp]:

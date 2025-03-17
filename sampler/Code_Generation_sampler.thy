@@ -132,36 +132,50 @@ lemma bernoulli_exp_minus_rat_from_0_to_1_loop_ra_correct:
 proof -
   include lifting_syntax
   have "((=) ===> rel_spmf_of_ra) (\<lambda>pair. bernoulli_exp_minus_rat_from_0_to_1_loop (fst pair) (snd pair)) (\<lambda>pair. bernoulli_exp_minus_rat_from_0_to_1_loop_ra (fst pair) (snd pair))"
-    unfolding bernoulli_exp_minus_rat_from_0_to_1_loop_def bernoulli_exp_minus_rat_from_0_to_1_loop_ra_def curry_def
-    apply(simp add: Basic_BNF_LFPs.xtor_rel)
-    apply(rule fixp_ra_parametric)
-    using bernoulli_exp_minus_rat_from_0_to_1_loop.mono 
-    unfolding curry_def apply(simp)
-    using bernoulli_exp_minus_rat_from_0_to_1_loop_ra.mono 
-    unfolding curry_def apply(simp)
   proof -
-    have 1:" (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop (p, k). (case quotient_of p of (n, d) \<Rightarrow> bernoulli_rat (nat n) (nat (d * int k))) \<bind> (\<lambda>a. if a then bernoulli_exp_minus_rat_from_0_to_1_loop (p, k + 1) else return_spmf k))
-        =  (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop (p, k). (bernoulli_rat (nat (fst(quotient_of p))) (nat ((snd(quotient_of p)) * int k))) \<bind> (\<lambda>a. if a then bernoulli_exp_minus_rat_from_0_to_1_loop (p, k + 1) else return_spmf k))"
-      by (simp add: split_def)
-    have 2:" (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k). (case quotient_of p of (n, d) \<Rightarrow> bernoulli_rat_ra (nat n) (nat (d * int k))) \<bind> (\<lambda>a. if a then bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k + 1) else return_ra k))
-        =  (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k). (bernoulli_rat_ra (nat (fst(quotient_of p))) (nat ((snd(quotient_of p)) * int k))) \<bind> (\<lambda>a. if a then bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k + 1) else return_ra k))"
-      by (simp add: split_def)
-    have 3:"(((=) ===> rel_spmf_of_ra) ===> (=) ===> rel_spmf_of_ra)
-     (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop (p, k). (bernoulli_rat (nat (fst(quotient_of p))) (nat ((snd(quotient_of p)) * int k))) \<bind> (\<lambda>a. if a then bernoulli_exp_minus_rat_from_0_to_1_loop (p, k + 1) else return_spmf k))
-     (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k). (bernoulli_rat_ra (nat (fst(quotient_of p))) (nat ((snd(quotient_of p)) * int k))) \<bind> (\<lambda>a. if a then bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k + 1) else return_ra k))"
-    proof-
-      have 1:"bernoulli_rat (nat (fst(quotient_of p))) (nat ((snd(quotient_of p)) * int k)) = (\<lambda>(n, d). bernoulli_rat n d) (nat (fst(quotient_of p)),nat ((snd(quotient_of p)) * int k))" by simp
-      have 2:"bernoulli_rat_ra (nat (fst(quotient_of p))) (nat ((snd(quotient_of p)) * int k)) = (\<lambda>(n, d). bernoulli_rat_ra n d) (nat (fst(quotient_of p)),nat ((snd(quotient_of p)) * int k))" by simp
-      have 3:"(((=) ===> rel_spmf_of_ra) ===> (=) ===> rel_spmf_of_ra)
-     (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop (p, k). (\<lambda>(n, d). bernoulli_rat n d) (nat (fst(quotient_of p)),nat ((snd(quotient_of p)) * int k)) \<bind> (\<lambda>a. if a then bernoulli_exp_minus_rat_from_0_to_1_loop (p, k + 1) else return_spmf k))
-     (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k). (\<lambda>(n, d). bernoulli_rat_ra n d) (nat (fst(quotient_of p)),nat ((snd(quotient_of p)) * int k))\<bind> (\<lambda>a. if a then bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k + 1) else return_ra k))"
-        by transfer_prover
-      show ?thesis using 1 2 3 by simp
+    have "((=) ===> rel_spmf_of_ra)
+     (spmf.fixp_fun
+       (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop (\<gamma>, k).
+           (case quotient_of \<gamma> of (n, d) \<Rightarrow> bernoulli_rat (nat n) (nat (d * int k))) \<bind> (\<lambda>a. if a then bernoulli_exp_minus_rat_from_0_to_1_loop (\<gamma>, k + 1) else return_spmf k)))
+     (random_alg_pf.fixp_fun
+       (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k).
+           (case quotient_of p of (n, d) \<Rightarrow> bernoulli_rat_ra (nat n) (nat (d * int k))) \<bind>
+           (\<lambda>b. if b then bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k + 1) else return_ra k)))"
+    proof(rule fixp_ra_parametric)
+      show "\<And>x. monotone spmf.le_fun (ord_spmf (=)) (\<lambda>f. case x of (\<gamma>, k) \<Rightarrow> (case quotient_of \<gamma> of (n, d) \<Rightarrow> bernoulli_rat (nat n) (nat (d * int k))) \<bind> (\<lambda>b. if b then f (\<gamma>, k + 1) else return_spmf k))"
+        using bernoulli_exp_minus_rat_from_0_to_1_loop.mono
+        unfolding curry_def by(simp)
+      show "\<And>x. monotone random_alg_pf.le_fun ord_ra (\<lambda>f. case x of (p, k) \<Rightarrow> (case quotient_of p of (n, d) \<Rightarrow> bernoulli_rat_ra (nat n) (nat (d * int k))) \<bind> (\<lambda>b. if b then f (p, k + 1) else return_ra k))"
+        using bernoulli_exp_minus_rat_from_0_to_1_loop_ra.mono
+        unfolding curry_def by(simp)
+      show "(((=) ===> rel_spmf_of_ra) ===> (=) ===> rel_spmf_of_ra)
+     (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop (\<gamma>, k). (case quotient_of \<gamma> of (n, d) \<Rightarrow> bernoulli_rat (nat n) (nat (d * int k))) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_rat_from_0_to_1_loop (\<gamma>, k + 1) else return_spmf k))
+     (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k). (case quotient_of p of (n, d) \<Rightarrow> bernoulli_rat_ra (nat n) (nat (d * int k))) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k + 1) else return_ra k))"
+      proof -
+        have 1:"(\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop (p, k). (case quotient_of p of (n, d) \<Rightarrow> bernoulli_rat (nat n) (nat (d * int k))) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_rat_from_0_to_1_loop (p, k + 1) else return_spmf k))
+              = (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop (p, k). (bernoulli_rat (nat (fst(quotient_of p))) (nat ((snd(quotient_of p)) * int k))) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_rat_from_0_to_1_loop (p, k + 1) else return_spmf k))"
+          by (simp add: split_def)
+        have 2:" (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k). (case quotient_of p of (n, d) \<Rightarrow> bernoulli_rat_ra (nat n) (nat (d * int k))) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k + 1) else return_ra k))
+          =  (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k). (bernoulli_rat_ra (nat (fst(quotient_of p))) (nat ((snd(quotient_of p)) * int k))) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k + 1) else return_ra k))"
+          by (simp add: split_def)
+        have 3:"(((=) ===> rel_spmf_of_ra) ===> (=) ===> rel_spmf_of_ra)
+              (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop (p, k). (bernoulli_rat (nat (fst(quotient_of p))) (nat ((snd(quotient_of p)) * int k))) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_rat_from_0_to_1_loop (p, k + 1) else return_spmf k))
+              (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k). (bernoulli_rat_ra (nat (fst(quotient_of p))) (nat ((snd(quotient_of p)) * int k))) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k + 1) else return_ra k))"
+        proof-
+          have 1:"bernoulli_rat (nat (fst(quotient_of p))) (nat ((snd(quotient_of p)) * int k)) = (\<lambda>(n, d). bernoulli_rat n d) (nat (fst(quotient_of p)),nat ((snd(quotient_of p)) * int k))" by simp
+          have 2:"bernoulli_rat_ra (nat (fst(quotient_of p))) (nat ((snd(quotient_of p)) * int k)) = (\<lambda>(n, d). bernoulli_rat_ra n d) (nat (fst(quotient_of p)),nat ((snd(quotient_of p)) * int k))" by simp
+          have 3:"(((=) ===> rel_spmf_of_ra) ===> (=) ===> rel_spmf_of_ra)
+                   (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop (p, k). (\<lambda>(n, d). bernoulli_rat n d) (nat (fst(quotient_of p)),nat ((snd(quotient_of p)) * int k)) \<bind> (\<lambda>b. if b then bernoulli_exp_minus_rat_from_0_to_1_loop (p, k + 1) else return_spmf k))
+                   (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k). (\<lambda>(n, d). bernoulli_rat_ra n d) (nat (fst(quotient_of p)),nat ((snd(quotient_of p)) * int k))\<bind> (\<lambda>b. if b then bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k + 1) else return_ra k))"
+            by transfer_prover
+          show ?thesis using 1 2 3 by simp
+        qed
+        show ?thesis using 1 2 3 by simp
+      qed
     qed
-    show "(((=) ===> rel_spmf_of_ra) ===> (=) ===> rel_spmf_of_ra)
-     (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop (p, k). (case quotient_of p of (n, d) \<Rightarrow> bernoulli_rat (nat n) (nat (d * int k))) \<bind> (\<lambda>a. if a then bernoulli_exp_minus_rat_from_0_to_1_loop (p, k + 1) else return_spmf k))
-     (\<lambda>bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k). (case quotient_of p of (n, d) \<Rightarrow> bernoulli_rat_ra (nat n) (nat (d * int k))) \<bind> (\<lambda>a. if a then bernoulli_exp_minus_rat_from_0_to_1_loop_ra (p, k + 1) else return_ra k)) "
-      using 1 2 3 by simp
+    then show ?thesis
+      unfolding bernoulli_exp_minus_rat_from_0_to_1_loop_def bernoulli_exp_minus_rat_from_0_to_1_loop_ra_def curry_def 
+      by(simp add: Basic_BNF_LFPs.xtor_rel)
   qed
   thus ?thesis
     unfolding rel_fun_def rel_spmf_of_ra_def by simp

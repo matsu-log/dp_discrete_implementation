@@ -24,11 +24,10 @@ proof (cases "d=0")
   then show ?thesis by(simp add: bernoulli_rat_def)
 next
   case False 
-  show ?thesis using False
-    apply(simp add: bernoulli_rat_def)
-    apply(simp add: fast_uniform_conv_uniform)
+  show ?thesis using False unfolding bernoulli_rat_def
   proof -
-    show "pmf (spmf_of_set {..<d} \<bind> (\<lambda>x. return_spmf (x < n))) None = 0"
+    show "pmf (if d = 0 then return_spmf False else fast_uniform d \<bind> (\<lambda>x. return_spmf (x < n))) None = 0"
+      apply(rewrite fast_uniform_conv_uniform, simp)
       apply(rewrite spmf_of_pmf_pmf_of_set[symmetric])
         apply simp
       using False apply blast

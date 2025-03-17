@@ -73,21 +73,25 @@ proof-
       = (let (n,d) = quotient_of p in (bernoulli_rat (nat n) (nat (d*k)) = (bernoulli (of_rat p/k))))"
     by auto
   have 2:"let (n,d) = quotient_of p in (bernoulli_rat (nat n) (nat (d*k))) = (bernoulli (of_rat p/k))"
-  proof (simp,rule)
-    fix n d
-    assume asm:"quotient_of p = (n,d)"    
-    have "0\<le>n" and "0\<le>d"
-      using asm assms quotient_of_div[of "p" "n" "d"] quotient_of_denom_pos[of "p" "n" "d"]
+  proof -
+    have "\<And>n d. quotient_of p = (n, d) \<Longrightarrow> bernoulli_rat (nat n) (nat (d * int k)) = bernoulli (real_of_rat p / real k)"
+    proof -
+      fix n d
+      assume asm:"quotient_of p = (n,d)"    
+      have "0\<le>n" and "0\<le>d"
+        using asm assms quotient_of_div[of "p" "n" "d"] quotient_of_denom_pos[of "p" "n" "d"]
             Fract_of_int_quotient zero_le_Fract_iff by(simp_all)
-    then have "nat n/nat (d*k) = n/(d*k)"
-      by simp
-    also have "... = of_rat p/k"
-      using asm quotient_of_div[of "p" "n" "d"] 
-      by (simp add: of_rat_divide)
-    finally have 0:"nat n/nat (d*k) = of_rat p/k"
-      by simp
-    show "bernoulli_rat (nat n) (nat (d*k)) = bernoulli (of_rat p/k)"
-      by (simp add: "0" bernoulli_eq_bernoulli_pmf bernoulli_rat_eq_bernoulli_pmf)
+      then have "nat n/nat (d*k) = n/(d*k)"
+        by simp
+      also have "... = of_rat p/k"
+        using asm quotient_of_div[of "p" "n" "d"] 
+        by (simp add: of_rat_divide)
+      finally have 0:"nat n/nat (d*k) = of_rat p/k"
+        by simp
+      show "bernoulli_rat (nat n) (nat (d*k)) = bernoulli (of_rat p/k)"
+        by (simp add: "0" bernoulli_eq_bernoulli_pmf bernoulli_rat_eq_bernoulli_pmf)
+    qed
+    then show ?thesis by auto
   qed
   show ?thesis 
     using 1 2 by simp
