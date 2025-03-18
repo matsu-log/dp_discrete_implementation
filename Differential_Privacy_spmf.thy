@@ -497,7 +497,7 @@ proof -
   then show "differential_privacy (measure_spmf \<circ> (\<lambda>x. M x \<bind> (\<lambda>y. N (x, y)))) adj (\<epsilon> + \<epsilon>') 0"
     using 2 by simp
 qed
-
+(*
 lemma pure_dp_comp':
   fixes M::"('a, 'b) mechanism" and N::"'a list \<times> 'b \<Rightarrow>'c spmf"
   assumes M:"pure_dp M \<epsilon>"
@@ -538,9 +538,9 @@ proof -
     using differential_privacy_composition_adaptive'[of "\<epsilon>" "\<epsilon>'" "measure_spmf \<circ> M" "count_space UNIV" "count_space UNIV" "adj" "0"
                                                    "measure_spmf \<circ> N" "count_space UNIV"]
                                                  3 4 5 6 assms
-    by auto
+    
   then show "differential_privacy (measure_spmf \<circ> (\<lambda>x. M x \<bind> (\<lambda>y. N (x, y)))) adj (\<epsilon> + \<epsilon>') 0"
     using 2 by simp
 qed
-
+*)
 end

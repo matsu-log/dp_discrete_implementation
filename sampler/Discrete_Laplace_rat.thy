@@ -171,7 +171,7 @@ proof-
   also have "... = (exp(-n/t)-exp(-(m+1)/t))/(1-exp(-1/t))"
   proof -
     have "(-n) + (-(m-n+1)) = - (m+1)"
-      by (simp add: assms(2) of_nat_diff)
+      by (simp add: assms(2))
     then have "-n/t + - (m - n + 1)/t = -(m+1)/t"
       by (metis add_divide_distrib of_int_add)     
     then have "exp(-n/t) * exp(-(m-n+1)/t) = exp(-(m+1)/t)"
@@ -1234,7 +1234,7 @@ proof -
           then have "(x mod t)/t + (x - x mod t) div t = x/t"
           proof -
             have "(x - x mod t)/t = (x - x mod t) div t"
-              by (simp add: real_of_nat_div_aux)
+              by (simp add: of_nat_of_nat_div)
             then show ?thesis 
               using p2 by simp
           qed
