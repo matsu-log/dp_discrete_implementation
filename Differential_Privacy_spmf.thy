@@ -17,18 +17,15 @@ proof(clarify)
   fix m n::nat
   assume mn:"m \<noteq> n"
   show "int_family m \<inter> int_family n = {}"
-    unfolding int_family_def 
-    using mn
-  proof(auto)
-    have "even m \<Longrightarrow> even n \<Longrightarrow>int n div 2 \<noteq> int m div 2"
+    unfolding int_family_def
+  proof -
+    have 1:"even m \<Longrightarrow> even n \<Longrightarrow>int n div 2 \<noteq> int m div 2"
       using mn by fastforce
-    then show "even m \<Longrightarrow> even n \<Longrightarrow> int n div 2 = int m div 2 \<Longrightarrow> False"
-      by simp
-    have "odd m \<Longrightarrow> odd n \<Longrightarrow> int n div 2 \<noteq> int m div 2"
+    have 2:"odd m \<Longrightarrow> odd n \<Longrightarrow> int n div 2 \<noteq> int m div 2"
       using mn 
       by (metis bit_eq_rec even_of_nat nat_int_comparison(1))
-    then show " odd m \<Longrightarrow> odd n \<Longrightarrow> int n div 2 = int m div 2 \<Longrightarrow> False"
-      by simp
+    show "(if even m then {int m div 2} else {- ((int m + 1) div 2)}) \<inter> (if even n then {int n div 2} else {- ((int n + 1) div 2)}) = {}" 
+      using 1 2 mn by auto
   qed
 qed
 
@@ -36,23 +33,21 @@ lemma int_family_eq_for_positive:
   assumes "0\<le>x"
   shows "{x} = int_family (nat (2*x))"
   unfolding int_family_def
-  using assms
-proof(simp)
+proof - 
   have "nat (2* x) = 2 * nat x"
     by simp
   then have "even (nat (2 * x))" 
     by simp
-  then show "odd (nat (2 * x)) \<longrightarrow> x = 0"
-    by simp
+  then show "{x} = (if even (nat (2 * x)) then {int (nat (2 * x)) div 2} else {- ((int (nat (2 * x)) + 1) div 2)})"
+    using assms by simp
 qed 
 
 lemma int_family_eq_for_negative:
   assumes "x<0"
   shows "{x} = int_family (nat(-2*x-1))"
   unfolding int_family_def
-  using assms
-proof(auto)
-  have 1:"\<not> even (nat (-2*x-1))"
+proof -
+  have "\<not> even (nat (-2*x-1))"
   proof -        
     have 1:"nat (-2*x-1) = 2*nat(-x) -1"        
       using assms by simp
@@ -61,8 +56,8 @@ proof(auto)
     show ?thesis
       using 1 2 by simp
   qed
-  then show "even (nat (- (2 * x) - 1)) \<Longrightarrow> x = (- (2 * x) - 1) div 2"
-    by simp
+  then show "{x} = (if even (nat (- 2 * x - 1)) then {int (nat (- 2 * x - 1)) div 2} else {- ((int (nat (- 2 * x - 1)) + 1) div 2)})"
+    using assms by simp
 qed
 
 lemma int_family_union:
@@ -100,9 +95,6 @@ proof
   qed
 qed
 
-thm suminf_emeasure
-find_theorems "disjoint_family "
-
 lemma suminf_emeasure_spmf_int_family:
 "(\<Sum>i::nat. emeasure (measure_spmf p) (int_family i)) = emeasure (measure_spmf p) (\<Union> (range int_family))"
   apply(rule suminf_emeasure,simp)
@@ -126,10 +118,10 @@ proof
     by auto
   show "A \<subseteq> \<Union> (range (int_family_set A))"
     unfolding int_family_set_def
-  proof(auto)
+  proof 
     fix x
     assume A:"x\<in>A"
-    show "\<exists>xa. int_family xa \<subseteq> A \<and> x \<in> int_family xa "
+    show "x \<in> (\<Union>n. if int_family n \<subseteq> A then int_family n else {})"
     proof(cases "x<0")
       case True
       then show ?thesis 
@@ -176,26 +168,25 @@ proof -
     proof(cases "int_family n \<subseteq> A")
       case True
       then show ?thesis
-        apply(simp)
         unfolding int_family_def
-        apply(auto)
       proof -
-        show "emeasure (measure_spmf p) {int n div 2} \<le> c * emeasure (measure_spmf q) {int n div 2}"
-          apply(rewrite emeasure_spmf_single, rewrite emeasure_spmf_single)
-        proof -
+        have 1:"emeasure (measure_spmf p) {int n div 2} \<le> c * emeasure (measure_spmf q) {int n div 2}"
+        proof(rewrite emeasure_spmf_single, rewrite emeasure_spmf_single)
           have "ennreal c * ennreal (spmf q (int n div 2)) = ennreal (c * (spmf q (int n div 2)))"
             using ennreal_mult' assms by simp
           then show "ennreal (spmf p (int n div 2)) \<le> ennreal c * ennreal (spmf q (int n div 2))"
             using ennreal_leI assms by simp
         qed
-        show "emeasure (measure_spmf p) {- (int n div 2) - 1} \<le> c * emeasure (measure_spmf q) {- (int n div 2) - 1}"
-          apply(rewrite emeasure_spmf_single, rewrite emeasure_spmf_single)
-        proof -
+        have 2:"emeasure (measure_spmf p) {- (int n div 2) - 1} \<le> c * emeasure (measure_spmf q) {- (int n div 2) - 1}"
+        proof(rewrite emeasure_spmf_single, rewrite emeasure_spmf_single)
           have "ennreal c * ennreal (spmf q (- (int n div 2) - 1)) = ennreal (c * (spmf q (- (int n div 2) - 1)))"
             using ennreal_mult' assms by simp
           then show "ennreal (spmf p (- (int n div 2) - 1)) \<le> ennreal c * ennreal (spmf q (- (int n div 2) - 1))"
             using ennreal_leI assms by simp
         qed
+        show "emeasure (measure_spmf p) (if (if even n then {int n div 2} else {- ((int n + 1) div 2)}) \<subseteq> A then if even n then {int n div 2} else {- ((int n + 1) div 2)} else {})
+    \<le> ennreal c * emeasure (measure_spmf q) (if (if even n then {int n div 2} else {- ((int n + 1) div 2)}) \<subseteq> A then if even n then {int n div 2} else {- ((int n + 1) div 2)} else {})"
+          using 1 2 by simp
       qed
     next
       case False
@@ -274,7 +265,6 @@ proof -
     show "emeasure (measure_spmf p) (if n \<in> A then {n} else {}) \<le> ennreal c * emeasure (measure_spmf q) (if n \<in> A then {n} else {})"
       apply(simp)
       apply(rewrite emeasure_spmf_single, rewrite emeasure_spmf_single)
-      apply(auto)
       using assms(1)[of "n"] assms(2) ennreal_mult'[of "c" "spmf q n"] ennreal_leI
       by fastforce
   qed
@@ -345,14 +335,16 @@ definition postprocess :: "('a, 'b) mechanism \<Rightarrow> ('b \<Rightarrow> 'c
 subsection \<open>lemmas for pure_dp\<close>
 
 lemma adj_sym: "sym adj"
-  unfolding adj_def neighbour.simps
-  by(auto,rule,blast)
+  unfolding adj_def neighbour.simps sym_def
+  by fast
+  
 
 lemma pure_dp_inequality_imp_pure_dp:
   assumes "\<forall>(l1, l2)\<in>adj. pure_dp_inequality (M l1) (M l2) \<epsilon>"
   shows "pure_dp M \<epsilon>"
   unfolding pure_dp_def 
-proof(rewrite differential_privacy_adj_sym, simp add: adj_sym)
+proof(rewrite differential_privacy_adj_sym)
+  show "sym adj" by (simp add: adj_sym)
   show "\<forall>(d1, d2)\<in>adj. DP_inequality ((measure_spmf \<circ> M) d1) ((measure_spmf \<circ> M) d2) \<epsilon> 0"
     using assms 
     unfolding pure_dp_inequality_def o_def
@@ -405,33 +397,34 @@ lemma dp_postprocess_theorem:
   assumes "pure_dp M \<epsilon>"
   shows "pure_dp (postprocess M pp) \<epsilon>"
   unfolding pure_dp_def
-  apply(rewrite differential_privacy_adj_sym, simp add: adj_sym) 
-proof (rule+,auto)
-  fix l1 l2:: "'a list" 
-  assume adj:"(l1, l2) \<in> adj"
-  have p:"DP_inequality (measure_spmf (M l1)) (measure_spmf (M l2)) \<epsilon> 0"
-    using assms pure_dp_def[of "M" "\<epsilon>"] adj
-    unfolding o_def differential_privacy_def
-    by auto
-       
-  show "DP_inequality (measure_spmf (postprocess M pp l1)) (measure_spmf (postprocess M pp l2)) \<epsilon> 0"
-    unfolding DP_inequality_def postprocess_def 
-  proof
-    fix A
-    have l1:"Sigma_Algebra.measure (measure_spmf (M l1 \<bind> (\<lambda>A. return_spmf (pp A)))) A 
-        = measure (measure_spmf (map_spmf pp (M l1))) A"
-      using map_spmf_conv_bind_spmf by metis
-    have l2:"Sigma_Algebra.measure (measure_spmf (M l2 \<bind> (\<lambda>A. return_spmf (pp A)))) A 
-        = measure (measure_spmf (map_spmf pp (M l2))) A"
-      using map_spmf_conv_bind_spmf by metis
-    have "measure (measure_spmf (map_spmf pp (M l1))) A \<le> exp \<epsilon> * measure (measure_spmf (map_spmf pp (M l2))) A"
-      apply(rewrite measure_map_spmf)
-      apply(rewrite measure_map_spmf)
-      using p unfolding DP_inequality_def
-      by auto
-    then show "Sigma_Algebra.measure (measure_spmf (M l1 \<bind> (\<lambda>A. return_spmf (pp A)))) A 
-              \<le> exp \<epsilon> * Sigma_Algebra.measure (measure_spmf (M l2 \<bind> (\<lambda>A. return_spmf (pp A)))) A + 0"
-      using l1 l2 by simp
+proof(rewrite differential_privacy_adj_sym)
+  show "sym adj" by (rule adj_sym)
+  show "\<forall>(d1, d2)\<in>adj. DP_inequality ((measure_spmf \<circ> postprocess M pp) d1) ((measure_spmf \<circ> postprocess M pp) d2) \<epsilon> 0"
+  proof clarify
+    fix l1 l2:: "'a list" 
+    assume adj:"(l1, l2) \<in> adj"
+    have p:"DP_inequality (measure_spmf (M l1)) (measure_spmf (M l2)) \<epsilon> 0"
+      using assms pure_dp_def[of "M" "\<epsilon>"] adj
+      unfolding o_def differential_privacy_def
+      by auto  
+    show " DP_inequality ((measure_spmf \<circ> postprocess M pp) l1) ((measure_spmf \<circ> postprocess M pp) l2) \<epsilon> 0"
+      unfolding DP_inequality_def postprocess_def 
+    proof
+      fix A
+      have l1:"Sigma_Algebra.measure (measure_spmf (M l1 \<bind> (\<lambda>A. return_spmf (pp A)))) A 
+          = measure (measure_spmf (map_spmf pp (M l1))) A"
+        using map_spmf_conv_bind_spmf by metis
+      have l2:"Sigma_Algebra.measure (measure_spmf (M l2 \<bind> (\<lambda>A. return_spmf (pp A)))) A 
+          = measure (measure_spmf (map_spmf pp (M l2))) A"
+        using map_spmf_conv_bind_spmf by metis
+      have "measure (measure_spmf (map_spmf pp (M l1))) A \<le> exp \<epsilon> * measure (measure_spmf (map_spmf pp (M l2))) A"
+        apply(rewrite measure_map_spmf)
+        apply(rewrite measure_map_spmf)
+        using p unfolding DP_inequality_def
+        by auto
+      then show "Sigma_Algebra.measure ((measure_spmf \<circ> (\<lambda>l. M l \<bind> (\<lambda>A. return_spmf (pp A)))) l1) A \<le> exp \<epsilon> * Sigma_Algebra.measure ((measure_spmf \<circ> (\<lambda>l. M l \<bind> (\<lambda>A. return_spmf (pp A)))) l2) A + 0" 
+        using l1 l2 by simp
+    qed
   qed
 qed
 
@@ -440,15 +433,15 @@ lemma lossless_spmf_imp_measurable_as_measure:
   shows "measure_spmf \<circ> M \<in> (count_space UNIV) \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
 proof(rewrite measurable_count_space_eq1)
   show "measure_spmf \<circ> M \<in> UNIV \<rightarrow> space (prob_algebra (count_space UNIV))" 
-  proof(auto)
+  proof
     fix x
     have "emeasure (measure_spmf (M x)) (space (measure_spmf (M x))) = 1"
       using assms space_measure_spmf[of "M x"]
       unfolding lossless_spmf_def weight_spmf_def
       by (simp add: measure_spmf.emeasure_eq_measure)
     then have "prob_space (measure_spmf (M x))"
-      by rule
-    then show "measure_spmf (M x) \<in> space (prob_algebra (count_space UNIV))"
+      by (rule prob_spaceI)
+    then show "(measure_spmf \<circ> M) x \<in> space (prob_algebra (count_space UNIV))"
       apply(rewrite space_prob_algebra)
       by(auto)
   qed
@@ -462,10 +455,10 @@ and "countable (UNIV::'b set)"
   shows "measure_spmf \<circ> N \<in> count_space UNIV \<Otimes>\<^sub>M count_space UNIV \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
   unfolding o_def
   apply(rewrite pair_measure_countable)
-  using assms 
-    apply(auto)
-  using lossless_spmf_imp_measurable_as_measure assms
+  using assms apply simp_all
+  using  lossless_spmf_imp_measurable_as_measure assms
   by force
+  
 
 lemma pure_dp_comp:
   fixes M::"('a, 'b) mechanism" and N::"'a list \<times> 'b \<Rightarrow>'c spmf"
@@ -527,7 +520,7 @@ proof -
     using lossless_M lossless_spmf_imp_measurable_as_measure
     by auto
   have 4:"\<forall>x\<in>space (count_space UNIV). (\<lambda>y. (measure_spmf \<circ> N) (x, y)) \<in> count_space UNIV \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"  
-  proof(rule)
+  proof 
     fix x
     have p:"(\<lambda>y. (measure_spmf \<circ> N) (x, y)) = (measure_spmf \<circ> (\<lambda>y. N(x, y)))"
       by auto
@@ -549,7 +542,5 @@ proof -
   then show "differential_privacy (measure_spmf \<circ> (\<lambda>x. M x \<bind> (\<lambda>y. N (x, y)))) adj (\<epsilon> + \<epsilon>') 0"
     using 2 by simp
 qed
-
-
 
 end

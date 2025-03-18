@@ -51,11 +51,10 @@ proof -
 qed
 
 lemma pointwise_pure_dp_inequality_discrete_laplace_mechanism:
-  assumes "is_sensitivity f \<Delta>"
-and "(x, y)\<in> adj"
-and "1\<le>epsilon1" and "1\<le>epsilon2"
-and "1\<le> \<Delta>"
-shows "\<And>z. spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z \<le> exp (epsilon1/epsilon2) * spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z"
+  assumes "is_sensitivity f \<Delta>" and "(x, y)\<in> adj"
+and "1\<le>epsilon1" and "1\<le>epsilon2" and "1\<le> \<Delta>"
+shows "\<And>z. spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z 
+         \<le> exp (epsilon1/epsilon2) * spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z"
 proof -
   fix z::int
   have 1:"spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z = (exp (epsilon1 /(epsilon2*\<Delta>))-1) * exp (-(epsilon1*\<bar>z-(f x)\<bar>/(epsilon2*\<Delta>)))/(exp (epsilon1/(epsilon2*\<Delta>))+1)"
@@ -65,16 +64,13 @@ proof -
     using assms spmf_discrete_laplace_mechanism[of "epsilon1" "epsilon2" "\<Delta>" "f" "y" "z"]
     by simp
   have 3:"spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 x) z/spmf (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 y) z = exp (-(epsilon1*\<bar>z-(f x)\<bar>/(epsilon2*\<Delta>)))/exp (-(epsilon1*\<bar>z-(f y)\<bar>/(epsilon2*\<Delta>)))"
-    apply(rewrite 1)
-    apply(rewrite 2)
-    apply(auto)
-    using assms apply(simp_all)
-  proof -
-    have "exp (real epsilon1 / (real epsilon2 * real \<Delta>)) + 1 > 0"
+  proof-
+    have p:"exp (real epsilon1 / (real epsilon2 * real \<Delta>)) + 1 > 0"
       using exp_gt_zero add_pos_pos zero_less_one
       by blast
-    then show "exp (real epsilon1 / (real epsilon2 * real \<Delta>)) + 1 = 0 \<Longrightarrow> False"
-      by simp
+    show ?thesis
+      apply(rewrite 1, rewrite 2)
+      using assms p by simp
   qed
   also have "... = exp (-epsilon1*\<bar>z-(f x)\<bar>/(epsilon2*\<Delta>) - (-epsilon1*\<bar>z-(f y)\<bar>/(epsilon2*\<Delta>)))"
     using exp_diff[of"-epsilon1*\<bar>z-(f x)\<bar>/(epsilon2*\<Delta>)" "-epsilon1*\<bar>z-(f y)\<bar>/(epsilon2*\<Delta>)"]
@@ -135,10 +131,7 @@ proof -
 qed
 
 lemma pure_dp_discrete_laplace_mechanism:
-  assumes "is_sensitivity f \<Delta>"
-and "1 \<le> epsilon1"
-and "1 \<le> epsilon2"
-and "1 \<le> \<Delta>"
+  assumes "is_sensitivity f \<Delta>" and "1 \<le> epsilon1" and "1 \<le> epsilon2" and "1 \<le> \<Delta>"
 shows "pure_dp (discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2) (epsilon1/epsilon2)"
   using pointwise_pure_dp_inequality_discrete_laplace_mechanism[of "f" "\<Delta>" "_" "_" "epsilon1" "epsilon2"]
         pointwise_spmf_bound_imp_pure_dp[of "(\<lambda>l. discrete_laplace_mechanism f \<Delta> epsilon1 epsilon2 l)" "epsilon1/epsilon2"] 
