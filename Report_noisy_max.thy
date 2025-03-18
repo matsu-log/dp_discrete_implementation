@@ -1400,9 +1400,11 @@ proof-
             have i2:"nat i \<le> length cs - 1"
               using H set_zip_rightD by fastforce
             have i:"i = [1+int (length ra) ..int(length cs - 1)] ! ?n"
-              using H i1 i2 unfolding in_set_zip by simp
-            have r:"r = rc ! ?n"
-              using H i i1 i2 unfolding in_set_zip by fastforce
+              using H i1 i2 unfolding in_set_zip by auto
+            have i':"(\<And>n. n<length [1+int (length ra).. int(length cs - 1)] \<Longrightarrow> i = [1+int (length ra) ..int(length cs - 1)] ! n \<Longrightarrow> n = ?n)"
+              using H i1 i2 unfolding in_set_zip snd_conv by simp
+            have r:"r = map real_of_int rc ! ?n"
+              using H i' i1 i2 unfolding in_set_zip fst_conv snd_conv by auto
             show "(r,i) = (snd (fst ?x) - fst (fst ?x) y, snd ?x)"
               unfolding fst_conv snd_conv using r apply simp
               apply(rewrite nth_map)
