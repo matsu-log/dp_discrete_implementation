@@ -7,279 +7,44 @@ begin
 
 subsection \<open>Auxiliary Lemmas for pointwise_spmf_bound_imp_pure_dp\<close>
 
-definition int_family :: "nat \<Rightarrow> int set" where
-"int_family n = (if even n then {n div 2} else {-((n+1) div 2)})"
-
-lemma disjoint_family_int_family:
-"disjoint_family int_family"
-  unfolding disjoint_family_on_def UNIV_def
-proof(clarify)
-  fix m n::nat
-  assume mn:"m \<noteq> n"
-  show "int_family m \<inter> int_family n = {}"
-    unfolding int_family_def
-  proof -
-    have 1:"even m \<Longrightarrow> even n \<Longrightarrow>int n div 2 \<noteq> int m div 2"
-      using mn by fastforce
-    have 2:"odd m \<Longrightarrow> odd n \<Longrightarrow> int n div 2 \<noteq> int m div 2"
-      using mn 
-      by (metis bit_eq_rec even_of_nat nat_int_comparison(1))
-    show "(if even m then {int m div 2} else {- ((int m + 1) div 2)}) \<inter> (if even n then {int n div 2} else {- ((int n + 1) div 2)}) = {}" 
-      using 1 2 mn by auto
-  qed
-qed
-
-lemma int_family_eq_for_positive:
-  assumes "0\<le>x"
-  shows "{x} = int_family (nat (2*x))"
-  unfolding int_family_def
-proof - 
-  have "nat (2* x) = 2 * nat x"
-    by simp
-  then have "even (nat (2 * x))" 
-    by simp
-  then show "{x} = (if even (nat (2 * x)) then {int (nat (2 * x)) div 2} else {- ((int (nat (2 * x)) + 1) div 2)})"
-    using assms by simp
-qed 
-
-lemma int_family_eq_for_negative:
-  assumes "x<0"
-  shows "{x} = int_family (nat(-2*x-1))"
-  unfolding int_family_def
-proof -
-  have "\<not> even (nat (-2*x-1))"
-  proof -        
-    have 1:"nat (-2*x-1) = 2*nat(-x) -1"        
-      using assms by simp
-    have 2:"\<not> even (2*nat(-x) -1)"        
-      using assms by simp
-    show ?thesis
-      using 1 2 by simp
-  qed
-  then show "{x} = (if even (nat (- 2 * x - 1)) then {int (nat (- 2 * x - 1)) div 2} else {- ((int (nat (- 2 * x - 1)) + 1) div 2)})"
-    using assms by simp
-qed
-
-lemma int_family_union:
-"\<Union> (range int_family) = UNIV"
-proof
-  show "\<Union> (range int_family) \<subseteq> UNIV"
-    by simp
-  show "UNIV \<subseteq> \<Union> (range int_family)"
-  proof
-    fix x::int
-    assume "x \<in> UNIV"
-    show "x \<in> \<Union> (range int_family)"
-    proof(cases "x<0")
-      case True
-      show ?thesis
-      proof 
-        show "nat(-2*x-1) \<in> UNIV"
-          by simp
-        show "x \<in> int_family (nat(-2*x-1))"
-          using int_family_eq_for_negative True
-          by auto
-      qed
-    next
-      case False
-      show ?thesis
-      proof
-        show "2*(nat x)\<in> UNIV"
-          by simp
-        show "x \<in> int_family (2*(nat x))"
-          unfolding int_family_def
-          using False 
-          by simp
-      qed
-    qed
-  qed
-qed
-
-lemma suminf_emeasure_spmf_int_family:
-"(\<Sum>i::nat. emeasure (measure_spmf p) (int_family i)) = emeasure (measure_spmf p) (\<Union> (range int_family))"
-  apply(rule suminf_emeasure,simp)
-  using disjoint_family_int_family by simp
-
-definition int_family_set:: "int set \<Rightarrow> nat \<Rightarrow>int set" where 
-"int_family_set A n = (if int_family n \<subseteq> A then int_family n else {})"
-
-lemma disjoint_family_int_family_set:
-"disjoint_family (int_family_set A)"
-  unfolding int_family_set_def
-  using disjoint_family_int_family
-  unfolding disjoint_family_on_def
-  by simp
-
-lemma int_family_set_union:
-"\<Union> (range (int_family_set A)) = A"
-proof
-  show "\<Union> (range (int_family_set A)) \<subseteq> A"
-    unfolding int_family_set_def
-    by auto
-  show "A \<subseteq> \<Union> (range (int_family_set A))"
-    unfolding int_family_set_def
-  proof 
-    fix x
-    assume A:"x\<in>A"
-    show "x \<in> (\<Union>n. if int_family n \<subseteq> A then int_family n else {})"
-    proof(cases "x<0")
-      case True
-      then show ?thesis 
-        using A int_family_eq_for_negative[of "x"]
-        by auto
-    next
-      case False
-      then show ?thesis
-        using A int_family_eq_for_positive[of "x"]
-        by auto
-    qed
-  qed
-qed
-
-lemma suminf_emeasure_spmf_int_family_set:
-"(\<Sum>i::nat. emeasure (measure_spmf p) (int_family_set A i)) = emeasure (measure_spmf p) A"
-proof -
-  have "(\<Sum>i::nat. emeasure (measure_spmf p) (int_family_set A i)) = emeasure (measure_spmf p) (\<Union> (range (int_family_set A)))"
-  apply(rule suminf_emeasure,simp)
-    using disjoint_family_int_family_set by simp
-  also have "... = emeasure (measure_spmf p) A"
-    using int_family_set_union by simp
-  finally show ?thesis by simp
-qed
 
 lemma emeasure_spmf_bound:
-  fixes A::"int set"
+  fixes A
   assumes "\<And>z. spmf p z \<le> c * spmf q z"
-and "0<c"
+    and "0<c"
   shows "emeasure (measure_spmf p) A \<le> c * emeasure (measure_spmf q) A"
 proof -
-  have 1:"emeasure (measure_spmf p) A = (\<Sum>i::nat. emeasure (measure_spmf p) (int_family_set A i))"
-    using suminf_emeasure_spmf_int_family_set
-    by simp
-  have 2:"emeasure (measure_spmf q) A = (\<Sum>i::nat. emeasure (measure_spmf q) (int_family_set A i))"
-    using suminf_emeasure_spmf_int_family_set
-    by simp
-  have 3:"(\<Sum>i::nat. emeasure (measure_spmf p) (int_family_set A i)) \<le>  (\<Sum>i::nat. c *  emeasure (measure_spmf q) (int_family_set A i))"
-    apply(rewrite suminf_le,auto)
-    unfolding int_family_set_def 
-  proof -
-    fix n::nat
-    show "emeasure (measure_spmf p) (if int_family n \<subseteq> A then int_family n else {}) \<le>  c * emeasure (measure_spmf q) (if int_family n \<subseteq> A then int_family n else {})"
-    proof(cases "int_family n \<subseteq> A")
-      case True
-      then show ?thesis
-        unfolding int_family_def
-      proof -
-        have 1:"emeasure (measure_spmf p) {int n div 2} \<le> c * emeasure (measure_spmf q) {int n div 2}"
-        proof(rewrite emeasure_spmf_single, rewrite emeasure_spmf_single)
-          have "ennreal c * ennreal (spmf q (int n div 2)) = ennreal (c * (spmf q (int n div 2)))"
-            using ennreal_mult' assms by simp
-          then show "ennreal (spmf p (int n div 2)) \<le> ennreal c * ennreal (spmf q (int n div 2))"
-            using ennreal_leI assms by simp
-        qed
-        have 2:"emeasure (measure_spmf p) {- (int n div 2) - 1} \<le> c * emeasure (measure_spmf q) {- (int n div 2) - 1}"
-        proof(rewrite emeasure_spmf_single, rewrite emeasure_spmf_single)
-          have "ennreal c * ennreal (spmf q (- (int n div 2) - 1)) = ennreal (c * (spmf q (- (int n div 2) - 1)))"
-            using ennreal_mult' assms by simp
-          then show "ennreal (spmf p (- (int n div 2) - 1)) \<le> ennreal c * ennreal (spmf q (- (int n div 2) - 1))"
-            using ennreal_leI assms by simp
-        qed
-        show "emeasure (measure_spmf p) (if (if even n then {int n div 2} else {- ((int n + 1) div 2)}) \<subseteq> A then if even n then {int n div 2} else {- ((int n + 1) div 2)} else {})
-    \<le> ennreal c * emeasure (measure_spmf q) (if (if even n then {int n div 2} else {- ((int n + 1) div 2)}) \<subseteq> A then if even n then {int n div 2} else {- ((int n + 1) div 2)} else {})"
-          using 1 2 by simp
-      qed
-    next
-      case False
-      then show ?thesis by simp
+  have "emeasure (measure_spmf p) A = \<integral>\<^sup>+ x. ennreal (spmf p x) \<partial>count_space A"
+    by (simp add: nn_integral_spmf)
+  moreover have "emeasure (measure_spmf q) A = \<integral>\<^sup>+ x. ennreal (spmf q x) \<partial>count_space A"
+    by (simp add: nn_integral_spmf)
+  ultimately show ?thesis
+  proof (simp)
+    have "(\<integral>\<^sup>+ x. ennreal (spmf p x) \<partial>count_space A)
+        \<le> (\<integral>\<^sup>+ x. ennreal (c * spmf q x) \<partial>count_space A)"
+      by (meson assms(1) ennreal_leI nn_integral_mono)
+    also have "(\<integral>\<^sup>+ x. ennreal (c * spmf q x) \<partial>count_space A)
+       =  (\<integral>\<^sup>+ x. ennreal c * ennreal (spmf q x) \<partial>count_space A)"
+      using ennreal_mult'' by auto
+    also have "... = ennreal c *  \<integral>\<^sup>+ x. ennreal (spmf q x) \<partial>count_space A"
+    proof (rule nn_integral_cmult)
+      show "(\<lambda>x. ennreal (spmf q x)) \<in> borel_measurable (count_space A)"
+        by simp
     qed
+    finally show "(\<integral>\<^sup>+ x. ennreal (spmf p x) \<partial>count_space A)
+               \<le> ennreal c * \<integral>\<^sup>+ x. ennreal (spmf q x) \<partial>count_space A"
+      by simp
   qed
-  show ?thesis
-    using 1 2 3 by auto
 qed
 
 lemma measure_spmf_bound: 
-  fixes p q:: "int spmf"
+  fixes p q:: "'a spmf"
   assumes "\<And>z. spmf p z \<le> c * spmf q z"
 and "0<c"
   shows "measure (measure_spmf p) A \<le> c * measure (measure_spmf q) A"
 proof - 
   have 1:"emeasure (measure_spmf p) A  \<le>  c * emeasure (measure_spmf q) A"
-    using emeasure_spmf_bound assms by blast
-  have 2:"emeasure (measure_spmf q) A < \<top>"
-    using measure_spmf.emeasure_finite[of "q" "A"] less_top 
-    by blast
-  then show ?thesis 
-    unfolding measure_def
-    using 1 2 assms
-    by (simp add: enn2real_leI ennreal_mult')
-qed
-
-definition nat_family:: "nat set \<Rightarrow> nat \<Rightarrow> nat set" where
-"nat_family A n = (if n\<in>A then {n} else {})"
-
-lemma disjoint_family_nat_family:
-"disjoint_family (nat_family A)"
-  unfolding nat_family_def
-  unfolding disjoint_family_on_def
-  by simp
-
-lemma nat_family_union:
-"\<Union> (range (nat_family A)) = A"
-proof
-  show "\<Union> (range (nat_family A)) \<subseteq> A"
-    unfolding nat_family_def
-    by auto
-  show "A \<subseteq> \<Union> (range (nat_family A))"
-    unfolding nat_family_def
-    by auto
-qed
-
-lemma suminf_emeasure_spmf_nat_family:
-"(\<Sum>i::nat. emeasure (measure_spmf p) (nat_family A i)) = emeasure (measure_spmf p) A"
-proof -
-  have "(\<Sum>i::nat. emeasure (measure_spmf p) (nat_family A i)) = emeasure (measure_spmf p) (\<Union> (range (nat_family A)))"
-  apply(rule suminf_emeasure,simp)
-    using disjoint_family_nat_family by simp
-  also have "... = emeasure (measure_spmf p) A"
-    using nat_family_union by simp
-  finally show ?thesis by simp
-qed
-
-lemma emeasure_spmf_bound_nat:
-  fixes A::"nat set"
-  assumes "\<And>z. spmf p z \<le> c * spmf q z"
-and "0<c"
-  shows "emeasure (measure_spmf p) A \<le> c * emeasure (measure_spmf q) A"
-proof -
-  have 1:"emeasure (measure_spmf p) A = (\<Sum>i::nat. emeasure (measure_spmf p) (nat_family A i))"
-    using suminf_emeasure_spmf_nat_family
-    by simp
-  have 2:"emeasure (measure_spmf q) A = (\<Sum>i::nat. emeasure (measure_spmf q) (nat_family A i))"
-    using suminf_emeasure_spmf_nat_family
-    by simp
-  have 3:"(\<Sum>i::nat. emeasure (measure_spmf p) (nat_family A i)) \<le>  (\<Sum>i::nat. c *  emeasure (measure_spmf q) (nat_family A i))"
-    apply(rewrite suminf_le,auto)
-    unfolding nat_family_def 
-  proof -
-    fix n::nat
-    show "emeasure (measure_spmf p) (if n \<in> A then {n} else {}) \<le> ennreal c * emeasure (measure_spmf q) (if n \<in> A then {n} else {})"
-      apply(simp)
-      apply(rewrite emeasure_spmf_single, rewrite emeasure_spmf_single)
-      using assms(1)[of "n"] assms(2) ennreal_mult'[of "c" "spmf q n"] ennreal_leI
-      by fastforce
-  qed
-  show ?thesis
-    using 1 2 3 by auto
-qed
-
-lemma measure_spmf_bound_nat: 
-  fixes p q:: "nat spmf"
-  assumes "\<And>z. spmf p z \<le> c * spmf q z"
-and "0<c"
-  shows "measure (measure_spmf p) A \<le> c * measure (measure_spmf q) A"
-proof - 
-  have 1:"emeasure (measure_spmf p) A  \<le>  c * emeasure (measure_spmf q) A"
-    using emeasure_spmf_bound_nat assms by simp
+    using emeasure_spmf_bound assms by auto
   have 2:"emeasure (measure_spmf q) A < \<top>"
     using measure_spmf.emeasure_finite[of "q" "A"] less_top 
     by blast
@@ -358,9 +123,9 @@ shows "\<bar>q l1 - q l2\<bar>\<le> \<Delta>"
   using assms 
   unfolding is_sensitivity_def
   by auto
-  
+
 lemma pointwise_spmf_bound_imp_pure_dp:
-  fixes M::"('a, int) mechanism"
+  fixes M::"('a, 'b) mechanism"
   assumes "\<And>z l1 l2. (l1, l2)\<in>adj \<Longrightarrow> spmf (M l1)z \<le> exp (\<epsilon>) * spmf (M l2)z"
 shows "pure_dp M \<epsilon>"
 proof(rule pure_dp_inequality_imp_pure_dp,clarify)
@@ -369,26 +134,9 @@ proof(rule pure_dp_inequality_imp_pure_dp,clarify)
   show "pure_dp_inequality (M h1) (M h2) \<epsilon>"
     unfolding pure_dp_inequality_def DP_inequality_def
   proof
-    fix A::"int set"
+    fix A
     show "Sigma_Algebra.measure (measure_spmf (M h1)) A \<le> exp \<epsilon> * Sigma_Algebra.measure (measure_spmf (M h2)) A+0"
       using measure_spmf_bound[of "M h1" "exp(\<epsilon>)" "M h2"] assms[of "h1" "h2"] exp_gt_zero adj
-      by simp
-  qed
-qed
-
-lemma pointwise_spmf_bound_imp_pure_dp_nat:
-  fixes M::"('a, nat) mechanism"
-  assumes "\<And>z l1 l2. (l1, l2)\<in>adj \<Longrightarrow> spmf (M l1)z \<le> exp (\<epsilon>) * spmf (M l2)z"
-shows "pure_dp M \<epsilon>"
-proof(rule pure_dp_inequality_imp_pure_dp,clarify)
-  fix h1 h2:: "'a list"
-  assume adj:"(h1, h2)\<in> adj"
-  show "pure_dp_inequality (M h1) (M h2) \<epsilon>"
-    unfolding pure_dp_inequality_def DP_inequality_def
-  proof
-    fix A::"nat set"
-    show "Sigma_Algebra.measure (measure_spmf (M h1)) A \<le> exp \<epsilon> * Sigma_Algebra.measure (measure_spmf (M h2)) A+0"
-      using measure_spmf_bound_nat[of "M h1" "exp(\<epsilon>)" "M h2"] assms[of "h1" "h2"] exp_gt_zero adj
       by simp
   qed
 qed

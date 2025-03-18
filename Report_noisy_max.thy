@@ -1960,7 +1960,7 @@ lemma pure_dp_report_noisy_max:
 and "is_count_queries cs"
   shows "pure_dp (report_noisy_max cs epsilon1 epsilon2) (epsilon1/epsilon2)"
   using pointwise_pure_dp_inequality_report_noisy_max[of "cs" _ _ _ "epsilon1" "epsilon2"]
-        pointwise_spmf_bound_imp_pure_dp_nat[of "(\<lambda>l. report_noisy_max cs epsilon1 epsilon2 l)" "epsilon1/epsilon2"] 
+        pointwise_spmf_bound_imp_pure_dp[of "(\<lambda>l. report_noisy_max cs epsilon1 epsilon2 l)" "epsilon1/epsilon2"] 
         assms
   by simp
 
