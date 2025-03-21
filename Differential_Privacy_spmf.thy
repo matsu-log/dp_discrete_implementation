@@ -5,7 +5,7 @@ theory Differential_Privacy_spmf
           "Differential_Privacy.Differential_Privacy_Standard"
 begin
 
-subsection \<open>Auxiliary Lemmas for pointwise_spmf_bound_imp_pure_dp\<close>
+subsection \<open>Auxiliary Lemmas\<close>
 
 
 lemma emeasure_spmf_bound:
@@ -54,6 +54,24 @@ proof -
     by (simp add: enn2real_leI ennreal_mult')
 qed
 
+lemma lossless_spmf_imp_measurable_as_measure:
+  assumes "\<And>x. lossless_spmf (M x)"
+  shows "measure_spmf \<circ> M \<in> (count_space UNIV) \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
+proof(rewrite measurable_count_space_eq1)
+  show "measure_spmf \<circ> M \<in> UNIV \<rightarrow> space (prob_algebra (count_space UNIV))" 
+  proof
+    fix x
+    have "emeasure (measure_spmf (M x)) (space (measure_spmf (M x))) = 1"
+      using assms space_measure_spmf[of "M x"]
+      unfolding lossless_spmf_def weight_spmf_def
+      by (simp add: measure_spmf.emeasure_eq_measure)
+    then have "prob_space (measure_spmf (M x))"
+      by (rule prob_spaceI)
+    then show "(measure_spmf \<circ> M) x \<in> space (prob_algebra (count_space UNIV))"
+      apply(rewrite space_prob_algebra)
+      by(auto)
+  qed
+qed
 
 subsection \<open>Define pure_dp\<close>
 
@@ -102,7 +120,6 @@ subsection \<open>lemmas for pure_dp\<close>
 lemma adj_sym: "sym adj"
   unfolding adj_def neighbour.simps sym_def
   by fast
-  
 
 lemma pure_dp_inequality_imp_pure_dp:
   assumes "\<forall>(l1, l2)\<in>adj. pure_dp_inequality (M l1) (M l2) \<epsilon>"
@@ -176,24 +193,27 @@ proof(rewrite differential_privacy_adj_sym)
   qed
 qed
 
-lemma lossless_spmf_imp_measurable_as_measure:
-  assumes "\<And>x. lossless_spmf (M x)"
-  shows "measure_spmf \<circ> M \<in> (count_space UNIV) \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
-proof(rewrite measurable_count_space_eq1)
-  show "measure_spmf \<circ> M \<in> UNIV \<rightarrow> space (prob_algebra (count_space UNIV))" 
-  proof
-    fix x
-    have "emeasure (measure_spmf (M x)) (space (measure_spmf (M x))) = 1"
-      using assms space_measure_spmf[of "M x"]
-      unfolding lossless_spmf_def weight_spmf_def
-      by (simp add: measure_spmf.emeasure_eq_measure)
-    then have "prob_space (measure_spmf (M x))"
-      by (rule prob_spaceI)
-    then show "(measure_spmf \<circ> M) x \<in> space (prob_algebra (count_space UNIV))"
-      apply(rewrite space_prob_algebra)
-      by(auto)
-  qed
-qed
+(*
+(* use differential_privacy_postprocess, but proof is incomplete due to differences in definitions of postprocess.*)
+
+lemma dp_postprocess_theorem':
+  assumes "pure_dp M \<epsilon>" and "0 \<le> \<epsilon>"
+and lossless_M:"\<And>x. lossless_spmf (M x)"
+  shows "pure_dp (postprocess M pp) \<epsilon>"
+proof -
+  have 1:"measure_spmf \<circ> M \<in> count_space UNIV \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
+    using lossless_M lossless_spmf_imp_measurable_as_measure by auto
+  have 2:"(\<lambda>x. measure_pmf (return_pmf (pp x))) \<in> count_space UNIV \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
+    sorry
+  have 3:"(\<lambda>x. measure_spmf (M x) \<bind> (\<lambda>y. measure_pmf (return_pmf (pp y)))) =(\<lambda>x. measure_spmf (M x \<bind> (\<lambda>A. return_spmf (pp A))))"
+    sorry
+  show ?thesis
+    using differential_privacy_postprocessing[of "\<epsilon>" "measure_spmf \<circ> M" "adj" "0" "count_space UNIV" "count_space UNIV" "\<lambda>A. return_pmf (pp A)" "count_space UNIV"]
+          assms 1 2 3
+    unfolding pure_dp_def o_def postprocess_def
+    by simp
+qed 
+*)
 
 lemma prod_measurable:
   fixes N::"'a list \<times>'b \<Rightarrow> 'c spmf"
@@ -206,7 +226,6 @@ and "countable (UNIV::'b set)"
   using assms apply simp_all
   using  lossless_spmf_imp_measurable_as_measure assms
   by force
-  
 
 lemma pure_dp_comp:
   fixes M::"('a, 'b) mechanism" and N::"'a list \<times> 'b \<Rightarrow>'c spmf"
@@ -217,7 +236,6 @@ and lossless_N:"\<And>x y. lossless_spmf (N (x,y))"
 and "0\<le>\<epsilon>" and "0\<le>\<epsilon>'"
 and "countable (UNIV::'a list set)" and "countable (UNIV::'b set)"
 shows "pure_dp (\<lambda>x. bind_spmf  (M x) (\<lambda>y. N (x, y))) (\<epsilon>+\<epsilon>')"
-  using M N
   unfolding pure_dp_def 
 proof -
   have 1:" \<And>y. (\<lambda>x. (measure_spmf \<circ> N) (x, y)) = (measure_spmf \<circ> (\<lambda>x. N (x, y)))"
@@ -245,7 +263,9 @@ proof -
   then show "differential_privacy (measure_spmf \<circ> (\<lambda>x. M x \<bind> (\<lambda>y. N (x, y)))) adj (\<epsilon> + \<epsilon>') 0"
     using 2 by simp
 qed
-(*
+
+(* use differential_privacy_composition_adaptive' and without the assumption of countability*)
+
 lemma pure_dp_comp':
   fixes M::"('a, 'b) mechanism" and N::"'a list \<times> 'b \<Rightarrow>'c spmf"
   assumes M:"pure_dp M \<epsilon>"
@@ -254,41 +274,22 @@ and lossless_M:"\<And>x. lossless_spmf (M x)"
 and lossless_N:"\<And>x y. lossless_spmf (N (x,y))"
 and "0\<le>\<epsilon>" and "0\<le>\<epsilon>'"
 shows "pure_dp (\<lambda>x. bind_spmf  (M x) (\<lambda>y. N (x, y))) (\<epsilon>+\<epsilon>')"
-  using M N
-  unfolding pure_dp_def 
+  unfolding pure_dp_def
 proof -
-  have 1:" \<And>y. (\<lambda>x. (measure_spmf \<circ> N) (x, y)) = (measure_spmf \<circ> (\<lambda>x. N (x, y)))"
-    unfolding o_def
-    by simp                                                                            
-  have 2:"(\<lambda>x. (measure_spmf \<circ> M) x \<bind> (\<lambda>y. (measure_spmf \<circ> N) (x, y))) = (measure_spmf \<circ> (\<lambda>x. M x \<bind> (\<lambda>y. N (x, y))))"
-    using measure_spmf_bind
-    unfolding o_def
-    by metis
-  have 3:"measure_spmf \<circ> M \<in> (count_space UNIV) \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
-    using lossless_M lossless_spmf_imp_measurable_as_measure
-    by auto
-  have 4:"\<forall>x\<in>space (count_space UNIV). (\<lambda>y. (measure_spmf \<circ> N) (x, y)) \<in> count_space UNIV \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"  
-  proof 
-    fix x
-    have p:"(\<lambda>y. (measure_spmf \<circ> N) (x, y)) = (measure_spmf \<circ> (\<lambda>y. N(x, y)))"
-      by auto
-    show "(\<lambda>y. (measure_spmf \<circ> N) (x, y)) \<in> count_space UNIV \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
-      apply(rewrite p)
-      using lossless_N lossless_spmf_imp_measurable_as_measure[of "(\<lambda>y. N(x, y))"]
-      by simp
-  qed
-  have 5:"differential_privacy (measure_spmf \<circ> M) adj \<epsilon> 0 "
-    using M unfolding pure_dp_def by simp
-  have 6:"\<forall>y\<in>space (count_space UNIV). differential_privacy (\<lambda>x. (measure_spmf \<circ> N) (x, y)) adj \<epsilon>' 0"
-    using N unfolding pure_dp_def 
-    by (simp add: o_def)
-  have "differential_privacy (\<lambda>x. (measure_spmf \<circ> M) x \<bind> (\<lambda>y. (measure_spmf \<circ> N) (x, y))) adj (\<epsilon> + \<epsilon>') (0 + 0)"
-    using differential_privacy_composition_adaptive'[of "\<epsilon>" "\<epsilon>'" "measure_spmf \<circ> M" "count_space UNIV" "count_space UNIV" "adj" "0"
-                                                   "measure_spmf \<circ> N" "count_space UNIV"]
-                                                 3 4 5 6 assms
-    
-  then show "differential_privacy (measure_spmf \<circ> (\<lambda>x. M x \<bind> (\<lambda>y. N (x, y)))) adj (\<epsilon> + \<epsilon>') 0"
-    using 2 by simp
+  have 1:"(measure_spmf \<circ> (\<lambda>x. M x \<bind> (\<lambda>y. N (x, y)))) = (\<lambda>x. (measure_spmf \<circ> M) x \<bind> (\<lambda>y. (measure_spmf \<circ> N) (x, y)))"
+    using measure_spmf_bind unfolding o_def by metis
+  have 2:"measure_spmf \<circ> M \<in> count_space UNIV \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
+    using lossless_M lossless_spmf_imp_measurable_as_measure by auto
+  have 3:"\<forall>x\<in>space (count_space UNIV). (\<lambda>y. (measure_spmf \<circ> N) (x, y)) \<in> count_space UNIV \<rightarrow>\<^sub>M prob_algebra (count_space UNIV)"
+    using lossless_N lossless_spmf_imp_measurable_as_measure unfolding o_def by metis
+  have 4:"differential_privacy (measure_spmf \<circ> M) adj \<epsilon> 0"
+    using assms unfolding pure_dp_def by simp
+  have 5:"\<forall>y\<in>space (count_space UNIV). differential_privacy (\<lambda>x. (measure_spmf \<circ> N) (x, y)) adj \<epsilon>' 0 "
+    using assms unfolding pure_dp_def o_def by simp
+  show "differential_privacy (measure_spmf \<circ> (\<lambda>x. M x \<bind> (\<lambda>y. N (x, y)))) adj (\<epsilon> + \<epsilon>') 0 "
+    using differential_privacy_composition_adaptive'[of "\<epsilon>" "\<epsilon>'" "measure_spmf \<circ> M" "count_space UNIV" "count_space UNIV" "adj" "0" "measure_spmf \<circ> N" "count_space UNIV" "0"]
+          assms 1 2 3 4 5
+    by simp
 qed
-*)
+
 end
