@@ -1,15 +1,15 @@
 theory Code_Generation_sampler
   imports "Executable_Randomized_Algorithms.Randomized_Algorithm"
-          "Bernoulli_exp_minus_rat"
-          "Bernoulli_rat"
-          "Discrete_Laplace_rat"
-          "Probabilistic_While.Fast_Dice_Roll"
+    "Bernoulli_exp_minus_rat"
+    "Bernoulli_rat"
+    "Discrete_Laplace_rat"
+    "Probabilistic_While.Fast_Dice_Roll"
 begin
 context fixes n :: nat notes [[function_internals]] begin
 
 partial_function (random_alg) fast_dice_roll_ra :: "nat \<Rightarrow> nat \<Rightarrow> nat random_alg"
-where
-  "fast_dice_roll_ra v c = 
+  where
+    "fast_dice_roll_ra v c = 
   (if v \<ge> n then if c < n then return_ra c else fast_dice_roll_ra (v - n) (c - n)
    else do {
      b \<leftarrow> coin_ra;
@@ -22,7 +22,7 @@ definition fast_uniform_ra :: "nat random_alg"
 end
 
 lemma fast_dice_roll_ra_correct:
-"spmf_of_ra (fast_dice_roll_ra n v c) = fast_dice_roll n v c"
+  "spmf_of_ra (fast_dice_roll_ra n v c) = fast_dice_roll n v c"
 proof -
   include lifting_syntax
   have "((=) ===> rel_spmf_of_ra) (\<lambda>pair. fast_dice_roll n (fst pair) (snd pair)) (\<lambda>pair. fast_dice_roll_ra n (fst pair) (snd pair))"
@@ -39,7 +39,7 @@ proof -
 qed
 
 lemma fast_uniform_ra_correct:
-"spmf_of_ra (fast_uniform_ra n)= (fast_uniform n)"
+  "spmf_of_ra (fast_uniform_ra n)= (fast_uniform n)"
   unfolding fast_uniform_def fast_uniform_ra_def
   by (simp add: fast_dice_roll_ra_correct)
 
@@ -55,7 +55,7 @@ lemma fast_uniform_ra_transfer [transfer_rule]:
 end
 
 definition bernoulli_rat_ra :: "nat \<Rightarrow> nat \<Rightarrow> bool random_alg" where
-"bernoulli_rat_ra n d = 
+  "bernoulli_rat_ra n d = 
   (if d=0 then return_ra False
    else do {
             x \<leftarrow> fast_uniform_ra d;
@@ -68,7 +68,7 @@ lemma spmf_of_ra_if:
   by (simp add: assms(1) assms(2))
 
 lemma bernoulli_rat_ra_correct:
-"spmf_of_ra (bernoulli_rat_ra n d) = bernoulli_rat n d"
+  "spmf_of_ra (bernoulli_rat_ra n d) = bernoulli_rat n d"
   unfolding bernoulli_rat_def bernoulli_rat_ra_def
   by(rule spmf_of_ra_if,simp add: spmf_of_ra_simps, simp add:fast_uniform_ra_correct spmf_of_ra_simps)
 
@@ -85,7 +85,7 @@ end
 
 context notes [[function_internals]] begin
 partial_function (random_alg) bernoulli_exp_minus_rat_from_0_to_1_loop_ra :: "rat  \<Rightarrow> nat  \<Rightarrow> nat random_alg" where
- "bernoulli_exp_minus_rat_from_0_to_1_loop_ra p k = 
+  "bernoulli_exp_minus_rat_from_0_to_1_loop_ra p k = 
     do {
        a \<leftarrow> let (n,d) = quotient_of p in bernoulli_rat_ra (nat n) (nat (d*k));
       if a then bernoulli_exp_minus_rat_from_0_to_1_loop_ra p (k+1) else return_ra k
@@ -128,7 +128,7 @@ definition bernoulli_exp_minus_rat_ra :: "rat  \<Rightarrow> bool random_alg" wh
 "
 
 lemma bernoulli_exp_minus_rat_from_0_to_1_loop_ra_correct:
-"spmf_of_ra (bernoulli_exp_minus_rat_from_0_to_1_loop_ra p k) = bernoulli_exp_minus_rat_from_0_to_1_loop p k"
+  "spmf_of_ra (bernoulli_exp_minus_rat_from_0_to_1_loop_ra p k) = bernoulli_exp_minus_rat_from_0_to_1_loop p k"
 proof -
   include lifting_syntax
   have "((=) ===> rel_spmf_of_ra) (\<lambda>pair. bernoulli_exp_minus_rat_from_0_to_1_loop (fst pair) (snd pair)) (\<lambda>pair. bernoulli_exp_minus_rat_from_0_to_1_loop_ra (fst pair) (snd pair))"
@@ -182,7 +182,7 @@ proof -
 qed
 
 lemma bernoulli_exp_minus_rat_from_0_to_1_ra_correct:
-"spmf_of_ra (bernoulli_exp_minus_rat_from_0_to_1_ra p) = bernoulli_exp_minus_rat_from_0_to_1 p"
+  "spmf_of_ra (bernoulli_exp_minus_rat_from_0_to_1_ra p) = bernoulli_exp_minus_rat_from_0_to_1 p"
   unfolding bernoulli_exp_minus_rat_from_0_to_1_def bernoulli_exp_minus_rat_from_0_to_1_ra_def
   by(simp add: spmf_of_ra_simps bernoulli_exp_minus_rat_from_0_to_1_loop_ra_correct,rule bind_spmf_cong,simp_all add:spmf_of_ra_simps)
 
@@ -198,7 +198,7 @@ lemma bernoulli_exp_minus_rat_from_0_to_1_ra_transfer [transfer_rule]:
 end
 
 lemma bernoulli_exp_minus_rat_loop_ra_correct:
-"spmf_of_ra (bernoulli_exp_minus_rat_loop_ra k) = bernoulli_exp_minus_rat_loop k"
+  "spmf_of_ra (bernoulli_exp_minus_rat_loop_ra k) = bernoulli_exp_minus_rat_loop k"
 proof -
   include lifting_syntax
   have "((=) ===> rel_spmf_of_ra) bernoulli_exp_minus_rat_loop  bernoulli_exp_minus_rat_loop_ra"
@@ -207,14 +207,14 @@ proof -
     using bernoulli_exp_minus_rat_loop.mono 
     apply(simp)
     using bernoulli_exp_minus_rat_loop_ra.mono 
-     apply(simp)
+    apply(simp)
     by transfer_prover
   thus ?thesis
     unfolding rel_fun_def rel_spmf_of_ra_def by simp
 qed
 
 lemma bernoulli_exp_minus_rat_ra_correct:
-"spmf_of_ra (bernoulli_exp_minus_rat_ra p) = bernoulli_exp_minus_rat p"
+  "spmf_of_ra (bernoulli_exp_minus_rat_ra p) = bernoulli_exp_minus_rat p"
   unfolding bernoulli_exp_minus_rat_def bernoulli_exp_minus_rat_ra_def
   by(simp add: spmf_of_ra_simps bernoulli_exp_minus_rat_from_0_to_1_ra_correct bernoulli_exp_minus_rat_loop_ra_correct spmf_of_ra_if)
 
@@ -231,7 +231,7 @@ end
 
 context notes [[function_internals]] begin
 partial_function (random_alg) discrete_laplace_rat_unit_loop1_ra :: "nat \<Rightarrow> nat random_alg" where 
-"discrete_laplace_rat_unit_loop1_ra t = do {
+  "discrete_laplace_rat_unit_loop1_ra t = do {
   u::nat \<leftarrow> fast_uniform_ra t;
   d::bool \<leftarrow> bernoulli_exp_minus_rat_ra (Rat.Fract u t);
   if d then return_ra u else discrete_laplace_rat_unit_loop1_ra t 
@@ -242,7 +242,7 @@ declare discrete_laplace_rat_unit_loop1_ra.simps[code]
 
 context notes [[function_internals]] begin
 partial_function (random_alg) discrete_laplace_rat_unit_loop2_ra :: "nat \<Rightarrow> nat random_alg" where
-"discrete_laplace_rat_unit_loop2_ra v = do {
+  "discrete_laplace_rat_unit_loop2_ra v = do {
               a \<leftarrow> bernoulli_exp_minus_rat_ra 1;
               if a = False then return_ra v
               else  discrete_laplace_rat_unit_loop2_ra (v+1)
@@ -252,7 +252,7 @@ end
 declare discrete_laplace_rat_unit_loop2_ra.simps[code]
 
 definition discrete_laplace_rat_unit_ra :: "nat \<Rightarrow> nat random_alg" where
-"discrete_laplace_rat_unit_ra t = do {
+  "discrete_laplace_rat_unit_ra t = do {
   u::nat \<leftarrow> discrete_laplace_rat_unit_loop1_ra t;
   v::nat \<leftarrow> discrete_laplace_rat_unit_loop2_ra 0;
   return_ra ((u::nat)+t * v)
@@ -261,7 +261,7 @@ definition discrete_laplace_rat_unit_ra :: "nat \<Rightarrow> nat random_alg" wh
 
 context notes [[function_internals]] begin
 partial_function (random_alg) discrete_laplace_rat_ra :: "nat \<Rightarrow> nat \<Rightarrow> int random_alg" where
-"discrete_laplace_rat_ra t s = do {
+  "discrete_laplace_rat_ra t s = do {
     x::nat \<leftarrow> discrete_laplace_rat_unit_ra t;
     b::bool \<leftarrow> bernoulli_rat_ra 1 2;
     let y = calculate_y x s in
@@ -275,39 +275,39 @@ end
 declare discrete_laplace_rat_ra.simps[code]
 
 lemma discrete_laplace_rat_unit_loop1_ra_correct:
-"spmf_of_ra (discrete_laplace_rat_unit_loop1_ra t) = discrete_laplace_rat_unit_loop1 t"
+  "spmf_of_ra (discrete_laplace_rat_unit_loop1_ra t) = discrete_laplace_rat_unit_loop1 t"
 proof-
   include lifting_syntax
   have "((=) ===> rel_spmf_of_ra) discrete_laplace_rat_unit_loop1 discrete_laplace_rat_unit_loop1_ra"
-  unfolding discrete_laplace_rat_unit_loop1_def discrete_laplace_rat_unit_loop1_ra_def
-  apply(rule fixp_ra_parametric)
-  using discrete_laplace_rat_unit_loop1.mono
+    unfolding discrete_laplace_rat_unit_loop1_def discrete_laplace_rat_unit_loop1_ra_def
+    apply(rule fixp_ra_parametric)
+    using discrete_laplace_rat_unit_loop1.mono
     apply(simp)
-  using discrete_laplace_rat_unit_loop1_ra.mono
-   apply(simp)
-  by(transfer_prover)
+    using discrete_laplace_rat_unit_loop1_ra.mono
+    apply(simp)
+    by(transfer_prover)
   thus ?thesis
     unfolding rel_fun_def rel_spmf_of_ra_def by simp
 qed
 
 lemma discrete_laplace_rat_unit_loop2_ra_correct:
-"spmf_of_ra (discrete_laplace_rat_unit_loop2_ra v) = discrete_laplace_rat_unit_loop2 v"
+  "spmf_of_ra (discrete_laplace_rat_unit_loop2_ra v) = discrete_laplace_rat_unit_loop2 v"
 proof-
   include lifting_syntax
   have "((=) ===> rel_spmf_of_ra) discrete_laplace_rat_unit_loop2 discrete_laplace_rat_unit_loop2_ra"
-  unfolding discrete_laplace_rat_unit_loop2_def discrete_laplace_rat_unit_loop2_ra_def
-  apply(rule fixp_ra_parametric)
-  using discrete_laplace_rat_unit_loop2.mono
+    unfolding discrete_laplace_rat_unit_loop2_def discrete_laplace_rat_unit_loop2_ra_def
+    apply(rule fixp_ra_parametric)
+    using discrete_laplace_rat_unit_loop2.mono
     apply(simp)
-  using discrete_laplace_rat_unit_loop2_ra.mono
-   apply(simp)
-  by(transfer_prover)
+    using discrete_laplace_rat_unit_loop2_ra.mono
+    apply(simp)
+    by(transfer_prover)
   thus ?thesis
     unfolding rel_fun_def rel_spmf_of_ra_def by simp
 qed
 
 lemma discrete_laplace_rat_unit_ra_correct:
-"spmf_of_ra (discrete_laplace_rat_unit_ra t) = discrete_laplace_rat_unit t"
+  "spmf_of_ra (discrete_laplace_rat_unit_ra t) = discrete_laplace_rat_unit t"
   unfolding discrete_laplace_rat_unit_def discrete_laplace_rat_unit_ra_def
   by(simp add: spmf_of_ra_simps discrete_laplace_rat_unit_loop1_ra_correct discrete_laplace_rat_unit_loop2_ra_correct)
 
@@ -324,7 +324,7 @@ lemma discrete_laplace_rat_unit_ra_transfer [transfer_rule]:
 end
 
 lemma discrete_laplace_rat_ra_correct:
-"spmf_of_ra (discrete_laplace_rat_ra t s) = discrete_laplace_rat t s"
+  "spmf_of_ra (discrete_laplace_rat_ra t s) = discrete_laplace_rat t s"
 proof-
   include lifting_syntax
   have "((=) ===> rel_spmf_of_ra) (\<lambda>pair. discrete_laplace_rat  (fst pair) (snd pair)) (\<lambda>pair. discrete_laplace_rat_ra  (fst pair) (snd pair))"
@@ -332,9 +332,9 @@ proof-
     apply(simp add: Basic_BNF_LFPs.xtor_rel)
     apply(rule fixp_ra_parametric)
     using discrete_laplace_rat.mono
-      apply(simp)
+    apply(simp)
     using discrete_laplace_rat_ra.mono
-     apply(simp)
+    apply(simp)
     unfolding Let_def curry_def rel_fun_def rel_spmf_of_ra_def
     apply(simp add: spmf_of_ra_simps discrete_laplace_rat_unit_ra_correct bernoulli_rat_ra_correct spmf_of_ra_if)
     by presburger

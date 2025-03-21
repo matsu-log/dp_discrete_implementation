@@ -1,15 +1,15 @@
 section \<open>Bernoulli distribution that take exp(-p) as parameter, where p is a rational number\<close>
 theory Bernoulli_exp_minus_rat
   imports "Probabilistic_While.While_SPMF"
-          "HOL-Probability.Probability"
-          "Bernoulli_rat"
-          "Bernoulli_exp_minus_real"
+    "HOL-Probability.Probability"
+    "Bernoulli_rat"
+    "Bernoulli_exp_minus_real"
 begin
 
 subsection \<open>Definite bernoulli_exp_minus_rat\<close>
 context notes [[function_internals]] begin
 partial_function (spmf) bernoulli_exp_minus_rat_from_0_to_1_loop :: "rat  \<Rightarrow> nat  \<Rightarrow> nat spmf" where
- "bernoulli_exp_minus_rat_from_0_to_1_loop \<gamma> k = 
+  "bernoulli_exp_minus_rat_from_0_to_1_loop \<gamma> k = 
     do {
        a \<leftarrow> let (n,d) = quotient_of \<gamma> in bernoulli_rat (nat n) (nat (d*k));
       if a then bernoulli_exp_minus_rat_from_0_to_1_loop \<gamma> (k+1) else return_spmf k
@@ -57,11 +57,11 @@ lemma bernoulli_exp_minus_rat_from_0_to_1_loop_fixp_induct [case_names adm botto
 
 lemma bernoulli_exp_minus_rat_loop_fixp_induct [case_names adm bottom step]:
   assumes "spmf.admissible P"
-and "P (\<lambda>bernoulli_exp_minus_rat_loop. return_pmf None)"
-and "(\<And>k. P k \<Longrightarrow>
+    and "P (\<lambda>bernoulli_exp_minus_rat_loop. return_pmf None)"
+    and "(\<And>k. P k \<Longrightarrow>
       P (\<lambda>ka. if 1 \<le> ka then bernoulli_exp_minus_rat_from_0_to_1 1 \<bind> (\<lambda>b. if b then k (ka - 1) else return_spmf False)
                else return_spmf True))"
-shows "P bernoulli_exp_minus_rat_loop"
+  shows "P bernoulli_exp_minus_rat_loop"
   using assms by (rule bernoulli_exp_minus_rat_loop.fixp_induct)
 
 lemma sublemma_for_bernoulli_exp_minus_rat_from_0_to_1_loop_eq_bernoulli_exp_minus_real_from_0_to_1_loop:
@@ -80,7 +80,7 @@ proof-
       assume asm:"quotient_of p = (n,d)"    
       have "0\<le>n" and "0\<le>d"
         using asm assms quotient_of_div[of "p" "n" "d"] quotient_of_denom_pos[of "p" "n" "d"]
-            Fract_of_int_quotient zero_le_Fract_iff by(simp_all)
+          Fract_of_int_quotient zero_le_Fract_iff by(simp_all)
       then have "nat n/nat (d*k) = n/(d*k)"
         by simp
       also have "... = of_rat p/k"
@@ -116,7 +116,7 @@ proof -
       then show ?case 
         apply(rewrite bernoulli_exp_minus_real_from_0_to_1_loop.simps)
         apply(rewrite sublemma_for_bernoulli_exp_minus_rat_from_0_to_1_loop_eq_bernoulli_exp_minus_real_from_0_to_1_loop)
-        apply(simp add:assms)
+         apply(simp add:assms)
         apply(clarsimp intro!: ord_spmf_bind_reflI)
         done
     qed
@@ -133,7 +133,7 @@ proof -
       then show ?case 
         apply(rewrite bernoulli_exp_minus_rat_from_0_to_1_loop.simps)
         apply(rewrite sublemma_for_bernoulli_exp_minus_rat_from_0_to_1_loop_eq_bernoulli_exp_minus_real_from_0_to_1_loop)
-        apply(simp add:assms)
+         apply(simp add:assms)
         apply(clarsimp intro!: ord_spmf_bind_reflI)
         done
     qed

@@ -2,14 +2,14 @@ section \<open>Bernoulli distribution that take rational n/d as parameter\<close
 
 theory Bernoulli_rat
   imports "HOL-Probability.Probability"
-          "Probabilistic_While.While_SPMF"
-          "Probabilistic_While.Fast_Dice_Roll"
+    "Probabilistic_While.While_SPMF"
+    "Probabilistic_While.Fast_Dice_Roll"
 begin
 
 subsection \<open>Define bernoulli_rat\<close>
 
 definition bernoulli_rat :: "nat \<Rightarrow> nat \<Rightarrow> bool spmf" where
-"bernoulli_rat n d = 
+  "bernoulli_rat n d = 
   (if d=0 then return_spmf False
    else do {
             x \<leftarrow> fast_uniform d;
@@ -66,7 +66,7 @@ qed
 lemma bernoulli_rat_pos [simp]:
   assumes "1\<le>n/d"
   shows  "spmf (bernoulli_rat n d) True = 1"
-and "spmf (bernoulli_rat n d) False = 0"
+    and "spmf (bernoulli_rat n d) False = 0"
 proof -
   have "d \<le> n" using assms
     using div_less linorder_not_less by fastforce
@@ -82,7 +82,7 @@ qed
 
 context begin interpretation pmf_as_function .
 lemma bernoulli_rat_eq_bernoulli_pmf:
-"bernoulli_rat n d = spmf_of_pmf (bernoulli_pmf (n/d))"
+  "bernoulli_rat n d = spmf_of_pmf (bernoulli_pmf (n/d))"
 proof -
   have true_eq:"spmf (bernoulli_rat n d) True = pmf (bernoulli_pmf (real n / real d)) True"
   proof (cases "1\<le>n/d")
